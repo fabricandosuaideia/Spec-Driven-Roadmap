@@ -1,154 +1,247 @@
 # Handoff Seed — One-Time, Not a Loop
 
+## Contents
+
+- [Goal](#goal) — what this step writes and where
+- [Two surfaces, two lifetimes](#two-surfaces-two-lifetimes) — why status lives in `docs/`, not in `## Handoff`
+- [When this runs](#when-this-runs)
+- [Step 1 — Determine whether real work is in flight](#step-1--determine-whether-real-work-is-in-flight)
+- [Step 2 — Determine which features are actually done](#step-2--determine-which-features-are-actually-done)
+- [Step 3 — Build the roadmap status list](#step-3--build-the-roadmap-status-list)
+- [Step 4 — Find the target feature and its remaining order](#step-4--find-the-target-feature-and-its-remaining-order)
+- [Step 5 — Write the durable Status block (this skill's own file)](#step-5--write-the-durable-status-block-this-skills-own-file)
+- [Step 6 — Write the Handoff (downstream skill's file, its exact schema)](#step-6--write-the-handoff-downstream-skills-file-its-exact-schema)
+- [Step 7 — Report and stop](#step-7--report-and-stop)
+
 ## Goal
 
-After a roadmap closes, write `.specs/STATE.md`'s `## Handoff` section **exactly once** so the
-downstream spec-driven skill's own "resume work" already knows: every roadmap that exists, which ones
-are done, which one is in progress and its remaining build order, and the exact next feature to open.
+After a roadmap closes, make the downstream spec-driven skill able to start the first feature
+without re-deriving anything. That takes **two writes to two different files**, because they have
+two different lifetimes:
+
+1. **`## Status` in this skill's own roadmap file** — the durable backlog picture (every roadmap,
+   what's done, remaining build order). Rewritten freely on every seed; nothing else owns it.
+2. **`## Handoff` in `.specs/STATE.md`** — the downstream skill's own pause snapshot, in **its**
+   exact schema, carrying a pointer back to (1).
+
 This is the entire extent of this skill's involvement in construction — no waiting for PASS, no
-advancing to the next feature automatically, no re-invoking itself. Once this step reports, this
-skill's job is done: every subsequent "specify feature", "resume work", pause, and verify belongs
-entirely to the downstream skill's own normal flow, driven directly by the user or the general agent —
-never routed back through this skill.
+advancing to the next feature automatically, no re-invoking itself. Once this step reports, every
+subsequent "specify feature", "resume work", pause, and verify belongs entirely to the downstream
+skill's normal flow, driven by the user or the general agent.
 
-**This is not Phase 3 of a build loop.** There is no persistent phase here that re-triggers on every
-"resume work", recomputes position on a schedule, or drives feature N+1 after feature N passes. It
-runs once per trigger below, writes one section of one file, and stops. What makes the loop that
-follows "simples e direto" isn't this skill watching over it — it's that the one write below already
-carries everything the downstream skill needs to know before it even asks.
+## Two surfaces, two lifetimes
 
-**Format precedent.** `.specs/STATE.md`'s `## Handoff` is free-form prose between its header and the
-next `##`/EOF — the downstream skill reads it as a narrative snapshot, not a rigidly-parsed template.
-The shape below (every roadmap listed with a DONE/IN-PROGRESS count, a "Remaining" build-order list
-for the one in flight, and per-feature detail deliberately left out and pointed at
-`.specs/features/<name>/validation.md` instead, to keep this section from growing unbounded) is what
-this step writes up front, in one pass, rather than something that has to accrete one session at a
-time by hand.
+**Do not put the backlog picture in `## Handoff`.** For `tlc-spec-driven` (the default downstream
+assumption), `references/memory.md` defines that section as a *"pause snapshot (~500 tokens,
+overwritten each pause)"*, with a trigger table row reading `| Pause work / end of session |
+## Handoff | Replace - overwrite Handoff section only |` and a pause procedure that replaces
+"everything between `## Handoff` and the next `##` or EOF". Its template is **eight fixed fields**.
+Anything extra written there survives exactly until the first `pause work` and is then gone, with no
+mechanism that ever restores it.
+
+The durable half therefore lives in a file this skill owns and the downstream skill never rewrites:
+
+- **Multi-section mode** → a `## Status` block at the top of `docs/ROADMAP-INDEX.md`.
+- **Single-section mode** → a `## Status` block at the top of `docs/ROADMAP.md`.
+
+That location is reachable by the downstream skill: `tlc-spec-driven`'s Knowledge Verification Chain
+Step 2 is *"Project docs → README, docs/, inline comments"*. It will not go there unprompted, which
+is why Step 6's **Next step** field must name the path explicitly.
+
+**Confirm the schema before writing.** The eight-field shape below is `tlc-spec-driven` v3.x's. If
+Phase 0 confirmed a different downstream skill, read that skill's own memory/handoff reference and
+match its schema instead — write only fields it defines, and put the durable half in `docs/`
+regardless.
 
 ## When this runs
 
-- Right after Phase 2 closes a roadmap (its coverage table reads "uncovered: none") — single-section
-  or multi-section, either way.
-- Right after Phase 1 extends an existing index with a brand-new section.
+Only after Phase 2 closes a roadmap (its coverage table reads "uncovered: none", counting the
+`deferred`/`pre-existing` dispositions as covered).
 
-Never run it speculatively "just to check" — it's a write step, not a status query. If the user just
-wants to know what the roadmap says is next without touching `STATE.md`, answer that by reading
-`docs/roadmap*.txt` / `docs/ROADMAP-INDEX.md` and the relevant `validation.md` files directly instead
-of going through this procedure.
+**Phase 1 does not trigger this step.** A newly indexed section has no `docs/roadmap-<slug>.txt`
+yet, so it is `NOT YET DECOMPOSED` — a state Step 4 can never pick a target from, which would burn a
+write on nothing. After Phase 1 extends an index, just report: *"next action: decompose section
+`<slug>`"*, and do not touch `.specs/STATE.md`.
 
-## Step 1 — Check whether it's safe to write
+Never run this speculatively "just to check" — it is a write step, not a status query. To answer
+"what's next?" without writing, read `docs/roadmap*.txt` and the relevant `validation.md` files
+directly.
 
-Read `.specs/STATE.md` if it exists (the exact section format is the downstream skill's own — confirm
-it at Phase 0 if the project uses something other than tlc-spec-driven's `## Decisions` / `## Handoff`
-shape).
+## Step 1 — Determine whether real work is in flight
 
-- **`## Handoff` names a feature with a non-empty "Next step" / "In-progress"** (real work is
-  mid-flight) → **stop.** Do not touch `STATE.md` at all. Report to the user that a feature is
-  already in flight and this roadmap update doesn't change the current position — the downstream
-  skill's own resume will keep picking that feature up exactly as it already does, with no help
-  needed from this skill.
-- **`## Handoff` is empty, says "none", or the file doesn't exist yet** → safe to seed. Continue.
+Read `.specs/STATE.md` if it exists. The question is **not** "is the Handoff non-empty?" — this
+skill's own prior seed always leaves it non-empty, and so does every downstream pause, so an
+emptiness test would permanently block every later seed and no section after the first would ever
+get one. Test for **evidence of actual work** instead:
 
-Never overwrite a non-empty Handoff to "fix" it into pointing at the roadmap — a real in-flight
-feature always wins over a freshly-generated roadmap's opinion of what should be next.
+Work is in flight if **any** of these hold:
 
-## Step 2 — Build the full roadmap status list
+- `## Handoff`'s `**Completed**` field is present and is not `none`.
+- `## Handoff`'s `**In-progress**` field is present and is not `none`.
+- The feature named in `## Handoff` has a `.specs/features/<name>/spec.md` on disk **and** does not
+  have a real PASS (per Step 2's test).
 
-Not just the next feature — every roadmap that exists gets one line, so the downstream skill (and
-whoever reads `STATE.md`) sees the whole shape of the backlog, not a single disconnected pointer:
+If work is in flight → **stop.** Do not write `.specs/STATE.md`. You may still refresh the `## Status`
+block in `docs/` (Step 5) — that file is this skill's own and reflects the roadmap, not the session.
+Report which feature is in flight and that the current position is unchanged.
 
-- **Single-section mode:** one line for `docs/roadmap.txt`: how many of its features already have a
-  PASS `validation.md`, out of the total.
-- **Multi-section mode:** walk `docs/ROADMAP-INDEX.md`'s section order top to bottom. For each section
-  that has a `docs/roadmap-<slug>.txt`, count PASS features out of its total and classify:
-  - **all PASS** → `DONE (X/X, all verified PASS)`.
-  - **some PASS, not all** → `IN PROGRESS (N/M features done, verified PASS)` — this is also the
-    section the target feature (Step 3) comes from.
-  - **none PASS yet, file exists** → `NOT STARTED (0/M)`.
-  - **no `docs/roadmap-<slug>.txt` yet** (Phase 2 hasn't decomposed it) → `NOT YET DECOMPOSED` — note
-    what it depends on per the index, so it's clear why it's waiting.
+If none hold — including when the Handoff is a stale snapshot naming a feature that is already
+verified PASS, or is this skill's own earlier seed — it is safe to write. Continue.
 
-There is at most one section in the `IN PROGRESS` or first-`NOT STARTED` state carrying an actual
-target feature — everything after it in the index order is necessarily untouched yet.
+## Step 2 — Determine which features are actually done
 
-## Step 3 — Find the target feature and its remaining order
+"Done" means a **real PASS**, not the presence of a file. A `validation.md` can exist while being
+empty, still holding the unfilled `[PASS | FAIL]` placeholder, reporting FAIL, or asserting PASS with
+no evidence. Worse, a genuine FAIL report normally contains per-criterion rows reading `| ✅ PASS |`,
+so **never substring-match `PASS` across the whole file** — that reports failed work as done and
+makes the seed skip past it.
 
-- **Single-section mode:** walk `docs/roadmap.txt` top to bottom. The first name without a PASS
-  `.specs/features/<name>/validation.md` is the target. The remaining build order is every name from
-  the target to the end of the file, in order.
-- **Multi-section mode:** within the section identified in Step 2 as `IN PROGRESS` or the first
-  `NOT STARTED`, walk its `docs/roadmap-<slug>.txt` top to bottom the same way. The remaining build
-  order is every name from the target to the end of *that section's* file — sections after it in the
-  index are summarized by Step 2's status line only, not expanded here (their own turn to be expanded
-  comes when the loop actually reaches them and this step runs again).
+**Preferred — run the downstream skill's own gate.** `tlc-spec-driven` ships one:
 
-If every feature across every existing roadmap is already PASS (a refresh added no new buildable
-work), there's nothing to seed — say so and stop. Don't write a Handoff pointing at nothing, and don't
-invent a "next" feature that doesn't exist yet.
+```
+python3 <skill-dir>/scripts/validate_state.py <feature> --root <project-root>
+```
 
-## Step 4 — Write the Handoff (section-scoped — never touch Decisions)
+Exit code `0` = real PASS. Non-zero = not done (missing report, FAIL, unfilled placeholder, or PASS
+with no `file:line` evidence). `<skill-dir>` is the downstream skill's own directory, not the
+project's.
 
-Following the downstream skill's own section-scoped write rule (locate the `## Handoff` header,
-replace only the body between it and the next `##`/EOF; create both headers with an empty
-`## Decisions` if the file doesn't exist yet), write:
+**Fallback, when no code execution is available.** Read only the `## Validation` heading line and any
+`**Result**:` line — not the whole file:
+
+- both `PASS` and `FAIL` on that line → unfilled template → **not done**
+- `FAIL` → **not done**
+- `PASS` with no `path.ext:NN` citation anywhere in the file → **not done**
+- `PASS` with at least one such citation → **done**
+- no `validation.md`, or no verdict at all → **not done**
+
+## Step 3 — Build the roadmap status list
+
+One line per roadmap, so the whole backlog shape is visible — not a single disconnected pointer.
+
+- **Single-section mode:** one line for `docs/ROADMAP.md`: how many of its features are done
+  (Step 2's test) out of the total in `docs/roadmap.txt`.
+- **Multi-section mode:** walk `docs/ROADMAP-INDEX.md`'s section order top to bottom. For each
+  section, read its `roadmap .txt` column to get the exact filename (never reconstruct it from the
+  prefix), then classify:
+  - all done → `DONE (X/X, verified PASS)`
+  - some done → `IN PROGRESS (N/M verified PASS)`
+  - none done, `.txt` exists → `NOT STARTED (0/M)`
+  - no `.txt` yet → `NOT YET DECOMPOSED` — note what it depends on per the index
+
+## Step 4 — Find the target feature and its remaining order
+
+**Pick the section first (multi-section mode), with an explicit precedence — do not assume only one
+section can be active.** A user who builds out of index order produces several:
+
+1. Any section marked `IN PROGRESS` wins. If more than one is, take the earliest in index order —
+   and say in the report that others are also in progress.
+2. If none is in progress, the first `NOT STARTED` in index order.
+3. If neither exists, every decomposed section is done → nothing to seed (see below).
+
+Then walk that section's `.txt` (or `docs/roadmap.txt` in single-section mode) top to bottom. **The
+target is the first name that is not done per Step 2** — not merely the first without a file. The
+remaining build order is every name from the target to the end of that file.
+
+**Do not assert what you did not check.** Step 6's template asks for `Completed` / `In-progress`. If
+the target has partial work on disk (a `spec.md`, a `tasks.md` with unchecked boxes) but no PASS,
+say so rather than writing `not started` — a confident falsehood in the machine-read handoff surface
+is worse than a vague truth. If the target's `validation.md` reads FAIL, do not treat it as unstarted
+either: name it as needing fixes.
+
+If every feature in every decomposed roadmap is done, there is nothing to seed. Say so and stop —
+never write a Handoff pointing at nothing, and never invent a "next" feature.
+
+## Step 5 — Write the durable Status block (this skill's own file)
+
+Insert or replace a `## Status` block immediately after the H1 of `docs/ROADMAP-INDEX.md`
+(multi-section) or `docs/ROADMAP.md` (single-section). Replace only that block's body — leave the
+rest of the file untouched.
+
+```markdown
+## Status
+
+_Backlog position. Regenerated by spec-driven-roadmap; feature status is derived from
+`.specs/features/<name>/validation.md`, never hand-edited here._
+
+- `docs/ROADMAP-<slugA>.md` — DONE (4/4, verified PASS)
+- `docs/ROADMAP-<slugB>.md` — IN PROGRESS (2/5 verified PASS)
+  - **Remaining** (build order): `<feature-3>` → `<feature-4>` → `<feature-5>` (closes the roadmap)
+- `docs/ROADMAP-<slugC>.md` — NOT STARTED (0/6) — next after `<slugB>` per this index
+- `docs/ROADMAP-<slugD>.md` — NOT YET DECOMPOSED (depends on `<slugC>`)
+
+**Next feature**: `<target>` — see `docs/ROADMAP-<slugB>.md` for its objective, dependencies and
+flagged dimensions.
+```
+
+Single-section mode collapses the list to one line for `docs/ROADMAP.md` plus its own **Remaining**
+sub-list.
+
+Keep it to counts, names and paths. Never copy feature objectives or task lists here — that detail
+already lives in the roadmap body below it.
+
+## Step 6 — Write the Handoff (downstream skill's file, its exact schema)
+
+Locate the `## Handoff` header in `.specs/STATE.md` and replace only the body between it and the
+next `##` or EOF. Never touch `## Decisions`. If the file does not exist, create it in the shape the
+downstream skill prescribes — for `tlc-spec-driven`, an H1 `# STATE`, then `## Decisions` with an
+empty body, then `## Handoff`.
+
+Emit **only** the fields that skill defines. For `tlc-spec-driven` v3.x, exactly these eight:
 
 ```markdown
 ## Handoff
 
-- **Roadmaps**:
-  - `docs/ROADMAP-<slugA>.md` — DONE (X/X, all verified PASS)
-  - `docs/ROADMAP-<slugB>.md` — IN PROGRESS (N/M features done, verified PASS)
-    - **Remaining** (build order): `<feature-n+1>` → `<feature-n+2>` → … → `<feature-m>` (closes the roadmap)
-  - `docs/ROADMAP-<slugC>.md` — NOT STARTED (0/K) — next after `<slugB>` per `docs/ROADMAP-INDEX.md`
-  - `docs/ROADMAP-<slugD>.md` — NOT YET DECOMPOSED (depends on `<slugC>`)
-- **Feature**: `<target feature name>`
-- **Phase / Task**: not started
+- **Feature**: <target feature name>
+- **Phase / Task**: not started — no spec.md on disk yet
 - **Completed**: none
-- **In-progress**: none
-- **Next step**: <the exact fresh-start trigger phrase confirmed at Phase 0, e.g. "specify feature `<target feature name>`">
+- **In-progress** (file:line): none
+- **Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Spec source: `docs/ROADMAP-<slug>.md` section `<target>` (objective, scope-units, dependencies, flagged dimensions and open questions are there — read it before clarifying). Backlog position: `docs/ROADMAP-INDEX.md` `## Status`.
 - **Blockers**: none
 - **Uncommitted files**: none
-- **Branch**: <current branch, if known — omit the line if not>
+- **Branch**: <output of `git branch --show-current`>
 ```
 
-Single-section mode: the **Roadmaps** list collapses to one line (`docs/ROADMAP.md — N/M features
-done`) with its own **Remaining** sub-list — no DONE/NOT-STARTED siblings to enumerate.
+Notes on the fields that carry real weight:
 
-Keep this compact the same way the real precedent does: counts and names, never a copy of each
-feature's objective/tasks — that detail already lives in the roadmap file and, once built, in
-`.specs/features/<name>/validation.md`. A Handoff that pastes full feature descriptions defeats its
-own purpose (the downstream skill's own convention targets roughly 500 tokens per snapshot).
+- **Next step** is the highest-value field in this file: it is the one place both the downstream
+  skill's resume *and* the human read. It must carry (a) the trigger phrase confirmed at Phase 0,
+  (b) the exact directory name so the built feature matches the roadmap's name, and (c) the roadmap
+  path. Without (c) the entire Phase 2 output — objective, scope-units, dependencies, sizing,
+  dimensions — reaches nothing, and the user gets re-interviewed on scope this skill already
+  resolved.
+- **Branch** is unconditional. Obtain it with `git branch --show-current`; use `none` only outside a
+  git repo.
+- **Blockers** — if the target feature has `needs pre-written context.md: yes` **and** a question in
+  its `open questions` field (or in a boundary contract's marked-open item it consumes), put the
+  exact question here instead of `none`, and set **Next step** to answering it rather than the
+  specify trigger. Never point a fresh start past an unanswered question.
 
-If the target feature has "needs pre-written context.md: yes" **and** a flagged open question
-attached (from Phase 2, or from a boundary contract's marked-open item it consumes): put the exact
-question in **Blockers** instead of "none", and set **Next step** to "answer the flagged question
-before specifying" instead of the fresh-start trigger. Never seed a fresh-start pointer past an
-unanswered question — that would hand the downstream skill a feature it can't actually start cleanly.
+Keep the whole section near the downstream skill's ~500-token budget. The backlog picture is not
+repeated here — Step 5's file holds it, and **Next step** points at it.
 
-## Step 5 — Report and stop
+## Step 7 — Report and stop
 
 Tell the user, plainly:
 
-- the full roadmap status list from Step 2 (one line each),
-- which feature was seeded as next, with its remaining build order (or that nothing was seeded, and
-  why — already in flight / nothing left to seed / blocked on a question),
-- that construction from here on is the downstream spec-driven skill's own job, through its own
-  triggers, driven by the user or the general agent directly.
+- the roadmap status list from Step 3, one line each;
+- which feature was seeded as next — or that nothing was seeded, and why (work in flight / nothing
+  left / blocked on an open question);
+- **the exact command to run next, verbatim**, since the downstream skill is normally entered by the
+  user typing its trigger:
+  `specify feature <target> — spec source: docs/ROADMAP-<slug>.md`
+- that construction from here on is the downstream skill's own job, through its own triggers.
 
-Then stop. Do not wait, do not poll `validation.md`, do not check back in. Moving from this feature to
-the next — including from the last feature of one section to the first of the next, in multi-section
-mode — is a decision the user (or the general agent, reading the roadmap files directly when asked)
-makes when ready. Nothing in this skill schedules or drives that; if asked to seed again later (or if
-the downstream skill's own pause naturally reaches the end of the section and its Handoff empties
-out), this same procedure just re-runs from Step 1, and Step 1's safety check is what keeps it from
-ever clobbering real progress.
+Then stop. Do not wait, do not poll `validation.md`, do not check back in. Moving from this feature
+to the next is the user's decision. If asked to seed again later, this procedure simply re-runs from
+Step 1, and Step 1's evidence test is what keeps it from clobbering real progress.
 
-## Why this makes the downstream loop simple
+**Optional bridge, offered as text — never written automatically.** The downstream skill only reaches
+`docs/` through its Knowledge Verification Chain, not by default. If the project has a `CLAUDE.md`,
+offer the user these lines to paste into it (their file, their call):
 
-Once this seed exists, "resume work" on the downstream skill reads a Handoff that already answers
-"what's the whole backlog, what's done, what's next, and why" in one place — the same shape this
-project's own `.specs/STATE.md` grew into by hand, one session at a time. The two skills stay
-decoupled (this one never authors spec/design/tasks/code, never loops), but the handoff between them
-carries full context instead of a bare pointer, which is what keeps every subsequent "specify feature"
-/ "resume work" call short and unambiguous instead of requiring someone to go re-read `docs/ROADMAP-
-INDEX.md` from scratch each time.
+```markdown
+- `docs/ROADMAP-INDEX.md` `## Status` — current backlog position and the next feature to build.
+- `docs/ROADMAP-*.md` — per-feature objective, scope-units, dependencies, flagged dimensions.
+  Read the relevant section before specifying a feature.
+```

@@ -1,156 +1,180 @@
 # Phase 2 — Decomposing Into Features
 
-## Single-section mode vs. multi-section mode
+## Contents
 
-Phase 0 already fixed which mode the project is in — this phase behaves differently depending on it:
+- [Mode differences and inputs](#mode-differences-and-inputs)
+- [Step 1 — Enumerate the scope-units first](#step-1--enumerate-the-scope-units-first)
+- [Step 2 — Derive the feature execution order](#step-2--derive-the-feature-execution-order)
+- [Step 3 — Slice into features](#step-3--slice-into-features)
+- [Step 4 — Shared ownership across sections](#step-4--shared-ownership-across-sections) (multi-section only)
+- [Step 5 — Defer work that cannot be built yet](#step-5--defer-work-that-cannot-be-built-yet) (multi-section only)
+- [Step 6 — Write each feature with all ten fields](#step-6--write-each-feature-with-all-ten-fields)
+- [Step 7 — Close the roadmap](#step-7--close-the-roadmap)
+- [When to re-run, and what is frozen](#when-to-re-run-and-what-is-frozen)
+- [Sanity checks](#sanity-checks)
 
-- **Multi-section mode:** run per section, lazily, right before the user is ready to start building
-  that section — not necessarily for every buildable section immediately after Phase 1. Decomposing a
-  section that won't be built for weeks risks staleness (the source or an upstream boundary contract
-  may shift before then); decomposing it just-in-time keeps every `ROADMAP-<slug>.md` close to what's
-  actually about to be built. If the user explicitly wants the whole backlog visible upfront, that's a
-  fine reason to run this for every section right away — just don't make it the default assumption.
-- **Single-section mode:** run this once, directly against the whole source — there is no per-section
-  laziness to have, since there's only one feature list for the entire scope. There is no
-  `docs/ROADMAP-INDEX.md`, no per-section prefix table, and no boundary contracts; assign one
-  project-level `<prefix>` up front (confirm it doesn't collide with any existing roadmap's prefix)
-  and every "external contract consumed" field is simply "none" — there are no sibling sections to
-  produce one.
+## Mode differences and inputs
 
-## Inputs to load (and nothing else)
+- **Multi-section mode:** run per section, lazily, right before the user is ready to build it.
+  Decomposing a section that will not be built for weeks risks staleness; just-in-time keeps each
+  roadmap close to what is actually about to be built. If the user wants the whole backlog visible
+  upfront, that is a fine reason to run it for every section — just not the default.
+  *Load:* `docs/ROADMAP-INDEX.md` (this section's prefix, dependencies, and boundary contracts), the
+  target section's own content, and the project's conventions doc. **Never load a sibling section in
+  full** — a need for sibling detail is already captured as a boundary contract; cite it.
+- **Single-section mode:** run once against the whole source. No index, no per-section prefix table,
+  no boundary contracts. Assign one project-level prefix up front (confirm it does not collide) and
+  every "external contract consumed" is "none".
+  *Load:* the whole source and the conventions doc.
 
-- **Multi-section mode:** `docs/ROADMAP-INDEX.md` (for this section's prefix, its dependencies, and
-  the boundary contracts that apply to it, both as consumer and producer), the target section's own
-  content from the source of truth (only this section, not siblings), and the project's conventions
-  doc (`CLAUDE.md`/README/etc.), if any.
-- **Single-section mode:** the whole source of truth, and the project's conventions doc, if any.
-  There is no index to load.
+## Step 1 — Enumerate the scope-units first
 
-Multi-section mode only: do not load sibling sections in full. If something looks like it needs a
-sibling section's detail, that need should already be captured as a boundary contract in the index
-(Phase 1, Step 4) — cite it, don't go re-read the sibling to re-derive it.
+**Build a compact inventory before decomposing anything:** one line per scope-unit — its ID and a
+short label. Whatever the source's atomic unit is (a diagram node, a requirement ID, a table row, an
+`M1`/`G1` bullet from Phase 0b/0c), it gets a line.
 
-## Step 1 — Derive the feature execution order
+Decompose from that inventory, re-reading the full text only for the unit you are currently writing
+a feature for. This is what keeps a large source tractable and what makes the coverage table
+trustworthy — a unit that was never enumerated cannot be noticed as missing later.
 
-- If the section's own content has internal structure (a sequence of steps, edges between its own
-  units, an explicit pipeline), derive the order from that and show the derivation — a small
-  dependency diagram is enough.
-- If it doesn't, order features by natural build dependency: schema/foundational persistence first,
-  shared/internal modules next, the things that consume them after, cross-cutting extras (export,
-  admin tooling, toggles) last.
-- A section's internal graph is sometimes just one long linear pipeline (each stage feeds the next
-  and nothing branches) — when that's the case, say so; don't force an artificial fan-out just to
-  make the graph look richer than it is.
+**If the source cannot be enumerated in one pass, stop and say so**, and recommend multi-section mode
+instead. Silently reading part of a large document and producing a confident coverage table is the
+one failure this phase must not have.
 
-## Step 2 — Slice into features (vertical, ≤8 tasks)
+## Step 2 — Derive the feature execution order
 
-For every unit of scope in this section (whatever the source's atomic unit is — a diagram node, a
-requirement ID, a table row; call it a "unit" below), assign it to exactly one feature. A feature
-typically groups several related units (e.g. a table + the module that reads/writes it + the rule
-that governs it) and never re-declares a unit already claimed by another feature.
+- If the section has internal structure (a sequence, edges between its units, an explicit pipeline),
+  derive the order from that and show the derivation — a small dependency diagram is enough.
+- Otherwise order by natural build dependency: foundational persistence first, shared modules next,
+  consumers after, cross-cutting extras (export, admin tooling, toggles) last.
+- **If the source declares an MVP or v1 boundary, every feature inside it is ordered before every
+  feature outside it**, dependencies permitting. A `## MVP Scope` from Phase 0b is exactly such a
+  boundary.
+- A section's graph is sometimes one long linear pipeline. Say so when it is; do not invent a
+  fan-out to make the diagram look richer than reality.
 
-Common slicing moves, roughly in order of how often they come up:
+## Step 3 — Slice into features
 
-- **Shared foundation first.** When several downstream features all read/write the same schema or
-  reuse the same interface, give that schema/interface its own feature ahead of them (a `-schema` or
-  `-registry` style feature), even if no single edge in the source points to it first — persistence
-  must exist before anything writes to it, regardless of how the source's edges are drawn.
-- **One feature per swappable adapter.** When the section defines an abstract interface with
-  multiple concrete implementations (multiple integration providers, multiple channel types), each
-  concrete implementation is its own feature sitting behind the shared interface's foundation
-  feature — they usually carry independent "confirm the technology" open questions and shouldn't be
-  bundled together.
-- **Correction/gap-only features are legitimate.** Not everything buildable has a matching unit in
-  the source. A corrections doc, a later addendum, or a "we realized afterward we need X" note often
-  produces a whole feature with zero scope-units to cite. Write it anyway, marked "no scope-unit —
-  originated from `<the correction/addendum>`" — never force a fake citation, and never drop it
-  silently just because it has no ID to point to.
-- **Formalize a blocking open question as its own feature.** When the source has a genuine
-  unresolved architectural question that gates several downstream features (which mechanism exposes
-  an internal capability, whether a component is AI-driven or fully deterministic, which of two
-  vendors to integrate), give it its own small feature whose first task is literally "get this
-  answered by the user". Every feature that needs the answer depends on this feature — never on a
-  guessed answer. The downstream spec-driven skill's own gray-area/Discuss step will stop and ask
-  when it reaches this feature — and the Handoff seed (see
-  [references/handoff-seed.md](handoff-seed.md)) refuses to point a fresh start at this feature while
-  the question is unanswered, surfacing it instead.
-- **Split at 8 tasks.** When honest task counting for a natural feature exceeds 8, split along the
-  clearest internal seam (read-path vs. write-path; core happy-path vs. an add-on capability) and
-  state the reason in both halves.
+Assign every scope-unit to exactly one feature. A feature typically groups several related units (a
+table + the module that reads it + the rule that governs it) and never re-declares a unit already
+claimed elsewhere.
 
-## Step 3 — Handle shared ownership across section boundaries (multi-section mode only)
+Common slicing moves:
 
-Doesn't apply in single-section mode — there are no section boundaries to cross when the whole
-source is one roadmap.
+- **Shared foundation first.** When several downstream features read/write the same schema or reuse
+  the same interface, give it its own feature ahead of them (a `-schema` or `-registry` feature),
+  even if no edge in the source points there first — persistence must exist before anything writes
+  to it. This is rule 2's one bounded exception, so **name its consumers** in the objective; a
+  foundation with fewer than three consumers should just be folded into the feature that uses it.
+- **One feature per swappable adapter.** An abstract interface with multiple concrete
+  implementations gives each implementation its own feature behind the shared foundation. They
+  usually carry independent "confirm the technology" open questions and should not be bundled.
+- **Correction and gap-only features are legitimate.** Not everything buildable has a matching unit
+  in the source. Write it anyway, marked "no scope-unit — originated from `<the correction>`". Never
+  force a fake citation, never drop it silently.
+- **Formalize a blocking open question as its own feature.** When an unresolved architectural
+  question gates several downstream features, give it a small feature whose first task is getting it
+  answered. Dependents depend on that feature, never on a guessed answer. Such a feature produces no
+  code, so it can never earn a PASS `validation.md` — record its discharge explicitly instead: it is
+  done when the answer is written into this roadmap's `## Open Questions` with `status: answered`,
+  or when `.specs/features/<name>/context.md` exists. Say so in the feature's own entry.
+- **Split at eight tasks.** When honest counting exceeds eight, split along the clearest internal
+  seam (read-path vs. write-path; core vs. add-on) and state the reason in both halves.
 
-Sometimes the source's own structural placement of a unit conflicts with which section should
-actually build it (a unit visually/structurally sits inside section C, but the real build order — or
-an explicit note elsewhere in the source — means section A must create it first because C depends on
-it). Resolve by:
+## Step 4 — Shared ownership across sections
 
-1. Checking whether `docs/ROADMAP-INDEX.md` already made a call on this in its boundary contracts
-   (Phase 1, Step 4) — if so, follow it.
-2. If the index is silent, decide based on genuine build necessity (whichever section needs the unit
-   to exist first, per the dependency graph, is the natural owner) and **record the decision in both
-   roadmaps**: the owning roadmap's feature lists the unit as covered, with a short note on why it
-   lives there despite where the source placed it; the consuming roadmap's coverage table marks the
-   unit "covered by reference to `<owning-roadmap>`/`<feature>`, not re-declared here". Never build
-   the same schema/module twice, and never let a unit vanish from every coverage table because each
-   side assumed the other already claimed it.
+*Multi-section mode only.*
 
-## Step 4 — Defer work that structurally can't be built yet (multi-section mode only)
+Sometimes a unit structurally sits in section C but must be built by section A because C depends on
+it. Resolve by:
 
-Doesn't apply in single-section mode — there is no downstream section to defer work to; everything
-belongs in the one roadmap, ordered by Step 1's dependency derivation instead.
+1. Following `docs/ROADMAP-INDEX.md`'s boundary contracts if they already made the call.
+2. If the index is silent, deciding by genuine build necessity and **recording it in both roadmaps**:
+   the owning roadmap's feature lists the unit as covered with a note on why it lives there; the
+   consuming roadmap's coverage table marks it `covered by reference to <owning-roadmap>/<feature>`.
 
-A correction or requirement may apply to this section but require a mechanism that only exists in a
-section built *later* in the index's order (e.g. a reconciliation job that needs a queue/events
-table owned by a downstream section). Don't invert the build order to satisfy it. Instead:
+Never build the same schema twice, and never let a unit vanish because each side assumed the other
+claimed it.
 
-- Leave it out of the current roadmap's feature list.
-- Add a short note in the current roadmap explaining what's deferred, to which future roadmap it
-  belongs, and why (cite the missing dependency).
-- When that later roadmap is actually decomposed, add the deferred feature there for real, with a
-  cross-reference back to the note that originally deferred it — don't let a deferred item become a
-  permanent, silent gap. This skill does not track this itself (there is no build loop keeping a
-  to-do list); the note in the roadmap file is the only record until that later roadmap is decomposed.
+## Step 5 — Defer work that cannot be built yet
 
-## Step 5 — Write each feature with all nine fields
+*Multi-section mode only.*
 
-- **name** — `<prefix>-<kebab-case>`, unique across the whole project.
+A requirement may apply here but need a mechanism only a later section provides. Do not invert the
+build order. Instead: leave it out of this feature list; add a note naming what is deferred, to which
+roadmap, and why (citing the missing dependency); mark the unit `deferred` in the coverage table
+(Step 7). When that later roadmap is decomposed, add the feature there with a cross-reference back.
+This skill keeps no to-do list of its own — the note in the roadmap is the only record.
+
+## Step 6 — Write each feature with all ten fields
+
+- **name** — `<prefix>-<kebab-case>`, unique across the project. English, always (it becomes a
+  directory name).
 - **objective** — one sentence.
-- **scope-units covered** — the source's own IDs/references (or "none — originated from `<X>`", per
-  Step 2's correction/gap-only case).
-- **depends on** — features from *this section only* (or the whole roadmap, in single-section mode);
-  empty/"—" for the first feature(s).
-- **external contract consumed** — an item from `docs/ROADMAP-INDEX.md`'s boundary contracts, or
-  "none" (always "none" in single-section mode — there is no index to consume from).
-- **size** — Small / Medium / Large / Complex, consistent within the roadmap. A feature landing on
-  Complex is usually a signal it should have been split back in Step 2.
-- **task estimate** — a number, target ≤8 (see Step 2's split rule).
+- **scope-units covered** — the source's own IDs, or "none — originated from `<X>`".
+- **depends on** — features earlier in this same roadmap; "—" for the first.
+- **external contract consumed** — an item from the index's boundary contracts, or "none" (always
+  "none" in single-section mode).
+- **size** — Small / Medium / Large / Complex, consistent within the roadmap. Complex usually means
+  it should have been split in Step 3.
+- **task estimate** — a number, target ≤8.
 - **implicit dimensions present** — any of: persistence/state, external calls, auth, payments,
-  concurrency, state transitions. List "none" if genuinely none apply (a pure function with no I/O,
-  for instance).
-- **needs pre-written context.md** — yes if any dimension is present or any open question was
-  flagged for this feature; no otherwise. The Handoff seed step reads this field directly to decide
-  whether to surface a question instead of seeding a fresh-start pointer (see
-  [references/handoff-seed.md](handoff-seed.md)).
+  concurrency, state transitions; or "none". These are the dimensions that trigger the downstream
+  skill's own Discuss step.
+- **open questions** — one line per unresolved point, phrased as a question, citing the exact place
+  in the source that leaves it open, each tagged `status: open` or `status: answered`; or "none".
+  **This is where rule 1's refusal to guess actually lands** — without this field there is nowhere to
+  put an ambiguity, and it gets silently resolved or dropped.
+- **needs pre-written context.md** — yes if any dimension is present or any open question is
+  `status: open`; no otherwise.
 
-## Step 6 — Close the roadmap
+## Step 7 — Close the roadmap
 
-- **Coverage table:** one row per scope-unit → feature. End with an explicit "uncovered: none" line
-  (or the actual list — which means Step 2 isn't finished yet).
-- **Execution-order block:** a fenced list, one feature name per line, in the order features should
-  be built (respecting every "depends on").
-- **Standalone `.txt` file:** `docs/roadmap-<slug>.txt` (multi-section mode) or `docs/roadmap.txt`
-  (single-section mode), the exact same list, one name per line — this is the file the Handoff seed
-  step reads to find the first not-yet-built feature, and what anyone manually sequencing features
-  should read too; it never re-parses the markdown.
+- **Coverage table:** one row per scope-unit → its disposition. Four dispositions are valid:
+  - `<feature-name>` — built by that feature in this roadmap.
+  - `covered by reference to <roadmap>/<feature>` — owned by another section (Step 4).
+  - `deferred to <roadmap> — blocked on <dependency>` — cannot be built yet (Step 5).
+  - `pre-existing — already built, verified in codebase` — from Phase 0c's
+    `## Capabilities Already Built`; not new scope.
 
-## Sanity checks before calling a roadmap done
+  Close with `uncovered: none (N deferred, N pre-existing, listed above)`. A genuinely uncovered unit
+  means Step 3 is not finished.
+- **`## Open Questions` roll-up:** every feature's `status: open` questions in one list, each naming
+  the feature that carries it. The Handoff seed reads this to decide whether to block. Omit the
+  section only when there are genuinely none.
+- **Execution-order block:** a fenced list, one feature name per line, respecting every "depends on".
+  When the source declares increments, mark their boundaries with comment lines the seed ignores:
+  `# --- end of increment 1: <what ships here> ---`.
+- **Standalone `.txt`:** `docs/roadmap-<slug>.txt` (multi-section) or `docs/roadmap.txt` (single),
+  the same list, one name per line, no status markers and no comments other than the increment lines
+  above. This is what the Handoff seed walks; it never re-parses the markdown.
+
+## When to re-run, and what is frozen
+
+Re-running is normal — the source gains requirements as the project moves. **Never wholesale-
+regenerate a roadmap that already covers the current scope; extend it.**
+
+Before rewriting anything, list every feature name that already has a `.specs/features/<name>/`
+directory. Those names **and their relative order are frozen**:
+
+- Never rename a feature that has been built or started. The seed identifies done work purely by
+  name, so one rename makes verified work look unbuilt and points the downstream skill at something
+  already shipped — while the old directory keeps existing, breaking rule 6's uniqueness.
+- New scope appends after the frozen block.
+- A feature that turned out obsolete is marked superseded in place, with a note; never deleted, never
+  renamed.
+- The `.txt` is append-mostly: reordering it only among not-yet-started features is fine.
+
+## Sanity checks
 
 - No feature's "depends on" points to a feature listed after it in the same file.
-- No feature name collides with one in any other `docs/ROADMAP-*.md` in the project.
-- Every open question is phrased as a question with enough context to answer it — never resolved
-  inline as if it were settled.
-- The coverage table accounts for 100% of the section's scope-units, each exactly once.
+- No feature name collides with one in any other `docs/ROADMAP-*.md` **or `docs/ROADMAP.md`**, or
+  with any existing `.specs/features/*` directory name. On collision with an existing directory,
+  stop and ask whether it is that same feature — do not rename around it.
+- Every open question is phrased as a question with enough context to answer it, and appears in the
+  `## Open Questions` roll-up.
+- The coverage table accounts for 100% of the enumerated scope-units, each exactly once, and closes
+  with `uncovered: none`.
+- If the roadmap is growing past roughly 3,000 tokens, say so and re-raise Phase 0's single-vs-multi
+  question — an oversized roadmap is evidence the mode choice was wrong. Never drop coverage rows to
+  hit a size target.

@@ -1,132 +1,135 @@
 # Phase 1 — Building/Refreshing the Index
 
+## Contents
+
+- [Only in multi-section mode](#only-in-multi-section-mode)
+- [Step 1 — Enumerate sections](#step-1--enumerate-sections)
+- [Step 2 — Assign file, slug and prefix per section](#step-2--assign-file-slug-and-prefix-per-section)
+- [Step 3 — Derive the dependency graph](#step-3--derive-the-dependency-graph)
+- [Step 4 — Write one boundary contract per edge](#step-4--write-one-boundary-contract-per-edge)
+- [Step 5 — List project-level decision candidates](#step-5--list-project-level-decision-candidates)
+- [Output shape](#output-shape-of-docsroadmap-indexmd)
+- [When to re-run](#when-to-re-run)
+
 ## Only in multi-section mode
 
-Phase 0 must already have confirmed the project is using multiple section roadmaps, not the single
-unified roadmap. If Phase 0 resolved to single-section mode, this entire phase is skipped — there is
-no index, no per-section prefixes, and no cross-section boundary contracts to derive, because the
-whole source is decomposed as one list in Phase 2 directly. Do not run this phase "just in case"; a
-`docs/ROADMAP-INDEX.md` that exists alongside a single-section project contradicts the very choice
-Phase 0 recorded.
+Phase 0 must already have confirmed multiple section roadmaps. In single-section mode this phase is
+skipped entirely — there is no index, no per-section prefix, and no cross-section boundary contract,
+because the whole source is decomposed as one list in Phase 2. Do not run this "just in case": a
+`docs/ROADMAP-INDEX.md` alongside a single-section project contradicts the choice Phase 0 recorded.
 
 ## Goal
 
-Produce `docs/ROADMAP-INDEX.md`: the one-level-above map of how many roadmaps exist, the order
-they're written/executed in, and what each may assume about the ones before it. This phase does not
-decompose any section into features — that is Phase 2, run once per `docs/ROADMAP-<slug>.md`, and
-usually run lazily (see Phase 2's own doc) rather than all at once right after Phase 1.
+Produce `docs/ROADMAP-INDEX.md`: the map of how many roadmaps exist, the order they execute in, and
+what each may assume about the ones before it. This phase decomposes nothing — that is Phase 2, run
+once per roadmap and usually lazily.
 
 ## Step 1 — Enumerate sections
 
-List every section/block the source of truth divides the system into (visual sections in a diagram,
-chapters/epics in a PRD, top-level components in an architecture doc's inventory table, etc.). For
-each, classify:
+List every section the source divides the system into (visual sections, chapters/epics, top-level
+components). Classify each:
 
-- **Buildable** — turns into a `ROADMAP-<slug>.md` with real feature work.
-- **Pure foundation** — already built/inherited, nothing to plan (an "existing platform" or
-  "already shipped infra" block). Exclude from roadmap generation, but keep it as reference —
-  features in buildable sections will consume it and cite it in their boundary contracts.
-- **Pure decision log** — a list of decisions/open-points/gaps with nothing to build directly (an
-  appendix-style block of numbered decisions or open questions). Exclude from roadmap generation;
-  route its content to whatever the project's decision-log mechanism is (an `AD-NNN` list, a
-  `STATE.md`), or list it under Step 5 below if the project has no such mechanism yet.
+- **Buildable** — becomes a `ROADMAP-<slug>.md` with real feature work.
+- **Pure foundation** — already built or inherited, nothing to plan. Excluded from generation, but
+  kept as reference: buildable sections consume it and cite it in boundary contracts.
+- **Pure decision log** — decisions, open points, gaps with nothing directly buildable. Excluded;
+  route its content to the project's decision-log mechanism, or list it under Step 5.
 
-Ask the user when a section is ambiguous between these categories — don't guess a section into
-"pure foundation" just because it looks large or partially built already; a section can look mature
-and still have real buildable work left in it.
+Ask when a section is ambiguous between these. Never classify a section as "pure foundation" just
+because it looks large or partly built — a section can look mature and still hold real work.
 
-## Step 2 — Assign file + prefix per buildable section
+## Step 2 — Assign file, slug and prefix per section
 
-- One `docs/ROADMAP-<slug>.md` per buildable section.
-- Each gets a short, mnemonic, kebab-case prefix (3–6 characters is a good target) used by every
-  feature in that section: `<prefix>-<kebab-case>`.
-- Prefixes must not collide with each other, and must not collide with prefixes already used by
-  roadmaps elsewhere in the project — check existing `docs/ROADMAP-*.md` files before assigning.
-- Record the mapping as a table: section → file → prefix → depends-on (filled in Step 3).
+- **slug** — the section's kebab-case identifier, used in filenames. **The slug and the prefix are
+  the same string**, so there is exactly one identifier per section and nothing has to be
+  reconstructed later.
+- Each slug is short, mnemonic, kebab-case (3-6 characters is a good target) and used by every
+  feature in that section as `<slug>-<kebab-case>`.
+- Slugs must not collide with each other, or with any already used by roadmaps in the project —
+  check existing `docs/ROADMAP-*.md` before assigning.
+- Filenames are exact and case-sensitive: `docs/ROADMAP-<slug>.md` (uppercase ROADMAP) and
+  `docs/roadmap-<slug>.txt` (lowercase).
 
-## Step 3 — Derive the dependency graph between sections
+Record the mapping as a table, including the `.txt` path explicitly so the Handoff seed reads it
+rather than guessing:
 
-This is the part most likely to get invented if rushed. Resolve every edge in this strict order,
-and record which source resolved it — that citation is what lets Phase 2, the Handoff seed, and
-whoever builds from this roadmap later trust the order without re-deriving it:
+| Section | Roadmap file | Build-order file | Slug / prefix | Depends on |
+|---|---|---|---|---|
+| Payments ingestion | `docs/ROADMAP-pay.md` | `docs/roadmap-pay.txt` | `pay` | — |
 
-1. **Explicit inter-section edges** in the source itself — an arrow/edge whose two ends fall in
-   different sections; an explicit "depends on" field on a PRD epic.
-2. **Explicit prose cross-references** inside a section's own content that name another section by
-   name (a node's label says "→ block F"; a requirement says "after the X module exists").
-3. **An existing build-order document** already in the project (a phased-rollout table, an ordering
-   already written into a `CLAUDE.md`/README/ADR).
-4. **Ask the user.** Never invent a dependency edge that isn't traceable to one of the above — a
-   wrong edge here silently corrupts every downstream roadmap's ordering, and by extension whatever
-   order the user or the downstream spec-driven skill actually builds sections in.
+Note excluded sections (foundation / decision-log) and why.
+
+## Step 3 — Derive the dependency graph
+
+This is the part most likely to get invented if rushed. Resolve every edge in this strict order, and
+**record which source resolved it** — that citation is what lets Phase 2 and the seed trust the order
+without re-deriving it:
+
+1. **Explicit inter-section edges** in the source — an arrow whose ends fall in different sections;
+   an explicit "depends on" field on an epic.
+2. **Explicit prose cross-references** inside a section naming another section.
+3. **An existing build-order document** already in the project (a phased-rollout table, an order
+   written into a `CLAUDE.md`/README/ADR).
+4. **Ask the user.** Never invent an edge that is not traceable to one of the above — a wrong edge
+   silently corrupts every downstream roadmap's ordering.
 
 State plainly if the source's own edges never cross section boundaries (common with auto-extracted
-diagrams, where drawn arrows rarely leave the section's own bounding box) — when that's the case,
-say so up front, and be explicit that the cross-section order below comes entirely from (2)/(3)/(4),
-not from any drawn edge.
+diagrams, where arrows rarely leave their bounding box). When that is the case, say so up front and
+be explicit that the order comes from (2)/(3)/(4), not from any drawn edge.
 
-Render the result as a DAG (a small textual diagram is enough) and as an ordered list, one line
-each, top-to-bottom = build order. If two or more sections share the same set of predecessors and
-have no edge between themselves, say so explicitly — they can be decomposed/built in either order
-or in parallel, and forcing a fake tie-break order would misrepresent the graph.
+Render the result as a small textual DAG and as an ordered list, top-to-bottom = build order. If two
+sections share predecessors and have no edge between them, say so — they can be built in either
+order or in parallel, and a fake tie-break would misrepresent the graph.
 
-## Step 4 — Write one boundary contract per inter-section edge
+## Step 4 — Write one boundary contract per edge
 
-For every edge in the dependency graph, write a short contract block:
+For every edge:
 
-- **Producer exposes:** the concrete tables/modules/endpoints/functions the upstream section hands
-  over (names are provisional — the actual `ROADMAP-<slug>.md` for that section confirms them when
-  it's decomposed).
-- **Consumer assumes:** exactly what the downstream section may rely on, and nothing beyond that.
-- **Marked-open:** anything the source leaves ambiguous about this boundary — write it as a
-  question, never as a decision. This is what lets Phase 2 skip re-deriving cross-section behavior
-  each time — it just cites the contract instead of re-reading the sibling section, and it's also
-  what the Handoff seed step surfaces to the user immediately if a feature depending on that
-  contract turns out to need the open question answered before it can be specified.
+- **Producer exposes:** the concrete tables/modules/endpoints the upstream section hands over (names
+  provisional until that section is decomposed).
+- **Consumer assumes:** exactly what the downstream section may rely on, and nothing more.
+- **Marked-open:** anything the source leaves ambiguous about this boundary, written as a question,
+  never as a decision. Phase 2 cites these instead of re-reading the sibling, and the seed surfaces
+  them as blockers when a feature depends on one.
 
-When a unit of scope structurally sits inside one section but really needs to be built by another
-(a table drawn inside section C that section A must actually create first because A depends on it),
-make the call here and record it in the contract — see Phase 2's Step 3 for the full worked case.
+When a unit structurally sits in one section but must be built by another, make the call here and
+record it — see Phase 2's Step 4 for the worked case.
 
-## Step 5 — List project-level decisions found along the way (optional Part 4)
+## Step 5 — List project-level decision candidates
 
-While reading the source, some things surface that are neither a boundary contract nor buildable
-scope — genuine standing project decisions (a naming convention fixed here, an explicit call on
-which section owns a shared module, an unresolved point that gates opening a specific roadmap).
-List them for the record:
+While reading the source, some things surface that are neither boundary contracts nor buildable
+scope — standing project decisions.
 
-- **Step 3's derived section order is always one of these candidates** — propose it explicitly, even
-  when every edge came cleanly from the source. The order isn't just a detail of `ROADMAP-INDEX.md`;
-  it's a project-level constraint the downstream skill's Design phase should be able to re-confirm
-  against later, worded as a decision record would be: the order itself, which source resolved each
-  edge (Step 3), and the trade-off if any section's opening is gated on an open question. (If the
-  downstream skill uses `tlc-spec-driven`'s `AD-NNN` convention, this is exactly the shape a
-  cross-roadmap build-order decision takes there — e.g. "AD-003: sections build in order X → Y → Z,
-  per `docs/ROADMAP-INDEX.md`'s dependency graph, because Y's `<table>` depends on X's `<module>`.")
-- For any other candidate (naming convention, shared-module ownership call, a gating open question):
-  if the project already has a decision log (an `AD-NNN` list in `.specs/STATE.md`, a
-  `DECISIONS.md`), note these as **candidates** for it — do not write into that file directly
-  unless the user explicitly asks to record them now. The downstream spec-driven skill's own Design
-  phase (or an explicit "record decision" request) is what actually appends an `AD-NNN` entry;
-  this skill only surfaces the candidate and cites where it came from.
-- If the project has no such mechanism yet, keep the list in this same index document, as Part 4,
-  until one exists.
+- **Step 3's derived section order is always a candidate.** Propose it explicitly even when every
+  edge came cleanly from the source: the order is a project-level constraint the downstream skill's
+  Design phase should be able to re-confirm later. Word it as a decision record would be: the order
+  itself, which source resolved each edge, and the trade-off if any section is gated on an open
+  question. (With `tlc-spec-driven`'s `AD-NNN` convention this reads as: *"sections build X → Y → Z
+  per the index's dependency graph, because Y's `<table>` depends on X's `<module>`."*)
+- For any other candidate (naming convention, shared-module ownership, a gating question): if the
+  project has a decision log, note these as **candidates** for it — do not write into it directly
+  unless the user explicitly asks. The downstream skill's own Design phase, or an explicit "record
+  decision", is what appends the entry.
+- If the project has no such mechanism yet, keep the list here as Part 4.
 
 ## Output shape of `docs/ROADMAP-INDEX.md`
 
-1. Table of roadmaps: section → file → prefix → depends-on. Note excluded sections
-   (foundation/decision-log) and why.
-2. Ordering: DAG + topological list, with each edge's resolving source cited (per Step 3).
-3. Boundary contracts, one subsection per inter-section edge (Step 4).
-4. Project-level decision candidates (Step 5), if any surfaced.
+1. `## Status` — the backlog position block, written and refreshed by the Handoff seed. Leave the
+   heading in place even before the first seed.
+2. Table of roadmaps: section → roadmap file → build-order file → slug/prefix → depends-on, plus
+   excluded sections and why.
+3. Ordering: DAG + topological list, each edge citing its resolving source.
+4. Boundary contracts, one subsection per edge.
+5. Project-level decision candidates, if any.
 
 ## When to re-run
 
-Re-run Phase 1 only when the source scope changes (a new section appears, an edge changes) or a
-section is missing from an existing index — never wholesale-regenerate an index that already covers
-the current scope just because a new roadmap is about to be written or the user is ready to start a
-new section. Extend it instead: add the new section's row, its edges, its contracts, and preserve
-everything already resolved for existing sections. Adding a new section this way is also one of the
-two triggers for the Handoff seed (see
-[handoff-seed.md](handoff-seed.md)) — run it once after extending the index, so
-`.specs/STATE.md` reflects the newly available section if nothing else is currently in flight.
+Re-run only when the source scope changes (a new section appears, an edge changes) or a section is
+missing from an existing index. **Never wholesale-regenerate an index that already covers the current
+scope** — extend it: add the new section's row, edges and contracts, and preserve everything already
+resolved.
+
+Adding a section here does **not** trigger the Handoff seed. A brand-new section has no
+`docs/roadmap-<slug>.txt` yet, so it is `NOT YET DECOMPOSED` — a state the seed can never pick a
+target from. Just report the next action: *"decompose section `<slug>`"*, and leave `.specs/STATE.md`
+alone. The seed runs when Phase 2 closes a roadmap — see [handoff-seed.md](handoff-seed.md).

@@ -2,9 +2,12 @@
 
 Roadmap and Product Plan Creator compatible with the TLC Spec-Driven Framework.
 
-A Claude Code skill that turns a system's scope — an existing document, an interview when you don't
-have one yet, or a scan of an existing codebase — into a dependency-ordered features backlog for a
-spec-driven workflow (default: `tlc-spec-driven`) to build, one feature at a time.
+A Claude Code skill that decides **what to build and in what order**, then hands off. It turns a
+system's scope — an existing document, an interview when you don't have one, or an existing codebase
+— into a dependency-ordered feature backlog, and seeds the downstream spec-driven skill so it can
+start building feature one.
+
+It is a **prequel** to the build cycle. It never writes specs, designs, tasks, or code.
 
 ## Install
 
@@ -12,16 +15,58 @@ spec-driven workflow (default: `tlc-spec-driven`) to build, one feature at a tim
 curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/install.sh | bash
 ```
 
-Installs into `.claude/skills/spec-driven-roadmap/` in the current project. Add `--global` to
-install into `~/.claude/skills/spec-driven-roadmap/` instead.
+Installs into `.claude/skills/spec-driven-roadmap/` in the current project.
 
-## What's in v3.0.0
+With flags — note the `-s --`, which is required when piping into bash:
 
-- **Interview Mode** — no document yet and not sure what to build? The skill interviews you
-  (one question at a time) and produces `docs/PROJECT.md` as the roadmap source, no separate tool
-  needed.
-- **Brownfield Mode** — existing codebase, no scope doc? The skill reuses whatever the downstream
-  spec-driven skill (or `codenavi`) already knows about the code, or does a light scan of its own,
-  and produces `docs/CODEBASE-SUMMARY.md` as the roadmap source.
-- Both fall straight through into the same Phase 0/1/2/Handoff pipeline as a hand-provided PRD or
-  architecture doc — see [SKILL.md](SKILL.md).
+```bash
+curl -fsSL .../install.sh | bash -s -- --global   # install to ~/.claude/skills/
+curl -fsSL .../install.sh | bash -s -- --force    # overwrite an existing install
+```
+
+> While the repository is private, GitHub returns 404 to unauthenticated requests and the one-liner
+> will not work. Clone the repo and run `./install.sh` from the checkout instead.
+
+## Prerequisite
+
+The roadmap hands off to a downstream spec-driven skill, which does the actual building. Default
+assumption is [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills):
+
+```bash
+npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
+```
+
+Without one installed, the roadmap is still generated — only the handoff step is skipped, and it
+tells you so.
+
+## Use
+
+Three entry points, depending on what you already have:
+
+| You have | Say | It produces |
+|---|---|---|
+| A PRD, architecture doc, ADRs, flowchart export | `generate a roadmap from docs/PRD.md` | the roadmap directly |
+| Nothing, and no clear idea yet | `plan product` / `I don't know what to build yet` | `docs/PROJECT.md` via interview, then the roadmap |
+| An existing codebase, no scope doc | `map this codebase into a roadmap source` | `docs/CODEBASE-SUMMARY.md`, then the roadmap |
+
+Output lands in `docs/` — a `ROADMAP.md` plus a machine-readable `roadmap.txt` build order (or a
+`ROADMAP-INDEX.md` with one roadmap per section, if you pick multi-section mode). Backlog position
+lives in a `## Status` block that gets refreshed on every run.
+
+Then hand off to the build cycle:
+
+```
+specify feature <name> — spec source: docs/ROADMAP.md
+```
+
+## How it fits with tlc-spec-driven
+
+The two skills own different files and never collide:
+
+- **This skill** owns `docs/` — the roadmap, the build order, the backlog status.
+- **tlc-spec-driven** owns `.specs/` — specs, designs, tasks, validation reports, decisions.
+
+The only shared surface is one write to `.specs/STATE.md`'s `## Handoff`, in that skill's own field
+schema, pointing back at the roadmap. Feature completion is read from
+`.specs/features/<name>/validation.md`, never tracked by hand — so the two never disagree about
+what's done.
