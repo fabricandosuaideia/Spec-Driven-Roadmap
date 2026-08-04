@@ -24,8 +24,23 @@ curl -fsSL .../install.sh | bash -s -- --global   # install to ~/.claude/skills/
 curl -fsSL .../install.sh | bash -s -- --force    # overwrite an existing install
 ```
 
-> While the repository is private, GitHub returns 404 to unauthenticated requests and the one-liner
-> will not work. Clone the repo and run `./install.sh` from the checkout instead.
+### Windows
+
+`install.sh` needs bash, so it works in Git Bash and WSL. For native PowerShell (5.1+, ships with
+Windows 10 and later) use `install.ps1` instead — it needs no curl, tar, bash or WSL:
+
+```powershell
+irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/install.ps1 | iex
+```
+
+The piped form cannot take parameters. For `-Global` or `-Force`, download it first:
+
+```powershell
+irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/install.ps1 -OutFile install.ps1
+.\install.ps1 -Global -Force
+```
+
+The skill itself is plain markdown and is fully cross-platform; only the installer differs by OS.
 
 ## Prerequisite
 

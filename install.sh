@@ -101,7 +101,8 @@ if [[ -d "$DEST" && "$FORCE" != "true" ]]; then
 fi
 
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+STAGE="${DEST}.tmp.$$"
+trap 'rm -rf "$TMP_DIR" "$STAGE"' EXIT
 
 print_status "Downloading $SKILL_NAME ($BRANCH)..."
 TARBALL_URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.tar.gz"
@@ -113,7 +114,9 @@ if ! curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/skill.tar.gz"; then
 fi
 
 tar -xzf "$TMP_DIR/skill.tar.gz" -C "$TMP_DIR"
-SRC_DIR="$(find "$TMP_DIR" -maxdepth 1 -mindepth 1 -type d -name 'Spec-Driven-Roadmap-*' | head -n1)"
+# -print -quit rather than `| head -n1`: no pipeline, so no SIGPIPE interaction
+# with `set -o pipefail`.
+SRC_DIR="$(find "$TMP_DIR" -maxdepth 1 -mindepth 1 -type d -name 'Spec-Driven-Roadmap-*' -print -quit)"
 
 # Validate the payload BEFORE touching the destination. A partial archive that
 # yielded SKILL.md but no references/ would install a skill whose every
@@ -126,7 +129,6 @@ done
 
 # Stage into a sibling, then swap. The destination is never left half-written.
 print_status "Installing to $DEST..."
-STAGE="${DEST}.tmp.$$"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 cp "$SRC_DIR/SKILL.md" "$STAGE/"

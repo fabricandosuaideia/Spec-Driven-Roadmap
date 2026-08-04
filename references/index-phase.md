@@ -46,7 +46,7 @@ because it looks large or partly built — a section can look mature and still h
 - Each slug is short, mnemonic, kebab-case (3-6 characters is a good target) and used by every
   feature in that section as `<slug>-<kebab-case>`.
 - Slugs must not collide with each other, or with any already used by roadmaps in the project —
-  check existing `docs/ROADMAP-*.md` before assigning.
+  check existing `docs/ROADMAP-*.md` **and `docs/ROADMAP.md`** before assigning.
 - Filenames are exact and case-sensitive: `docs/ROADMAP-<slug>.md` (uppercase ROADMAP) and
   `docs/roadmap-<slug>.txt` (lowercase).
 

@@ -1,6 +1,6 @@
 ---
 name: spec-driven-roadmap
-description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a machine-readable build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) from whatever scope exists, then seeds the downstream spec-driven skill so it can start building feature one. Takes its source from an existing PRD, architecture doc, ADR set or flowchart export; from an interview when the user has no document and no clear idea yet; or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "split this system into buildable features", "turn this PRD into a backlog", "I don't know what to build yet", or wants a roadmap before running a spec-driven build cycle. Do NOT use for writing an individual feature's spec, design, tasks or code, for driving feature-by-feature construction, or for answering "resume work" or "continue" - those belong to the downstream spec-driven skill. Do NOT use for monolith-to-microservices extraction planning.
+description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a machine-readable build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) and seeds the downstream spec-driven skill so it can start building feature one. Sources the scope from an existing PRD, architecture doc or flowchart export, from an interview when the user has no document, or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "turn this PRD into a backlog", or "I do not know what to build yet". Do NOT use for writing a feature's spec, design, tasks or code, for driving construction, or for "resume work" - those belong to the downstream spec-driven skill.
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
@@ -40,7 +40,7 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 2. **Vertical slices only.** A feature is route + service + persistence + test for one coherent
    capability. Never slice by architectural layer. *One bounded exception:* a genuinely shared
    foundation consumed by three or more later features may be its own slice, and must name its
-   consumers (see decompose-phase Step 2).
+   consumers (see decompose-phase Step 3).
 3. **Eight tasks per feature, maximum.** Over budget means split and say why. Never pad.
 4. **No forward dependencies.** A feature may only depend on one listed earlier in the same roadmap.
    Cross-section needs are boundary contracts, never "depends on".
@@ -53,14 +53,16 @@ a map; the procedures live in `references/`. Read the relevant reference complet
    pre-written context.md" to yes. These are the same dimensions that trigger the downstream skill's
    own Discuss step, which is what writes `context.md` — this field predicts that.
 8. **Ask how the scope is shaped.** Single unified roadmap versus multiple section roadmaps is the
-   user's call, made explicitly in Phase 0. Never infer it from how big the source looks.
+   user's call, made explicitly in Phase 0. Never infer it from how big the source looks. Exception:
+   an existing `docs/ROADMAP-INDEX.md` or `docs/ROADMAP.md` already fixed the mode — continue in it.
+   If *both* exist, that is a contradiction: stop and ask which is authoritative.
 9. **Delegate, never author, never loop.** Never write `spec.md`, `design.md`, `tasks.md`, or
    application code. Never re-invoke this skill to march through features. Phase 0's own modes write
    only to `docs/` — never into the downstream skill's namespace.
 10. **Seed once per generation, and never clobber real work.** Write the durable backlog status to
     this skill's own `docs/` file, and only the downstream skill's own field schema to
-    `.specs/STATE.md`'s `## Handoff`. Stop if work is genuinely in flight — tested by evidence, not
-    by whether the Handoff is empty.
+    `.specs/STATE.md`'s `## Handoff` — never an entry under `## Decisions`. Stop if work is genuinely
+    in flight — tested by evidence, not by whether the Handoff is empty.
 11. **Interview and Brownfield modes need explicit confirmation.** Enter them only when a check for
     a source came back empty **and** the user confirmed there is none. An empty `docs/` folder alone
     is never sufficient.
@@ -76,7 +78,8 @@ a map; the procedures live in `references/`. Read the relevant reference complet
   single-section mode `ROADMAP.md` carries the `## Status` block.
 - `docs/roadmap.txt` / `docs/roadmap-<slug>.txt` — build order, one feature name per line.
 - `.specs/STATE.md` `## Handoff` — one write per generation, in the downstream skill's schema.
-  Never `## Decisions`; never `.specs/features/*`.
+  Never an entry under `## Decisions` (the empty header may be created once, only when creating
+  `STATE.md` from scratch); never `.specs/features/*`.
 
 Output directory is `docs/`. This is fixed, not configurable.
 

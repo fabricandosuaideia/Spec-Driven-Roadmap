@@ -27,10 +27,14 @@ Report the seed as pending, and tell the user which skill to install to complete
 stop the whole run.
 
 **Fix the output language.** Write generated documents in the language of the source document if one
-exists; otherwise the language the user is conversing in. **Carve-out, always English regardless:**
-feature names, prefixes, slugs, filenames, and the downstream skill's Handoff field labels
-(`**Feature**`, `**Next step**`, …). Those are machine-read keys and path components; translating
-them breaks the handoff and the `.specs/features/<name>/` directories.
+exists; otherwise the language the user is conversing in — this applies to prose and body text.
+
+**Carve-out, always English regardless:** feature names, prefixes, slugs, filenames, the downstream
+skill's Handoff field labels (`**Feature**`, `**Next step**`, …), **and every generated section
+heading** (`## MVP Scope`, `## Explicitly Out of Scope`, `## Capabilities Already Built`,
+`## Gaps / Likely Next Work`, `## Status`, `## Open Questions`). Those are machine-read keys, path
+components, and literals that later phases locate by exact name — translating any of them breaks the
+handoff, the `.specs/features/<name>/` directories, or a cross-file lookup.
 
 **How to ask.** One question at a time — never batch. Wait for each answer before asking the next.
 Use `AskUserQuestion` where a genuine small option set exists (single-vs-multi mode, which downstream
@@ -42,10 +46,14 @@ anchors the user to something you made up.
 
 ## Routing — pick 0a, 0b, or 0c
 
+Evaluate in order; the first match wins, so the paths never overlap:
+
 1. **A scope document exists** (PRD, ADR set, architecture doc, flowchart export, or a
    `docs/PROJECT.md` / `docs/CODEBASE-SUMMARY.md` from a previous run) → **0a**.
-2. **No document, and the user does not yet know what to build** → **0b, Interview Mode**.
-3. **No document, but a substantial codebase exists** → **0c, Brownfield Mode**.
+2. **No document, but a substantial codebase exists** → **0c, Brownfield Mode** — regardless of
+   whether the user knows what to build next. 0c asks them that directly, and what already exists
+   constrains what to build next, so the codebase must be read either way.
+3. **No document and no substantial codebase** → **0b, Interview Mode**.
 
 **Substantial codebase** means: a dependency manifest plus at least one non-scaffold source
 directory. A bare `create-*-app` skeleton is not substantial — that is a greenfield project, so it
@@ -162,7 +170,11 @@ do not re-ask which document describes the scope. Continue at 0a's single-vs-mul
 
 ### Step 0 — Reuse and overwrite checks
 
-Resolve in this order; never skip ahead while an earlier option is available.
+**First, before anything else: does `docs/CODEBASE-SUMMARY.md` already exist?** If so, show its
+`## Capabilities Already Built` and ask: use as-is (go to 0a), update specific sections, or start
+fresh. Never silently overwrite it, and never run a scan whose output already exists.
+
+Then resolve the source in this order; never skip ahead while an earlier option is available.
 
 1. **The downstream skill's own codebase-mapping output** — e.g. `tlc-spec-driven` **v2's**
    `.specs/codebase/*`. Version matters: v3.x has no such step, so *check whether the confirmed
@@ -171,8 +183,6 @@ Resolve in this order; never skip ahead while an earlier option is available.
 2. **The `codenavi` skill**, if installed. Delegate exploration to it rather than reading files
    natively.
 3. **A light native scan**, when neither is available.
-4. **Does `docs/CODEBASE-SUMMARY.md` already exist?** Show its `## Capabilities Already Built` and
-   ask: use as-is, update, or start fresh.
 
 **Branches 1 and 2 describe what exists — they never say what to build next.** So whichever branch
 supplied the first three sections, you must **always** produce `## Gaps / Likely Next Work`, and its
@@ -190,6 +200,9 @@ go stale the moment that runs.
 - Top-level directory structure, two or three levels → what areas exist.
 - Entry points, route/controller lists, or a README's feature list → what capabilities already exist,
   in plain language.
+
+Extract actual examples, not assumptions: every entry you write must trace to a file you actually
+read, and each `## Capabilities Already Built` bullet records that file as its evidence anchor.
 
 **Sample 5-10 representative files per category** — per category, not overall. A whole-repo cap of
 ten files on a monorepo produces a module list that omits most of the system. If the repo is too
@@ -223,7 +236,8 @@ are not covered here.
 
 ## Capabilities Already Built
 
-- **C1** — [capability. Phase 2 marks these `pre-existing` in the coverage table, not new scope.]
+- **C1** — [capability] (evidence: `path/to/file.ext`)
+  [Phase 2 marks these `pre-existing` in the coverage table, not new scope.]
 
 ## Gaps / Likely Next Work
 

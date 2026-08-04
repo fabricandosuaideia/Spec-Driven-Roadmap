@@ -55,9 +55,18 @@ one failure this phase must not have.
 
 ## Step 3 — Slice into features
 
+**Every feature is a vertical slice** — route + service + persistence + test for one coherent
+capability. "The whole schema", "the whole API layer", "all the UI" is not a feature. Never slice by
+architectural layer; the one bounded exception is the shared-foundation move below.
+
 Assign every scope-unit to exactly one feature. A feature typically groups several related units (a
 table + the module that reads it + the rule that governs it) and never re-declares a unit already
 claimed elsewhere.
+
+Units marked `pre-existing` (Phase 0c's `## Capabilities Already Built`) are enumerated in Step 1 and
+appear in the coverage table with that disposition, but get no feature — they are already built.
+Phase 0b's `## Explicitly Out of Scope` bullets are **not** scope-units at all: they are never
+enumerated, never appear in the coverage table, and never become features.
 
 Common slicing moves:
 
@@ -92,6 +101,10 @@ it. Resolve by:
 2. If the index is silent, deciding by genuine build necessity and **recording it in both roadmaps**:
    the owning roadmap's feature lists the unit as covered with a note on why it lives there; the
    consuming roadmap's coverage table marks it `covered by reference to <owning-roadmap>/<feature>`.
+   *If the consuming roadmap does not exist yet* — the normal case, since decomposition is lazy —
+   record the ownership call in `docs/ROADMAP-INDEX.md`'s boundary contract for that edge instead.
+   That roadmap picks it up from there when it is eventually decomposed. Never create a roadmap file
+   early just to hold one coverage row.
 
 Never build the same schema twice, and never let a unit vanish because each side assumed the other
 claimed it.
@@ -139,15 +152,32 @@ This skill keeps no to-do list of its own — the note in the roadmap is the onl
 
   Close with `uncovered: none (N deferred, N pre-existing, listed above)`. A genuinely uncovered unit
   means Step 3 is not finished.
-- **`## Open Questions` roll-up:** every feature's `status: open` questions in one list, each naming
-  the feature that carries it. The Handoff seed reads this to decide whether to block. Omit the
-  section only when there are genuinely none.
+- **`## Open Questions` roll-up:** every feature's questions in one list, each naming the feature that
+  carries it and tagged `status: open` or `status: answered`. **Answered entries stay** — they are
+  never deleted; the answer itself is the record, and it is what discharges a question-only feature.
+  The Handoff seed reads this list by name to decide whether to block. Omit the section only when
+  there are genuinely no questions at all.
 - **Execution-order block:** a fenced list, one feature name per line, respecting every "depends on".
-  When the source declares increments, mark their boundaries with comment lines the seed ignores:
+  When the source declares increments, mark their boundaries here with a comment line:
   `# --- end of increment 1: <what ships here> ---`.
-- **Standalone `.txt`:** `docs/roadmap-<slug>.txt` (multi-section) or `docs/roadmap.txt` (single),
-  the same list, one name per line, no status markers and no comments other than the increment lines
-  above. This is what the Handoff seed walks; it never re-parses the markdown.
+- **Standalone `.txt`:** `docs/roadmap-<slug>.txt` (multi-section) or `docs/roadmap.txt` (single):
+  **feature names only, one per line — no status markers, no comments, no increment lines.** Keep the
+  increment markers in the markdown block above; this file is machine-read by the Handoff seed, which
+  counts its lines to compute progress, and a comment line would both inflate the total and never
+  match a feature. The seed never re-parses the markdown, so this file must stay trivially parseable.
+
+### Output shape of the roadmap file
+
+`docs/ROADMAP.md` (single-section) or `docs/ROADMAP-<slug>.md` (multi-section):
+
+1. H1 title.
+2. `## Status` — **single-section mode only.** Written and refreshed by the Handoff seed; leave the
+   heading in place even before the first seed. (In multi-section mode this block lives in
+   `docs/ROADMAP-INDEX.md` instead — exactly one `## Status` exists per project.)
+3. The feature entries, each with all ten fields (Step 6).
+4. `## Open Questions` roll-up.
+5. Coverage table, closing with the `uncovered:` line.
+6. Execution-order block.
 
 ## When to re-run, and what is frozen
 

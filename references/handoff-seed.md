@@ -96,15 +96,25 @@ no evidence. Worse, a genuine FAIL report normally contains per-criterion rows r
 so **never substring-match `PASS` across the whole file** — that reports failed work as done and
 makes the seed skip past it.
 
-**Preferred — run the downstream skill's own gate.** `tlc-spec-driven` ships one:
+**Precondition, before any test — check the directory exists.** If `.specs/features/<name>/` is not
+on disk, the feature is **not done**. Stop there; do not run the gate script.
+
+This is not a formality. `tlc-spec-driven`'s `validate_state.py` returns **exit 0 when
+`.specs/features/` does not exist at all** (it prints "nothing to check" and exits before it ever
+looks at the feature argument). A fresh project — the normal state when this skill runs, since it is
+a prequel to the build cycle — would therefore report *every* feature as verified, and the seed would
+conclude the whole backlog is finished and seed nothing.
+
+**Then run the downstream skill's own gate.** `tlc-spec-driven` ships one:
 
 ```
 python3 <skill-dir>/scripts/validate_state.py <feature> --root <project-root>
 ```
 
-Exit code `0` = real PASS. Non-zero = not done (missing report, FAIL, unfilled placeholder, or PASS
-with no `file:line` evidence). `<skill-dir>` is the downstream skill's own directory, not the
-project's.
+Read the result as: exit `0` **and** the feature directory existed = real PASS. Exit `1` = not done
+(missing report, FAIL, unfilled placeholder, or PASS with no `file:line` evidence). Exit `2` = usage
+error, most often the feature directory is missing — also not done. `<skill-dir>` is the downstream
+skill's own directory, not the project's.
 
 **Fallback, when no code execution is available.** Read only the `## Validation` heading line and any
 `**Result**:` line — not the whole file:
@@ -115,15 +125,25 @@ project's.
 - `PASS` with at least one such citation → **done**
 - no `validation.md`, or no verdict at all → **not done**
 
+**One exception — question-only features.** Phase 2 may formalize a blocking open question as its own
+feature (decompose-phase Step 3). It produces no code, so it can never earn a PASS report and would
+block the seed forever. Such a feature is **done** when the roadmap's `## Open Questions` shows its
+question `status: answered`, or when `.specs/features/<name>/context.md` exists. Its roadmap entry
+says it produces no code — that is what marks it as taking this test instead of the PASS test.
+
+**Reading a `.txt`, always:** one feature name per line. Skip blank lines and any line starting with
+`#`. Count and target only feature-name lines.
+
 ## Step 3 — Build the roadmap status list
 
 One line per roadmap, so the whole backlog shape is visible — not a single disconnected pointer.
 
 - **Single-section mode:** one line for `docs/ROADMAP.md`: how many of its features are done
   (Step 2's test) out of the total in `docs/roadmap.txt`.
-- **Multi-section mode:** walk `docs/ROADMAP-INDEX.md`'s section order top to bottom. For each
-  section, read its `roadmap .txt` column to get the exact filename (never reconstruct it from the
-  prefix), then classify:
+- **Multi-section mode:** walk the topological list in `docs/ROADMAP-INDEX.md`'s **Ordering** section
+  (its output-shape item 3) — that is build order; the roadmaps table is not necessarily sorted. For
+  each section, read its **Build-order file** column to get the exact `.txt` filename (never
+  reconstruct it from the slug), then classify:
   - all done → `DONE (X/X, verified PASS)`
   - some done → `IN PROGRESS (N/M verified PASS)`
   - none done, `.txt` exists → `NOT STARTED (0/M)`
@@ -134,14 +154,19 @@ One line per roadmap, so the whole backlog shape is visible — not a single dis
 **Pick the section first (multi-section mode), with an explicit precedence — do not assume only one
 section can be active.** A user who builds out of index order produces several:
 
-1. Any section marked `IN PROGRESS` wins. If more than one is, take the earliest in index order —
-   and say in the report that others are also in progress.
-2. If none is in progress, the first `NOT STARTED` in index order.
+1. Any section marked `IN PROGRESS` wins. If more than one is, take the earliest in the index's
+   Ordering list — and say in the report that others are also in progress.
+2. If none is in progress, the first `NOT STARTED` in that same order.
 3. If neither exists, every decomposed section is done → nothing to seed (see below).
 
 Then walk that section's `.txt` (or `docs/roadmap.txt` in single-section mode) top to bottom. **The
 target is the first name that is not done per Step 2** — not merely the first without a file. The
 remaining build order is every name from the target to the end of that file.
+
+**Guard against name drift.** If a roadmap name has no `.specs/features/<name>/` directory but a
+similarly-named one exists (`auth-login` vs. `auth-signin`), do not count it as unbuilt — that is
+almost certainly the same feature built under a different name. Report the mismatch and stop, rather
+than seeding a pointer that would rebuild shipped work.
 
 **Do not assert what you did not check.** Step 6's template asks for `Completed` / `In-progress`. If
 the target has partial work on disk (a `spec.md`, a `tasks.md` with unchecked boxes) but no PASS,
@@ -196,11 +221,19 @@ Emit **only** the fields that skill defines. For `tlc-spec-driven` v3.x, exactly
 - **Phase / Task**: not started — no spec.md on disk yet
 - **Completed**: none
 - **In-progress** (file:line): none
-- **Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Spec source: `docs/ROADMAP-<slug>.md` section `<target>` (objective, scope-units, dependencies, flagged dimensions and open questions are there — read it before clarifying). Backlog position: `docs/ROADMAP-INDEX.md` `## Status`.
+- **Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Spec source: `<ROADMAP-PATH>` section `<target>` (objective, scope-units, dependencies, flagged dimensions and open questions are there — read it before clarifying). Backlog position: `<STATUS-PATH>` `## Status`.
 - **Blockers**: none
 - **Uncommitted files**: none
 - **Branch**: <output of `git branch --show-current`>
 ```
+
+**Resolve the two path placeholders by mode** — writing an index path in single-section mode points
+at a file that does not exist:
+
+| Placeholder | Multi-section | Single-section |
+|---|---|---|
+| `<ROADMAP-PATH>` | `docs/ROADMAP-<slug>.md` | `docs/ROADMAP.md` |
+| `<STATUS-PATH>` | `docs/ROADMAP-INDEX.md` | `docs/ROADMAP.md` |
 
 Notes on the fields that carry real weight:
 
@@ -212,10 +245,15 @@ Notes on the fields that carry real weight:
   resolved.
 - **Branch** is unconditional. Obtain it with `git branch --show-current`; use `none` only outside a
   git repo.
-- **Blockers** — if the target feature has `needs pre-written context.md: yes` **and** a question in
-  its `open questions` field (or in a boundary contract's marked-open item it consumes), put the
-  exact question here instead of `none`, and set **Next step** to answering it rather than the
-  specify trigger. Never point a fresh start past an unanswered question.
+- **Uncommitted files** — report what `git status --porcelain` actually shows, not a blind `none`.
+  The downstream skill's resume reconciles this field against git, so a false `none` is a claim it
+  will catch and have to work around.
+- **Blockers** — if the target feature has `needs pre-written context.md: yes` **and** a question
+  tagged `status: open` in its `open questions` field (or an unresolved marked-open item in a
+  boundary contract it consumes), put the exact question here instead of `none`, and set **Next
+  step** to answering it rather than the specify trigger. Treat the question as resolved if the
+  roll-up entry reads `status: answered` or `.specs/features/<target>/context.md` already exists.
+  Never point a fresh start past an unanswered question.
 
 Keep the whole section near the downstream skill's ~500-token budget. The backlog picture is not
 repeated here — Step 5's file holds it, and **Next step** points at it.
@@ -228,8 +266,11 @@ Tell the user, plainly:
 - which feature was seeded as next — or that nothing was seeded, and why (work in flight / nothing
   left / blocked on an open question);
 - **the exact command to run next, verbatim**, since the downstream skill is normally entered by the
-  user typing its trigger:
-  `specify feature <target> — spec source: docs/ROADMAP-<slug>.md`
+  user typing its trigger — using the same `<ROADMAP-PATH>` resolved in Step 6:
+  `specify feature <target> — spec source: <ROADMAP-PATH>`
+  **Unless Step 6 recorded a blocker.** Then give no specify command: report the question that has to
+  be answered first, so the user is not handed a command that would start a feature that cannot
+  start cleanly.
 - that construction from here on is the downstream skill's own job, through its own triggers.
 
 Then stop. Do not wait, do not poll `validation.md`, do not check back in. Moving from this feature
