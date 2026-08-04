@@ -9,6 +9,9 @@ start building feature one.
 
 It is a **prequel** to the build cycle. It never writes specs, designs, tasks, or code.
 
+📖 **New here? Read the how-it-works guide first:**
+[English](guide/HOW-IT-WORKS.md) · [Português](guide/HOW-IT-WORKS.pt-BR.md) · [Español](guide/HOW-IT-WORKS.es.md)
+
 ## Install
 
 ### As a plugin (recommended)
