@@ -1,0 +1,28 @@
+{
+  "name": "fabricandosuaideia",
+  "owner": {
+    "name": "Fabricando Sua Ideia",
+    "url": "https://github.com/fabricandosuaideia"
+  },
+  "metadata": {
+    "description": "Skills and plugins from Fabricando Sua Ideia",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "spec-driven-roadmap",
+      "source": "./",
+      "description": "Generates a dependency-ordered feature backlog from a PRD, architecture doc, interview, or existing codebase, then seeds the downstream spec-driven build skill.",
+      "version": "3.1.0",
+      "author": {
+        "name": "Fabricando Sua Ideia",
+        "url": "https://github.com/fabricandosuaideia"
+      },
+      "homepage": "https://github.com/fabricandosuaideia/Spec-Driven-Roadmap",
+      "repository": "https://github.com/fabricandosuaideia/Spec-Driven-Roadmap",
+      "license": "MIT",
+      "category": "development",
+      "keywords": ["roadmap", "spec-driven", "planning", "backlog", "product"]
+    }
+  ]
+}
