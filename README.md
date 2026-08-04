@@ -11,6 +11,17 @@ It is a **prequel** to the build cycle. It never writes specs, designs, tasks, o
 
 ## Install
 
+### As a plugin (recommended)
+
+Works on every OS Claude Code runs on, and gives you `/plugin update`:
+
+```
+/plugin marketplace add fabricandosuaideia/Spec-Driven-Roadmap
+/plugin install spec-driven-roadmap@fabricandosuaideia
+```
+
+### As a plain skill
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/install.sh | bash
 ```
