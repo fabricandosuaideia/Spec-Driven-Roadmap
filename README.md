@@ -59,14 +59,19 @@ The roadmap hands off to a downstream spec-driven skill, which does the actual b
 assumption is [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills):
 
 ```bash
-git init                       # if the project is not a git repo yet — see note
+git init   # only if this folder has no version control yet — see note below
 npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
 ```
 
-> **Run this from the project root, inside a git repository.** Outside one, the installer prints
-> `✅ Successfully installed` and exits 0 while writing nothing to `.claude/skills/`. Verify with
+> **This installer requires a git repository — but you likely already have one.** If you're running
+> this inside a project you're already versioning (it has a `.git` folder, however it got there —
+> `git init`, `git clone`, etc.), skip the `git init` line; the requirement is already satisfied.
+> `git init` is only needed as a one-time fix for a brand-new, not-yet-versioned folder.
+>
+> Outside a git repository, the installer prints `✅ Successfully installed` and exits 0 while
+> writing nothing to `.claude/skills/` — no error, so the gap is easy to miss. Verify with
 > `ls .claude/skills/tlc-spec-driven` before moving on. (The two installers above have no such
-> requirement — they work in any directory.)
+> requirement — they work in any directory, git or not.)
 
 Without a downstream skill installed, the roadmap is still generated — only the handoff step is
 skipped, and it tells you so.
