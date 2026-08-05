@@ -219,3 +219,7 @@ __marimo__/
 
 # Reference
 .reference/
+
+# Locally installed skills (used for testing this repo, not part of it)
+.claude/
+.agents/

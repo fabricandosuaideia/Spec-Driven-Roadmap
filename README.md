@@ -1,5 +1,7 @@
 # Spec-Driven-Roadmap
 
+🌐 **Available in:** [English](README.md) · [Português](README.pt-BR.md) · [Español](README.es.md)
+
 Roadmap and Product Plan Creator compatible with the TLC Spec-Driven Framework.
 
 A Claude Code skill that decides **what to build and in what order**, then hands off. It turns a
@@ -59,11 +61,13 @@ The skill itself is plain markdown and is fully cross-platform; only the install
 ## Prerequisite
 
 The roadmap hands off to a downstream spec-driven skill, which does the actual building. Default
-assumption is [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills):
+assumption is [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills), paired with its
+companion skill [`not-your-babysitter`](https://github.com/tech-leads-club/agent-skills):
 
 ```bash
 git init   # only if this folder has no version control yet — see note below
 npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
+npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-code
 ```
 
 > **This installer requires a git repository — but you likely already have one.** If you're running
@@ -73,8 +77,8 @@ npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
 >
 > Outside a git repository, the installer prints `✅ Successfully installed` and exits 0 while
 > writing nothing to `.claude/skills/` — no error, so the gap is easy to miss. Verify with
-> `ls .claude/skills/tlc-spec-driven` before moving on. (The two installers above have no such
-> requirement — they work in any directory, git or not.)
+> `ls .claude/skills/tlc-spec-driven` and `ls .claude/skills/not-your-babysitter` before moving on.
+> (The two installers above have no such requirement — they work in any directory, git or not.)
 
 Without a downstream skill installed, the roadmap is still generated — only the handoff step is
 skipped, and it tells you so.
