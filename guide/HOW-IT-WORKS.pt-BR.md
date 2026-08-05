@@ -126,21 +126,40 @@ por design: ela nunca decide algo ambíguo no seu lugar.
 
 ## O que acontece depois
 
-Quando o roadmap está pronto e sua skill de build está instalada, a skill te diz o comando exato
-para rodar — algo como:
+Quando o roadmap está pronto e sua skill de build está instalada, a skill confirma que o trabalho de
+planejamento terminou e pergunta **como você quer construir**. Duas opções:
+
+**A — uma feature por vez.** Você recebe o comando só da próxima feature, roda, e volta quando ela
+passar:
 
 ```
 specify feature `tt-create-task` — spec source: docs/ROADMAP.md
 ```
 
-Essa é a última coisa que essa skill faz. Dali em diante, todo o ciclo de build — spec, design,
-tasks, implementação, verificação — pertence inteiramente à sua skill de build (`tlc-spec-driven`,
-por padrão). Essa skill não intervém de novo até você pedir para gerar ou atualizar um roadmap.
+**B — o roadmap inteiro em um loop.** Você recebe um prompt que começa com `/loop` (o comando de loop
+do seu próprio CLI — Claude Code, Cursor e OpenCode têm um) e que só termina quando todas as features
+do backlog estiverem verificadas. Como um loop roda sem supervisão e não tem a quem perguntar, essa
+opção exige um roadmap com **zero perguntas em aberto** — então a skill primeiro lê o roadmap inteiro
+atrás de lacunas, te entrevista até toda pergunta em aberto ser respondida, grava as respostas de
+volta, e então relê os arquivos do disco para confirmar que não sobrou nada em aberto. Só aí ela te
+entrega o prompt.
+
+⚠️ **Nos dois casos, rode esse prompt em uma nova sessão de chat, com contexto limpo** — não na
+sessão que gerou o roadmap. A própria skill vai te avisar disso. A skill de build relê tudo o que
+precisa de `.specs/STATE.md` e dos arquivos do roadmap no disco; reaproveitar a sessão de
+planejamento só arrisca ela trabalhar pela conversa lembrada em vez dos arquivos escritos, e começa a
+construção com o orçamento de contexto já gasto.
+
+Esse prompt é a última coisa que essa skill faz. Dali em diante, todo o ciclo de build — spec,
+design, tasks, implementação, verificação — pertence inteiramente à sua skill de build
+(`tlc-spec-driven`, por padrão). Mesmo no modo loop, quem conduz aquela skill é o seu CLI; essa aqui
+já parou. Ela não intervém de novo até você pedir para gerar ou atualizar um roadmap.
 
 ## O que ela deliberadamente *não* faz
 
 - Nunca escreve `spec.md`, `design.md`, `tasks.md`, ou código de aplicação.
-- Nunca avança pelas features sozinha — sem loop de build, sem avanço automático.
+- Nunca avança pelas features sozinha — sem avanço automático. Ela até *escreve* um prompt `/loop`
+  para você, mas quem roda é o seu CLI, na sua sessão, depois que essa skill já parou.
 - Nunca chuta uma ambiguidade — ela pergunta, ou registra como pergunta em aberto e bloqueia o
   handoff até isso ser resolvido.
 - Nunca re-deriva o que outra skill já mapeou — se sua skill de build (ou a `codenavi`) já

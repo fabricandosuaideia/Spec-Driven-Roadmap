@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.1.0"
+  version: "3.2.0"
 ---
 
 # Spec-Driven Roadmap
@@ -30,7 +30,7 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 | 0 | [references/scope-phase.md](references/scope-phase.md) | Locate a source doc (0a), interview to create one (0b), or derive one from the codebase (0c). Confirms the downstream skill, output language, and single-vs-multi mode. |
 | 1 | [references/index-phase.md](references/index-phase.md) | Multi-section mode only: section map, dependency graph, boundary contracts. |
 | 2 | [references/decompose-phase.md](references/decompose-phase.md) | Slice into vertical features with full coverage, open questions, and a build order. |
-| Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then one Handoff write to `.specs/STATE.md`. |
+| Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then one Handoff write to `.specs/STATE.md`. Then hand the user one implementation prompt — a single feature, or a `/loop` over the whole roadmap (which first requires every open question closed). |
 
 ## Non-negotiable rules
 
@@ -58,7 +58,9 @@ a map; the procedures live in `references/`. Read the relevant reference complet
    If *both* exist, that is a contradiction: stop and ask which is authoritative.
 9. **Delegate, never author, never loop.** Never write `spec.md`, `design.md`, `tasks.md`, or
    application code. Never re-invoke this skill to march through features. Phase 0's own modes write
-   only to `docs/` — never into the downstream skill's namespace.
+   only to `docs/` — never into the downstream skill's namespace. Handing the user a `/loop` prompt
+   at the seed is not an exception: this skill emits that text and stops. The loop is the user's CLI
+   driving the downstream skill, never this skill running itself.
 10. **Seed once per generation, and never clobber real work.** Write the durable backlog status to
     this skill's own `docs/` file, and only the downstream skill's own field schema to
     `.specs/STATE.md`'s `## Handoff` — never an entry under `## Decisions`. Stop if work is genuinely

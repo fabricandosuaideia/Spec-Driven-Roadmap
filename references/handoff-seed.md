@@ -11,7 +11,10 @@
 - [Step 4 — Find the target feature and its remaining order](#step-4--find-the-target-feature-and-its-remaining-order)
 - [Step 5 — Write the durable Status block (this skill's own file)](#step-5--write-the-durable-status-block-this-skills-own-file)
 - [Step 6 — Write the Handoff (downstream skill's file, its exact schema)](#step-6--write-the-handoff-downstream-skills-file-its-exact-schema)
-- [Step 7 — Report and stop](#step-7--report-and-stop)
+- [Step 7 — Report the outcome](#step-7--report-the-outcome)
+- [Step 8 — Ask which implementation prompt to hand over](#step-8--ask-which-implementation-prompt-to-hand-over)
+- [Step 9 — Loop option only: close every open question first](#step-9--loop-option-only-close-every-open-question-first)
+- [Step 10 — Hand over the prompt, warn about the session, stop](#step-10--hand-over-the-prompt-warn-about-the-session-stop)
 
 ## Goal
 
@@ -23,6 +26,9 @@ two different lifetimes:
    what's done, remaining build order). Rewritten freely on every seed; nothing else owns it.
 2. **`## Handoff` in `.specs/STATE.md`** — the downstream skill's own pause snapshot, in **its**
    exact schema, carrying a pointer back to (1).
+
+Then it hands the user **one prompt** to start construction with — either one feature, or a `/loop`
+run across the whole roadmap — and stops.
 
 This is the entire extent of this skill's involvement in construction — no waiting for PASS, no
 advancing to the next feature automatically, no re-invoking itself. Once this step reports, every
@@ -234,6 +240,7 @@ at a file that does not exist:
 |---|---|---|
 | `<ROADMAP-PATH>` | `docs/ROADMAP-<slug>.md` | `docs/ROADMAP.md` |
 | `<STATUS-PATH>` | `docs/ROADMAP-INDEX.md` | `docs/ROADMAP.md` |
+| `<BUILD-ORDER-TXT>` | `docs/roadmap-<slug>.txt` (from the index's **Build-order file** column) | `docs/roadmap.txt` |
 
 Notes on the fields that carry real weight:
 
@@ -258,24 +265,166 @@ Notes on the fields that carry real weight:
 Keep the whole section near the downstream skill's ~500-token budget. The backlog picture is not
 repeated here — Step 5's file holds it, and **Next step** points at it.
 
-## Step 7 — Report and stop
+## Step 7 — Report the outcome
 
 Tell the user, plainly:
 
+- that roadmap generation is finished — this is the moment the planning work closes;
 - the roadmap status list from Step 3, one line each;
 - which feature was seeded as next — or that nothing was seeded, and why (work in flight / nothing
   left / blocked on an open question);
-- **the exact command to run next, verbatim**, since the downstream skill is normally entered by the
-  user typing its trigger — using the same `<ROADMAP-PATH>` resolved in Step 6:
-  `specify feature <target> — spec source: <ROADMAP-PATH>`
-  **Unless Step 6 recorded a blocker.** Then give no specify command: report the question that has to
-  be answered first, so the user is not handed a command that would start a feature that cannot
-  start cleanly.
 - that construction from here on is the downstream skill's own job, through its own triggers.
 
-Then stop. Do not wait, do not poll `validation.md`, do not check back in. Moving from this feature
-to the next is the user's decision. If asked to seed again later, this procedure simply re-runs from
-Step 1, and Step 1's evidence test is what keeps it from clobbering real progress.
+Then go to Step 8 — **unless** any of these hold, in which case there is no prompt to hand over and
+this procedure ends here:
+
+- **Nothing was seeded** (work in flight, or every feature already done). There is no target to
+  build; offering a prompt would point at nothing.
+- **No downstream skill exists** (Phase 0 recorded its absence). Say the roadmap is complete and
+  name what to install to build from it; there is no trigger to put in a prompt.
+
+A blocker recorded in Step 6 does **not** end it here — Step 8 is still offered, because option B
+exists precisely to close blocking questions.
+
+## Step 8 — Ask which implementation prompt to hand over
+
+The roadmap is done and the user now has to actually build from it. There are two legitimate ways to
+drive that, and **which one is the user's call — never pick for them, and never default to the loop
+because it looks faster.** Ask, in the confirmed output language:
+
+- **Option A — one feature at a time.** They get the prompt for `<target>` only, run it, and come
+  back for the next feature when it passes. Full control, a checkpoint per feature.
+- **Option B — one `/loop` run over the whole roadmap.** The build does not stop until every feature
+  in the backlog is verified PASS. State the precondition up front: **the roadmap must have zero open
+  questions**, because a loop has no one to ask. If any remain, you will interview them closed first,
+  and only then produce the prompt.
+
+If Step 6 recorded a blocker, say so here: option A cannot give a clean start command until that
+question is answered, and option B's sweep is what answers it.
+
+Option A → skip to Step 10. Option B → Step 9.
+
+## Step 9 — Loop option only: close every open question first
+
+*Only when the user chose option B.*
+
+A loop runs unattended. Every ambiguity rule 1 refused to guess is a place the run would either stall
+or silently guess — so all of them get closed **before** the prompt exists. Announce that first: say
+you will read the roadmap for gaps, and that the roadmap must be complete before you can hand over a
+loop prompt.
+
+**1. Sweep every decomposed roadmap, in full.** Not just the target's section, and not just the
+target feature — the loop will run past all of them without stopping.
+
+- Single-section mode: `docs/ROADMAP.md`.
+- Multi-section mode: every `docs/ROADMAP-<slug>.md` that exists — i.e. every section Step 3 did not
+  classify `NOT YET DECOMPOSED`.
+
+Read each file top to bottom. Collect open questions from **both** places they live: each feature's
+`open questions` field, and the `## Open Questions` roll-up. They can disagree — a question present
+in one and missing from the other is still an open question, and the roll-up is the half the loop
+prompt's reader is least likely to check.
+
+**Sections that are `NOT YET DECOMPOSED` cannot be covered by the loop.** Decomposing them is a
+Phase 2 run, and this skill never marches through phases on its own (rule 9). Say plainly which
+sections the loop prompt will *not* build, so the user does not read "loop until done" as "loop until
+the whole product exists".
+
+**2. Interview them closed, one at a time, in build order** — earliest-blocking question first, so an
+answer that reshapes later questions arrives before them. For each: quote the question, cite where
+the source leaves it unresolved (the field already carries that citation), and wait for the answer.
+Never batch them into one wall of questions, and never answer one yourself.
+
+If the user replies "you decide": ask once for the single constraint that actually governs the
+choice, then record the resulting choice as the answer, noting it was delegated. Never leave a
+question effectively unanswered while tagging it `answered`.
+
+If the user abandons the interview or defers a question, **option B is off the table.** Say so, and
+fall back to option A at the first still-open question. Never emit a loop prompt over a roadmap with
+a known gap.
+
+**3. Write each answer back, in both places.** For the feature that carries the question: retag its
+`open questions` line `status: answered` and write the answer inline. For the `## Open Questions`
+roll-up: the same, on that question's entry. Answered entries are never deleted (decompose-phase
+Step 7). Then re-evaluate that feature's **needs pre-written context.md** — it stays `yes` if any
+implicit dimension is still present, and flips to `no` only when the open question was its sole
+cause.
+
+**Stay inside the question.** Do not re-open scope-units, dependencies, sizing, or task estimates
+from an answer. If an answer genuinely invalidates the decomposition — it reveals a scope-unit no
+feature covers, or breaks a dependency edge — stop and say Phase 2 has to be re-run for that
+roadmap, under its own "When to re-run, and what is frozen" rules. Never quietly patch a
+decomposition inside this step.
+
+**4. Re-read from disk before speaking to the user again.** When the last answer is written, read
+every swept roadmap file again, top to bottom, from disk — not from your memory of the interview.
+Confirm no `status: open` survives anywhere, in either place. If one turns up (the usual cause is a
+roll-up and a feature field that were out of sync), close it and re-read again. Repeat until a full
+read comes back clean. Do not report "no gaps" on the strength of having asked the questions; report
+it on the strength of having re-read the files.
+
+**5. Recompute the seed if anything moved.** Closing a question can discharge a question-only feature
+(Step 2's exception), which changes the target and the remaining order — and it clears the Step 6
+**Blockers** field. If any question was closed, re-run Steps 2–6 before emitting the prompt, so the
+`## Status` block and the Handoff cannot contradict the prompt you are about to hand over.
+
+## Step 10 — Hand over the prompt, warn about the session, stop
+
+Give the prompt **verbatim, in one copy-paste block** — the downstream skill is entered by the user
+typing its trigger, so a paraphrase is a broken handoff. Resolve every placeholder against Step 6's
+table. Write the prose in the confirmed output language, but keep trigger phrases, feature names and
+file paths exactly as they are on disk.
+
+`specify feature` in both templates below is `tlc-spec-driven`'s trigger. If Phase 0 confirmed a
+different downstream skill, substitute **its** fresh-start trigger phrase — the same one Step 6's
+**Next step** carries. A prompt built on a trigger the installed skill does not answer to is inert.
+
+**Option A — one feature:**
+
+```
+specify feature <target> — spec source: <ROADMAP-PATH>
+```
+
+*Unless Step 6 recorded a blocker.* Then give no command at all: report the question that has to be
+answered first, so the user is not handed a command that would start a feature that cannot start
+cleanly.
+
+**Option B — the whole roadmap in one loop.** Tell the user first that `/loop` must be the literal
+first thing in the message — it is their CLI's own loop command (Claude Code, Cursor, OpenCode all
+have one), and it is already baked into the front of the prompt below, so it must be pasted as-is,
+not retyped after a greeting. This skill never runs that loop itself; it only writes the prompt.
+
+```
+/loop Implement the entire roadmap at <ROADMAP-PATH>, one feature at a time, in the exact order of
+<BUILD-ORDER-TXT>, using the `<downstream-skill>` skill for every feature — run its full cycle
+(specify → design → tasks → execute → verify), starting each feature with:
+`specify feature <name> — spec source: <ROADMAP-PATH>`. Start at `<target>`. Do not skip a feature,
+do not reorder them, and do not start the next one until the current one has a verified PASS in
+`.specs/features/<name>/validation.md`. Backlog position is at <STATUS-PATH> `## Status`. Stop only
+when every feature in <BUILD-ORDER-TXT> has a verified PASS.
+```
+
+Point at the paths; never paste the roadmap's contents into the prompt — the files are on disk and
+the run will read them, and an inlined copy goes stale the moment anything is edited. In
+multi-section mode, list each decomposed section's `<ROADMAP-PATH>` / `<BUILD-ORDER-TXT>` pair in
+index order and name the sections the loop does not cover. If the user's tool has no `/loop`, the
+body still works as a plain instruction — say so, and say the run will then need supervising.
+
+**Then the session warning — both options, every time, unconditionally.** Do not omit it because the
+option looked simple or the session felt short. Render it prominently, in the confirmed output
+language:
+
+> ⚠️ **Open a new chat session before running this prompt.** Paste it into a fresh session with clean
+> context — not this one. This session is full of scope and decomposition reasoning that construction
+> does not need; the downstream skill re-derives everything it needs from `.specs/STATE.md` and the
+> roadmap files on disk, which is exactly what the Handoff and the paths in the prompt are for.
+> Building here risks the agent working from remembered conversation instead of the written
+> artifacts, and it starts the build with the context budget already spent.
+
+Then stop. Do not wait, do not poll `validation.md`, do not check back in — including under option B,
+where the loop is the user's CLI running the downstream skill, not this skill continuing. If asked to
+seed again later, this procedure simply re-runs from Step 1, and Step 1's evidence test is what keeps
+it from clobbering real progress.
 
 **Optional bridge, offered as text — never written automatically.** The downstream skill only reaches
 `docs/` through its Knowledge Verification Chain, not by default. If the project has a `CLAUDE.md`,
