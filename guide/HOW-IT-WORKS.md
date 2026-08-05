@@ -122,6 +122,20 @@ Notice it didn't guess how team membership works — the PRD never said, so it f
 open question and **refused to hand off the first feature** until that gets answered. That's by
 design: it never decides something ambiguous on your behalf.
 
+## The questions it asks before finishing
+
+Before closing the roadmap, it runs one short sweep of **project-wide decisions** — the ones that
+would otherwise get re-decided, differently, inside every feature: soft or hard delete, the auth
+model, what happens on a partial failure, retry and idempotency policy, what must never be logged.
+It only asks about themes your roadmap actually touches, and each comes with a recommended default
+you can accept in a word. The answers go into a `## Cross-Cutting Decisions` block that every
+feature is then built against.
+
+It deliberately **does not** ask about everything. Decisions that live inside a single feature —
+layout, response shape, error wording — are left to your build skill, which asks them later with
+the actual code in front of it and answers them better for it. Those are listed in an
+`## Expected Gray Areas` block so you can see what's coming without having to decide it now.
+
 ## What happens next
 
 Once the roadmap is ready and your build skill is installed, the skill confirms that the planning

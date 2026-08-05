@@ -124,6 +124,20 @@ Repare que ela não chutou como funciona a associação de time — o PRD nunca 
 como pergunta em aberto e **recusou entregar a primeira feature** até isso ser respondido. É assim
 por design: ela nunca decide algo ambíguo no seu lugar.
 
+## As perguntas que ela faz antes de terminar
+
+Antes de fechar o roadmap, ela roda uma varredura curta de **decisões que valem para o projeto
+inteiro** — aquelas que, sem isso, seriam redecididas de forma diferente dentro de cada feature:
+delete lógico ou físico, modelo de auth, o que acontece numa falha parcial, política de retry e
+idempotência, o que nunca pode ir para o log. Ela só pergunta sobre os temas que o seu roadmap
+realmente toca, e cada um vem com um default recomendado que você aceita numa palavra. As respostas
+vão para um bloco `## Cross-Cutting Decisions`, e toda feature passa a ser construída contra ele.
+
+Ela deliberadamente **não** pergunta sobre tudo. Decisões que vivem dentro de uma feature só —
+layout, formato de resposta, texto de erro — ficam para a sua skill de build, que pergunta depois
+com o código na frente e responde melhor por isso. Essas ficam listadas num bloco
+`## Expected Gray Areas`, para você ver o que vem pela frente sem precisar decidir agora.
+
 ## O que acontece depois
 
 Quando o roadmap está pronto e sua skill de build está instalada, a skill confirma que o trabalho de

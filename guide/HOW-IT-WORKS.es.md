@@ -123,6 +123,20 @@ Nota que no adivinó cómo funciona la pertenencia a equipos — el PRD nunca lo
 como pregunta abierta y **se negó a entregar la primera feature** hasta que eso se responda. Así es
 por diseño: nunca decide algo ambiguo en tu lugar.
 
+## Las preguntas que hace antes de terminar
+
+Antes de cerrar el roadmap, corre un barrido corto de **decisiones que valen para todo el proyecto**
+— las que, sin esto, se volverían a decidir de forma distinta dentro de cada feature: borrado lógico
+o físico, modelo de auth, qué pasa ante una falla parcial, política de retry e idempotencia, qué
+nunca debe ir al log. Solo pregunta por los temas que tu roadmap realmente toca, y cada uno viene con
+un default recomendado que puedes aceptar en una palabra. Las respuestas van a un bloque
+`## Cross-Cutting Decisions`, y toda feature se construye contra él.
+
+Deliberadamente **no** pregunta por todo. Las decisiones que viven dentro de una sola feature —
+layout, formato de respuesta, texto de error — quedan para tu skill de build, que las pregunta
+después con el código delante y las responde mejor por eso. Esas quedan listadas en un bloque
+`## Expected Gray Areas`, para que veas lo que viene sin tener que decidirlo ahora.
+
 ## Qué pasa después
 
 Cuando el roadmap está listo y tu skill de build está instalada, la skill confirma que el trabajo de

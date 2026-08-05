@@ -227,7 +227,7 @@ Emit **only** the fields that skill defines. For `tlc-spec-driven` v3.x, exactly
 - **Phase / Task**: not started — no spec.md on disk yet
 - **Completed**: none
 - **In-progress** (file:line): none
-- **Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Spec source: `<ROADMAP-PATH>` section `<target>` (objective, scope-units, dependencies, flagged dimensions and open questions are there — read it before clarifying). Backlog position: `<STATUS-PATH>` `## Status`.
+- **Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Spec source: `<ROADMAP-PATH>` section `<target>` (objective, scope-units, dependencies, flagged dimensions and open questions are there — read it before clarifying). Project-wide decisions already settled: `<STATUS-PATH>` `## Cross-Cutting Decisions` — read before Discuss and do not re-decide what it answers. Backlog position: `<STATUS-PATH>` `## Status`.
 - **Blockers**: none
 - **Uncommitted files**: none
 - **Branch**: <output of `git branch --show-current`>
@@ -242,14 +242,21 @@ at a file that does not exist:
 | `<STATUS-PATH>` | `docs/ROADMAP-INDEX.md` | `docs/ROADMAP.md` |
 | `<BUILD-ORDER-TXT>` | `docs/roadmap-<slug>.txt` (from the index's **Build-order file** column) | `docs/roadmap.txt` |
 
+`<STATUS-PATH>` carries **both** project-level blocks — `## Status` and `## Cross-Cutting Decisions`
+(decompose-phase Step 7a) — which is why one placeholder serves both references above. They live
+together for the same reason: exactly one of each exists per project.
+
 Notes on the fields that carry real weight:
 
 - **Next step** is the highest-value field in this file: it is the one place both the downstream
   skill's resume *and* the human read. It must carry (a) the trigger phrase confirmed at Phase 0,
-  (b) the exact directory name so the built feature matches the roadmap's name, and (c) the roadmap
-  path. Without (c) the entire Phase 2 output — objective, scope-units, dependencies, sizing,
-  dimensions — reaches nothing, and the user gets re-interviewed on scope this skill already
-  resolved.
+  (b) the exact directory name so the built feature matches the roadmap's name, (c) the roadmap
+  path, and (d) the pointer to `## Cross-Cutting Decisions`. Without (c) the entire Phase 2 output —
+  objective, scope-units, dependencies, sizing, dimensions — reaches nothing, and the user gets
+  re-interviewed on scope this skill already resolved. Without (d) the same happens to Step 7a: that
+  skill's Discuss reads `spec.md` and the codebase, never this skill's `docs/` unprompted, so a
+  project decision the user already made gets asked again per feature — and answered inconsistently,
+  which is worse than not having asked at all.
 - **Branch** is unconditional. Obtain it with `git branch --show-current`; use `none` only outside a
   git repo.
 - **Uncommitted files** — report what `git status --porcelain` actually shows, not a blind `none`.
@@ -299,6 +306,16 @@ because it looks faster.** Ask, in the confirmed output language:
   questions**, because a loop has no one to ask. If any remain, you will interview them closed first,
   and only then produce the prompt.
 
+**Say what option B actually trades away — it is not "no questions left".** Closing the roadmap's
+open questions does not close the gray areas Phase 2 Step 7b deliberately left to the downstream
+skill's own Discuss. In a loop those get the agent's default, recorded with its rationale in each
+spec's Assumptions & Open Questions, for the user to review afterwards. That is a legitimate trade
+and it is that skill's own documented fallback (Step 10), but it is the user's to make knowingly:
+option B means *"the roadmap has no gaps, and the implementation-shape calls inside each feature get
+decided for you and written down"*. Name the count from `## Expected Gray Areas` so the size of that
+trade is concrete rather than abstract. Under option A those same gray areas are put to the user in
+context, with the code in front of them — which is the better answer whenever a human is available.
+
 If Step 6 recorded a blocker, say so here: option A cannot give a clean start command until that
 question is answered, and option B's sweep is what answers it.
 
@@ -325,8 +342,19 @@ Read each file top to bottom. Collect open questions from **both** places they l
 in one and missing from the other is still an open question, and the roll-up is the half the loop
 prompt's reader is least likely to check.
 
+Also read `## Cross-Cutting Decisions` (in `docs/ROADMAP.md`, or `docs/ROADMAP-INDEX.md` in
+multi-section mode). Not for open questions — Phase 2 Step 7a's unanswered themes were already
+routed into `## Open Questions` tagged `cross-cutting`. Read it because point 4's propagation check
+tests every new answer against it, and because a theme sitting there as a bare `N/A because` whose
+reason no longer holds is a gap the sweep should catch.
+
+**Do not sweep `## Expected Gray Areas`.** Those were deliberately left to the downstream skill's own
+Discuss (decompose-phase Step 7b) — they failed the three tests, meaning they are feature-local and
+better answered with the code in front of them. Step 10's prompt is what tells the run how to handle
+them unattended; re-asking them here is the exact waste Step 7 exists to prevent.
+
 **Sections that are `NOT YET DECOMPOSED` cannot be covered by the loop.** Decomposing them is a
-Phase 2 run, and this skill never marches through phases on its own (rule 9). Say plainly which
+Phase 2 run, and this skill never marches through phases on its own (rule 10). Say plainly which
 sections the loop prompt will *not* build, so the user does not read "loop until done" as "loop until
 the whole product exists".
 
@@ -346,9 +374,15 @@ a known gap.
 **3. Write each answer back, in both places.** For the feature that carries the question: retag its
 `open questions` line `status: answered` and write the answer inline. For the `## Open Questions`
 roll-up: the same, on that question's entry. Answered entries are never deleted (decompose-phase
-Step 7). Then re-evaluate that feature's **needs pre-written context.md** — it stays `yes` if any
+Step 8). Then re-evaluate that feature's **needs pre-written context.md** — it stays `yes` if any
 implicit dimension is still present, and flips to `no` only when the open question was its sole
 cause.
+
+**A question tagged `cross-cutting` takes a third write: its answer becomes an entry in
+`## Cross-Cutting Decisions`.** The roll-up keeps the answered question as the record of where the
+decision came from; the decisions block is what actually reaches the build, since Step 6's **Next
+step** and Step 10's prompts point there and not at the roll-up. An answer that lands only in
+`## Open Questions` was collected and then dropped on the floor.
 
 **Stay inside the question.** Do not re-open scope-units, dependencies, sizing, or task estimates
 from an answer. If an answer genuinely invalidates the decomposition — it reveals a scope-unit no
@@ -356,12 +390,39 @@ feature covers, or breaks a dependency edge — stop and say Phase 2 has to be r
 roadmap, under its own "When to re-run, and what is frozen" rules. Never quietly patch a
 decomposition inside this step.
 
-**4. Re-read from disk before speaking to the user again.** When the last answer is written, read
-every swept roadmap file again, top to bottom, from disk — not from your memory of the interview.
-Confirm no `status: open` survives anywhere, in either place. If one turns up (the usual cause is a
-roll-up and a feature field that were out of sync), close it and re-read again. Repeat until a full
-read comes back clean. Do not report "no gaps" on the strength of having asked the questions; report
-it on the strength of having re-read the files.
+**4. Re-read from disk, and check what the answers set off.** When the last answer is written, read
+every swept roadmap file again, top to bottom, from disk — not from your memory of the interview. Do
+not report "no gaps" on the strength of having asked the questions; report it on the strength of
+having re-read the files.
+
+The re-read does two things at once. First, the obvious one: confirm no `status: open` survives
+anywhere, in either place. If one turns up — the usual cause is a roll-up and a feature field that
+were out of sync — close it and start the pass over.
+
+Second, and this is what the pass is really for: **an answer is not inert.** It can create work
+somewhere else in the roadmap that nobody wrote down, and the loop will not notice. Test each answer
+just given against this fixed list, in the other features, not only in the one that carried the
+question:
+
+1. **It adds a dimension elsewhere.** "Payments retry automatically" gives the orders feature
+   idempotency/dedup that was never flagged on it.
+2. **It creates a question elsewhere.** "Soft delete, always" forces "do reports count
+   soft-deleted rows?" onto a feature that had no open question at all.
+3. **It contradicts an earlier answer** — including a `## Cross-Cutting Decisions` entry, or an
+   `N/A because <reason>` whose reason the answer just invalidated.
+4. **It changes a dependency edge or the build order.** "Auth through an external IdP" introduces a
+   config/secrets dependency that no feature currently provides, ahead of everything that authenticates.
+5. **It reveals uncovered scope.** Then stop: that is a Phase 2 re-run under decompose-phase's "When
+   to re-run, and what is frozen", not something to patch in here (see point 3).
+
+Anything 1–4 turns up becomes a new question, asked the same way, written back the same way — and
+then the whole pass runs again, because the new answers can propagate too.
+
+**Cap it at three passes.** If a third pass still produces new questions, stop and say so plainly: a
+set of answers that keeps generating more answers is evidence the scope is not settled, and that is
+information the user needs — not something to grind out. Option B is off the table in that case;
+fall back to option A and report where it kept branching. An uncapped fixpoint is how a check
+designed to protect an unattended run becomes an unattended run of its own.
 
 **5. Recompute the seed if anything moved.** Closing a question can discharge a question-only feature
 (Step 2's exception), which changes the target and the remaining order — and it clears the Step 6
@@ -382,12 +443,17 @@ different downstream skill, substitute **its** fresh-start trigger phrase — th
 **Option A — one feature:**
 
 ```
-specify feature <target> — spec source: <ROADMAP-PATH>
+specify feature <target> — spec source: <ROADMAP-PATH>. Read <STATUS-PATH> `## Cross-Cutting
+Decisions` before Discuss and treat it as settled — do not re-decide what it answers.
 ```
 
 *Unless Step 6 recorded a blocker.* Then give no command at all: report the question that has to be
 answered first, so the user is not handed a command that would start a feature that cannot start
 cleanly.
+
+Omit the second sentence only when `## Cross-Cutting Decisions` genuinely does not exist yet. It is
+what makes Step 7a reach the build; a prompt without it hands the user a roadmap whose project-wide
+answers the downstream skill will never see.
 
 **Option B — the whole roadmap in one loop.** Tell the user first that `/loop` must be the literal
 first thing in the message — it is their CLI's own loop command (Claude Code, Cursor, OpenCode all
@@ -400,9 +466,40 @@ not retyped after a greeting. This skill never runs that loop itself; it only wr
 (specify → design → tasks → execute → verify), starting each feature with:
 `specify feature <name> — spec source: <ROADMAP-PATH>`. Start at `<target>`. Do not skip a feature,
 do not reorder them, and do not start the next one until the current one has a verified PASS in
-`.specs/features/<name>/validation.md`. Backlog position is at <STATUS-PATH> `## Status`. Stop only
-when every feature in <BUILD-ORDER-TXT> has a verified PASS.
+`.specs/features/<name>/validation.md`. Exception — these features are already discharged and must
+be skipped, never built: <DISCHARGED-LIST>.
+
+Before each feature's gray-area discussion, read <STATUS-PATH> `## Cross-Cutting Decisions` and
+treat every entry as settled — do not re-decide it, and keep every feature consistent with it.
+
+No user is available for this run. When a gray area is not settled there, treat it as declined:
+choose the default, record it with its rationale in that feature's spec under Assumptions & Open
+Questions, and continue. Never stop to ask, and never leave one silently unrecorded.
+
+Backlog position is at <STATUS-PATH> `## Status`. Stop only when every remaining feature in
+<BUILD-ORDER-TXT> has a verified PASS.
 ```
+
+The two added paragraphs are what keep the run from stalling. The downstream skill triggers its own
+Discuss automatically whenever a feature has any implicit dimension present — which, in a well-formed
+roadmap, includes the very first feature, since decompose-phase Step 3 puts the shared persistence
+foundation there. That discussion is interactive by design and offers no "skip all". Unattended, it
+either hangs on a question nobody will answer or invents an answer and leaves no trace.
+
+**The declined-gray-area instruction is not a workaround; it is that skill's own documented
+fallback** — `tlc-spec-driven`'s discuss.md already routes any gray area the user declines or leaves
+undiscussed into the spec's Assumptions & Open Questions with the agent's default and rationale,
+*"never silently dropped"*. The loop prompt only states, up front, that every remaining gray area is
+in that state. Confirm the wording against the confirmed downstream skill's own reference; if it
+defines no such fallback, say so and do not invent one — offer option A instead.
+
+**Resolve `<DISCHARGED-LIST>` before emitting, or the loop cannot terminate.** Phase 2 may formalize
+a blocking open question as its own feature (decompose-phase Step 3). It is a normal feature name in
+`<BUILD-ORDER-TXT>`, but it *"produces no code, so it can never earn a PASS `validation.md`"* — it is
+discharged by its question reading `status: answered`, which is exactly what Step 9 just did to every
+question. Left unnamed, the prompt orders the run to wait for a PASS that can never exist: it either
+spins on that feature or fabricates a verdict to get past it. Walk `<BUILD-ORDER-TXT>` against Step
+2's question-only test and list every such name here; write `none` when there are none.
 
 Point at the paths; never paste the roadmap's contents into the prompt — the files are on disk and
 the run will read them, and an inlined copy goes stale the moment anything is edited. In
@@ -432,6 +529,13 @@ offer the user these lines to paste into it (their file, their call):
 
 ```markdown
 - `docs/ROADMAP-INDEX.md` `## Status` — current backlog position and the next feature to build.
+- `docs/ROADMAP-INDEX.md` `## Cross-Cutting Decisions` — project-wide decisions already made with
+  the user (deletion policy, auth model, failure handling, …). Read before discussing gray areas;
+  treat as settled and keep every feature consistent with it.
 - `docs/ROADMAP-*.md` — per-feature objective, scope-units, dependencies, flagged dimensions.
   Read the relevant section before specifying a feature.
 ```
+
+In single-section mode both blocks are in `docs/ROADMAP.md`; adjust the paths accordingly. This
+bridge is the durable half of the delivery: the Handoff's **Next step** carries the pointer for the
+next feature only, while these lines make it reach every feature after it.

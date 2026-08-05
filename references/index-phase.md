@@ -110,17 +110,25 @@ scope — standing project decisions.
   project has a decision log, note these as **candidates** for it — do not write into it directly
   unless the user explicitly asks. The downstream skill's own Design phase, or an explicit "record
   decision", is what appends the entry.
-- If the project has no such mechanism yet, keep the list here as Part 4.
+- If the project has no such mechanism yet, keep the list here as Part 6.
+
+**These candidates feed Phase 2's Step 7a.** A candidate that passes that step's three tests stops
+being a candidate and becomes an answered entry in `## Cross-Cutting Decisions`, in this same file.
+Listing one here is not deciding it — this phase still never answers anything.
 
 ## Output shape of `docs/ROADMAP-INDEX.md`
 
 1. `## Status` — the backlog position block, written and refreshed by the Handoff seed. Leave the
    heading in place even before the first seed.
-2. Table of roadmaps: section → roadmap file → build-order file → slug/prefix → depends-on, plus
+2. `## Cross-Cutting Decisions` — the project-wide answers from Phase 2's Step 7a. **This phase does
+   not fill it**; it leaves the heading in place, because in multi-section mode this is the block's
+   only home and each section's Phase 2 extends it in turn. Exactly one exists per project, like
+   `## Status`.
+3. Table of roadmaps: section → roadmap file → build-order file → slug/prefix → depends-on, plus
    excluded sections and why.
-3. Ordering: DAG + topological list, each edge citing its resolving source.
-4. Boundary contracts, one subsection per edge.
-5. Project-level decision candidates, if any.
+4. Ordering: DAG + topological list, each edge citing its resolving source.
+5. Boundary contracts, one subsection per edge.
+6. Project-level decision candidates, if any.
 
 ## When to re-run
 

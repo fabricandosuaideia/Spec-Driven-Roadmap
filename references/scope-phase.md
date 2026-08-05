@@ -18,7 +18,7 @@ run before reaching.
 
 **Confirm the downstream spec-driven skill.** Default assumption is `tlc-spec-driven`, but the seed
 needs that skill's exact fresh-start trigger phrase and its exact `.specs/STATE.md` field schema, and
-0b/0c need to know whose project-init output to reuse (rule 12). Ask if it is not evident from the
+0b/0c need to know whose project-init output to reuse (rule 13). Ask if it is not evident from the
 project.
 
 *If nothing is installed yet:* **generate the roadmap anyway.** Phases 1 and 2 write only to `docs/`
