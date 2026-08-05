@@ -59,7 +59,7 @@ if ($Global) {
 # `irm ... | iex` cannot pass parameters, so an interactive prompt is the only
 # way a piped user can confirm. When the host is non-interactive we refuse
 # loudly rather than guessing.
-if ((Test-Path $Dest) -and -not $Force) {
+if ((Test-Path -LiteralPath $Dest) -and -not $Force) {
     Write-Host "An existing install was found at: $Dest"
     $interactive = $Host.UI.RawUI -and -not [Console]::IsInputRedirected
     if ($interactive) {
@@ -77,6 +77,11 @@ if ((Test-Path $Dest) -and -not $Force) {
 }
 
 $Tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("sdr-" + [Guid]::NewGuid().ToString('N'))
+# Declared out here so `finally` can clean it too, and PID-suffixed to match
+# install.sh and survive two concurrent runs. $Stage is a sibling of $Dest -
+# i.e. INSIDE .claude\skills\ - so a leftover is not clutter: it is a second
+# directory holding a SKILL.md with the same skill name, which registers twice.
+$Stage = "$Dest.tmp.$PID"
 New-Item -ItemType Directory -Path $Tmp -Force | Out-Null
 
 try {
@@ -90,7 +95,9 @@ try {
     } catch {
         Write-Fail "Failed to download $zipUrl"
         Write-Host 'If the repository is private, GitHub returns 404 to unauthenticated requests.' -ForegroundColor Yellow
-        Write-Host 'Clone it and run .\install.ps1 from the checkout instead.' -ForegroundColor Yellow
+        Write-Host 'This installer only downloads - it has no local-source mode, so re-running it' -ForegroundColor Yellow
+        Write-Host 'from a checkout fails the same way. From a clone, install by hand:' -ForegroundColor Yellow
+        Write-Host "  New-Item -ItemType Directory -Path '$Dest' -Force; Copy-Item SKILL.md,references '$Dest' -Recurse -Force" -ForegroundColor Yellow
         exit 1
     }
 
@@ -110,30 +117,30 @@ try {
 
     # Stage into a sibling, then swap. The destination is never left half-written.
     Write-Status "Installing to $Dest..."
-    $stage = "$Dest.tmp"
-    if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-    New-Item -ItemType Directory -Path $stage -Force | Out-Null
-    Copy-Item (Join-Path $src.FullName 'SKILL.md') $stage
-    Copy-Item $refDir $stage -Recurse
+    if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
+    New-Item -ItemType Directory -Path $Stage -Force | Out-Null
+    Copy-Item (Join-Path $src.FullName 'SKILL.md') $Stage
+    Copy-Item $refDir $Stage -Recurse
 
     $parent = Split-Path $Dest -Parent
-    if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
-    if (Test-Path $Dest) { Remove-Item $Dest -Recurse -Force }
-    Move-Item $stage $Dest
+    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+    if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Recurse -Force }
+    Move-Item -LiteralPath $Stage -Destination $Dest
 
     Write-Ok "$SkillName installed at $Dest"
     Write-Host ''
     Write-Host 'Installed:'
     Write-Host '  SKILL.md'
-    Get-ChildItem (Join-Path $Dest 'references') -Filter *.md |
+    Get-ChildItem -LiteralPath (Join-Path $Dest 'references') -Filter *.md |
         Sort-Object Name | ForEach-Object { Write-Host "  references/$($_.Name)" }
     Write-Host @'
 
 Next steps:
   1. Restart Claude Code (or run /skills) to pick it up.
   2. Install a downstream spec-driven skill if you have not yet - the roadmap
-     hands off to it. Default assumption is tlc-spec-driven:
+     hands off to it. Default assumption is tlc-spec-driven, with its companion:
        npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
+       npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-code
   3. Start it with any of:
        "generate a roadmap from docs/PRD.md"
        "plan product"            (interview - when you have no document yet)
@@ -141,5 +148,6 @@ Next steps:
 '@
 }
 finally {
-    if (Test-Path $Tmp) { Remove-Item $Tmp -Recurse -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $Tmp)   { Remove-Item -LiteralPath $Tmp   -Recurse -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue }
 }

@@ -109,7 +109,9 @@ TARBALL_URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.tar.gz"
 if ! curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/skill.tar.gz"; then
     print_error "Failed to download $TARBALL_URL"
     echo "If the repository is private, GitHub returns 404 to unauthenticated" >&2
-    echo "requests. Clone it and run ./install.sh from the checkout instead." >&2
+    echo "requests. This installer only downloads — it has no local-source mode," >&2
+    echo "so re-running it from a checkout fails the same way. From a clone:" >&2
+    echo "  mkdir -p \"$DEST\" && cp -r SKILL.md references \"$DEST/\"" >&2
     exit 1
 fi
 
@@ -148,8 +150,9 @@ cat << EOF
 Next steps:
   1. Restart Claude Code (or run /skills) to pick it up.
   2. Install a downstream spec-driven skill if you have not yet — the roadmap
-     hands off to it. Default assumption is tlc-spec-driven:
+     hands off to it. Default assumption is tlc-spec-driven, with its companion:
        npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
+       npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-code
   3. Start it with any of:
        "generate a roadmap from docs/PRD.md"
        "plan product"            (interview - when you have no document yet)

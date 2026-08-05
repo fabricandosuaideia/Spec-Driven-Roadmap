@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.3.0"
+  version: "3.4.0"
 ---
 
 # Spec-Driven Roadmap
@@ -17,7 +17,7 @@ build. It never builds anything itself.
 ```
 PHASE 0            PHASE 1          PHASE 2            HANDOFF SEED
 scope + ask   →    index       →    decompose     →    durable Status in docs/
-0a doc exists      (multi-           (per section,      + one Handoff write to
+0a doc exists      (multi-           (per section,      + a Handoff write to
 0b interview        section           or all at once     .specs/STATE.md, then
 0c codebase         mode only)        if single)         this skill is done
 ```
@@ -30,13 +30,16 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 | 0 | [references/scope-phase.md](references/scope-phase.md) | Locate a source doc (0a), interview to create one (0b), or derive one from the codebase (0c). Confirms the downstream skill, output language, and single-vs-multi mode. |
 | 1 | [references/index-phase.md](references/index-phase.md) | Multi-section mode only: section map, dependency graph, boundary contracts. |
 | 2 | [references/decompose-phase.md](references/decompose-phase.md) | Slice into vertical features with full coverage, open questions, and a build order. Then pre-empt the cross-cutting gray areas, and record the ones left to the downstream skill. |
-| Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then one Handoff write to `.specs/STATE.md`. Then hand the user one implementation prompt — a single feature, or a `/loop` over the whole roadmap (which first requires every open question closed). |
+| Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`. Then hand the user one implementation prompt — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed). |
 
 ## Non-negotiable rules
 
 1. **Never decide a genuine ambiguity.** A missing technology choice, an undefined business rule, a
    source that just does not say — record it in the feature's `open questions` field, citing where
-   it is unresolved. Never guess, never pick a silent default.
+   it is unresolved. Never guess, never pick a silent default. An ambiguity belonging to no single
+   feature has a home too: the `## Open Questions` roll-up, tagged `cross-cutting` and carrying an
+   `affects:` line naming the features it reaches (Phase 2 Step 7a). "There was no feature to put it
+   in" is never a reason it goes unrecorded.
 2. **Vertical slices only.** A feature is route + service + persistence + test for one coherent
    capability. Never slice by architectural layer. *One bounded exception:* a genuinely shared
    foundation consumed by three or more later features may be its own slice, and must name its
@@ -49,16 +52,21 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 6. **Globally unique feature names.** Check every `docs/ROADMAP-*.md`, `docs/ROADMAP.md`, and every
    existing `.specs/features/*` directory before naming anything.
 7. **Flag implicit-requirement dimensions** per feature: persistence/state, external calls, auth,
-   payments, concurrency, state transitions. Any present, or any open question, sets "needs
-   pre-written context.md" to yes. These are the same dimensions that trigger the downstream skill's
-   own Discuss step, which is what writes `context.md` — this field predicts that.
+   payments, concurrency, state transitions. Any present, or any open question still `status: open`,
+   sets "needs pre-written context.md" to yes — an *answered* question does not, which is what lets
+   the field flip back after an interview closes one. These six are the downstream skill's Discuss
+   **trigger** list, and Discuss is what writes `context.md` — this field predicts that. They are not
+   rule 8's rubric; the two lists overlap but are not interchangeable.
 8. **Pre-empt only the gray areas that skill cannot see.** Flagging predicts *that* Discuss will
    fire; it says nothing about *what* it will demand. Phase 2's Step 7 closes that gap against the
-   downstream skill's own dimensions rubric, and splits by a three-part test: only-the-user-decides,
-   spans two or more features, expensive to reverse. All three → ask now, record in
-   `## Cross-Cutting Decisions`. Any missing → record in `## Expected Gray Areas` and leave it to
-   Discuss, which answers it better with the code in front of it. Never sweep everything: a question
-   asked here that the built code would have answered later spends the user's attention twice.
+   downstream skill's **rubric** — a different, longer list than rule 7's six triggers — and splits
+   by a three-part test: only-the-user-decides, spans two or more features, expensive to reverse.
+   Three destinations, exactly one each: all three tests **and answered** → that theme's row in
+   `## Cross-Cutting Decisions`; all three but left **unanswered** → a `cross-cutting` question in
+   `## Open Questions` plus a `not decided` row in that same ledger, because silence never promotes
+   a proposed default into a decision; any test missing → `## Expected Gray Areas`, left to Discuss,
+   which answers it better with the code in front of it. Never sweep everything: a question asked
+   here that the built code would have answered later spends the user's attention twice.
 9. **Ask how the scope is shaped.** Single unified roadmap versus multiple section roadmaps is the
    user's call, made explicitly in Phase 0. Never infer it from how big the source looks. Exception:
    an existing `docs/ROADMAP-INDEX.md` or `docs/ROADMAP.md` already fixed the mode — continue in it.
@@ -68,10 +76,12 @@ a map; the procedures live in `references/`. Read the relevant reference complet
     only to `docs/` — never into the downstream skill's namespace. Handing the user a `/loop` prompt
     at the seed is not an exception: this skill emits that text and stops. The loop is the user's CLI
     driving the downstream skill, never this skill running itself.
-11. **Seed once per generation, and never clobber real work.** Write the durable backlog status to
-    this skill's own `docs/` file, and only the downstream skill's own field schema to
-    `.specs/STATE.md`'s `## Handoff` — never an entry under `## Decisions`. Stop if work is genuinely
-    in flight — tested by evidence, not by whether the Handoff is empty.
+11. **Seed one surface, and never clobber real work.** Write the durable backlog status to this
+    skill's own `docs/` file, and only the downstream skill's own field schema to `.specs/STATE.md`'s
+    `## Handoff` — never an entry under `## Decisions`. That section is always a full overwrite of
+    its own body, never an append, so re-writing it is safe and sometimes required: the seed's loop
+    interview can move the target, and the Handoff must not contradict the prompt handed over. Stop
+    if work is genuinely in flight — tested by evidence, not by whether the Handoff is empty.
 12. **Interview and Brownfield modes need explicit confirmation.** Enter them only when a check for
     a source came back empty **and** the user confirmed there is none. An empty `docs/` folder alone
     is never sufficient.
@@ -88,9 +98,11 @@ a map; the procedures live in `references/`. Read the relevant reference complet
   `## Open Questions` and `## Expected Gray Areas` roll-ups. In single-section mode `ROADMAP.md` also
   carries `## Status` and `## Cross-Cutting Decisions` — exactly one of each exists per project.
 - `docs/roadmap.txt` / `docs/roadmap-<slug>.txt` — build order, one feature name per line.
-- `.specs/STATE.md` `## Handoff` — one write per generation, in the downstream skill's schema.
-  Never an entry under `## Decisions` (the empty header may be created once, only when creating
-  `STATE.md` from scratch); never `.specs/features/*`.
+- `.specs/STATE.md` `## Handoff` — the only write into that namespace, in the downstream skill's
+  schema, always a full overwrite of that section's body, and **only when Phase 0 confirmed a skill
+  whose schema is readable**; otherwise nothing under `.specs/` is created at all. Never an entry
+  under `## Decisions` (the empty header may be created once, only when creating `STATE.md` from
+  scratch); never `.specs/features/*`.
 
 Output directory is `docs/`. This is fixed, not configurable.
 

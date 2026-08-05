@@ -82,7 +82,7 @@ decide this before you start.
 | `docs/ROADMAP-INDEX.md` + one `ROADMAP-<slug>.md`/`roadmap-<slug>.txt` per section | If you chose multiple roadmaps |
 | `docs/PROJECT.md` | Only if you went through the interview (path B) |
 | `docs/CODEBASE-SUMMARY.md` | Only if it mapped your codebase (path C) |
-| `.specs/STATE.md` (one line updated) | Only if your build skill is confirmed/installed — this is the handoff |
+| `.specs/STATE.md` (`## Handoff` section rewritten) | Only if your build skill is confirmed/installed — this is the handoff |
 
 The roadmap file itself contains, per feature: an objective, what it depends on, an honest task
 estimate (≤8 tasks — if a feature needs more, it gets split), which "tricky" dimensions are
@@ -129,7 +129,8 @@ would otherwise get re-decided, differently, inside every feature: soft or hard 
 model, what happens on a partial failure, retry and idempotency policy, what must never be logged.
 It only asks about themes your roadmap actually touches, and each comes with a recommended default
 you can accept in a word. The answers go into a `## Cross-Cutting Decisions` block that every
-feature is then built against.
+feature is then built against. If you leave one of these unanswered, it is recorded as `not decided`
+and it will hold up the handoff for the features it affects — answering it is what releases them.
 
 It deliberately **does not** ask about everything. Decisions that live inside a single feature —
 layout, response shape, error wording — are left to your build skill, which asks them later with
@@ -145,15 +146,23 @@ work is finished and asks **how you want to build it**. Two options:
 when it passes:
 
 ```
-specify feature `tt-create-task` — spec source: docs/ROADMAP.md
+specify feature `tt-create-task` — create it at `.specs/features/tt-create-task/` using that exact
+directory name. Spec source: docs/ROADMAP.md. Read docs/ROADMAP.md `## Cross-Cutting Decisions`
+before Discuss and treat it as settled.
 ```
 
-**B — the whole roadmap in one loop.** You get a prompt that starts with `/loop` (your CLI's own loop
-command — Claude Code, Cursor and OpenCode all have one) and doesn't stop until every feature in the
-backlog is verified. Because a loop runs unattended with nobody to ask, this option requires a
+**B — a whole roadmap in one loop.** You get a prompt that starts with `/loop` (your CLI's own loop
+command — Claude Code, Cursor and OpenCode all have one) and doesn't stop until every feature in that
+roadmap is verified. Because a loop runs unattended with nobody to ask, this option requires a
 roadmap with **zero open questions** — so the skill first reads the whole roadmap for gaps,
 interviews you until every open question is answered, writes the answers back, then re-reads the
 files from disk to confirm nothing is left open. Only then does it hand you the prompt.
+
+**One loop covers one roadmap.** If you split your product into section roadmaps, the loop builds the
+section you're on — not the whole product. That's deliberate: what one section hands another stays
+provisional until that section is actually built, so the gap between two sections is where the plan
+meets what shipped. It's a checkpoint worth keeping a human in. When a section finishes, you come
+back, the skill re-seeds, and the next section gets its own loop.
 
 ⚠️ **Either way, run that prompt in a new chat session, with clean context** — not in the session
 that generated the roadmap. The skill will tell you this too. The build skill re-reads everything it

@@ -22,9 +22,11 @@ needs that skill's exact fresh-start trigger phrase and its exact `.specs/STATE.
 project.
 
 *If nothing is installed yet:* **generate the roadmap anyway.** Phases 1 and 2 write only to `docs/`
-and produce artifacts a human or any agent can use. Only the Handoff seed needs a downstream skill.
-Report the seed as pending, and tell the user which skill to install to complete the chain. Do not
-stop the whole run.
+and produce artifacts a human or any agent can use. The seed still runs — it just stops after its
+`docs/` half and writes nothing under `.specs/` (handoff-seed.md Step 6's skip). Record the pending
+seed on the `## Status` block's `**Handoff**` line, tell the user which skill to install, and say
+that re-running the seed afterwards completes the chain without re-running Phase 2. Do not stop the
+whole run.
 
 **Fix the output language.** Write generated documents in the language of the source document if one
 exists; otherwise the language the user is conversing in — this applies to prose and body text.
@@ -32,11 +34,14 @@ exists; otherwise the language the user is conversing in — this applies to pro
 **Carve-out, always English regardless:** feature names, prefixes, slugs, filenames, the downstream
 skill's Handoff field labels (`**Feature**`, `**Next step**`, …), **and every generated section
 heading** (`## MVP Scope`, `## Explicitly Out of Scope`, `## Capabilities Already Built`,
-`## Gaps / Likely Next Work`, `## Status`, `## Open Questions`). Those are machine-read keys, path
-components, and literals that later phases locate by exact name — translating any of them breaks the
-handoff, the `.specs/features/<name>/` directories, or a cross-file lookup.
+`## Gaps / Likely Next Work`, `## Status`, `## Open Questions`, `## Cross-Cutting Decisions`,
+`## Expected Gray Areas`). Those are machine-read keys, path components, and literals that later
+phases locate by exact name — translating any of them breaks the handoff, the
+`.specs/features/<name>/` directories, or a cross-file lookup.
 
-**How to ask.** One question at a time — never batch. Wait for each answer before asking the next.
+**How to ask, in this phase.** One question at a time — never batch. Wait for each answer before
+asking the next. (Phase 2's Step 7a deliberately batches its cross-cutting themes and says why; the
+seed's loop interview goes back to one at a time. Three cadences, three reasons — this is Phase 0's.)
 Use `AskUserQuestion` where a genuine small option set exists (single-vs-multi mode, which downstream
 skill, stack known versus not-yet-decided). Ask open questions as free text with a short parenthetical
 hint — do not fabricate 2-4 options for "what are you building?", since inventing candidate answers
@@ -105,7 +110,7 @@ Phase 2 loads it to keep naming and stack choices consistent with the rest of th
 **Trigger:** the user has no document and says something like "I don't know what to build yet",
 "help me plan this from scratch", or "plan product".
 
-### Step 0 — Reuse and overwrite checks
+### Step 0 — Reuse and overwrite checks (interview)
 
 1. **Does the downstream skill already have project-init output?** (e.g. `tlc-spec-driven` **v2's**
    `.specs/project/PROJECT.md` — v3.x has no such step, so detect rather than assume.) If present,
@@ -168,7 +173,7 @@ do not re-ask which document describes the scope. Continue at 0a's single-vs-mul
 
 **Trigger:** a substantial codebase (see Routing) with no document describing its scope.
 
-### Step 0 — Reuse and overwrite checks
+### Step 0 — Reuse and overwrite checks (brownfield)
 
 **First, before anything else: does `docs/CODEBASE-SUMMARY.md` already exist?** If so, show its
 `## Capabilities Already Built` and ask: use as-is (go to 0a), update specific sections, or start

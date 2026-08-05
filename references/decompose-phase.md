@@ -87,7 +87,12 @@ Common slicing moves:
   answered. Dependents depend on that feature, never on a guessed answer. Such a feature produces no
   code, so it can never earn a PASS `validation.md` — record its discharge explicitly instead: it is
   done when the answer is written into this roadmap's `## Open Questions` with `status: answered`,
-  or when `.specs/features/<name>/context.md` exists. Say so in the feature's own entry.
+  or when `.specs/features/<name>/context.md` exists. Mark it in the feature's own entry with this
+  exact line, verbatim, so the seed finds it without parsing prose:
+  `discharge: no code — answered open question or context.md`. Three separate consumers key off that
+  line (the seed's done-test, its target pick, and the loop prompt's skip list); a prose paraphrase
+  that varies per run either strands the seed on a feature that can never PASS, or lets a real
+  feature be skipped as discharged.
 - **Split at eight tasks.** When honest counting exceeds eight, split along the clearest internal
   seam (read-path vs. write-path; core vs. add-on) and state the reason in both halves.
 
@@ -141,6 +146,10 @@ This skill keeps no to-do list of its own — the note in the roadmap is the onl
   put an ambiguity, and it gets silently resolved or dropped.
 - **needs pre-written context.md** — yes if any dimension is present or any open question is
   `status: open`; no otherwise.
+- **discharge** — *question-only features only* (Step 3): the literal line
+  `discharge: no code — answered open question or context.md`. Not one of the ten; absent on every
+  other feature, and the seed's done-test, its target pick and the loop's skip list all key off it
+  verbatim.
 
 ## Step 7 — Pre-empt the gray areas
 
@@ -169,17 +178,28 @@ cannot.
 
 ### 7a — Sweep the cross-cutting themes, once per project
 
-The checklist is not a new invention: it is the downstream skill's own **implicit-requirement
-dimensions rubric**, asked once at project scope instead of nine times at feature scope. Read that
-rubric from the confirmed skill's own reference before using it — the list below is
-`tlc-spec-driven` v3.x's (`references/specify.md`), and a different downstream skill will have its
-own.
+The checklist is not a new invention: it is the downstream skill's own canonical
+**implicit-requirement dimensions rubric**, asked once at project scope instead of once per feature.
+Read that rubric from the confirmed skill's own reference before using it — the table below is
+`tlc-spec-driven` v3.x's nine, from `references/specify.md`, and a different downstream skill will
+have its own, of its own length.
+
+**If Phase 0 recorded that no skill is installed, use the table below as the rubric** — it is the
+default assumption's, and the ledger has to be complete for a human reader too. Note in the block
+which rubric it was built against, so a later run under a confirmed skill can reconcile it.
+
+**This rubric is not Step 6's dimension flags.** Those six — persistence/state, external calls, auth,
+payments, concurrency, state transitions — are that skill's Discuss **trigger** list, from
+`discuss.md`; they answer *whether* Discuss fires. The rubric answers *what it will ask*. There is no
+`payments` theme and no `persistence/state` theme, and there need not be: a payments feature's gray
+areas land under idempotency/retry/dedup, failure/partial-failure, external-dependency failure and
+auth boundaries. **Map the gray area to a theme, never the feature's flag to a theme.**
 
 | Theme | The project-level decision |
 |---|---|
 | Input validation & bounds | Where validation lives, the canonical error shape, standard limits |
-| Failure / partial-failure | On a partial write: roll back, compensate, or leave pending — and is it user-visible |
-| Idempotency / retry / dedup | Which operations are safely retryable, and what makes two calls duplicates |
+| Failure / partial-failure states | On a partial write: roll back, compensate, or leave pending — and is it user-visible |
+| Idempotency / retry / duplicate handling | Which operations are safely retryable, and what makes two calls duplicates |
 | Auth boundaries & rate limits | The identity/role model, who may act on whose data, throttle policy |
 | Concurrency / ordering | Last-write-wins vs. optimistic locking; what ordering is guaranteed |
 | Data lifecycle / expiry | Soft vs. hard delete, cascade rules, retention, archival |
@@ -187,46 +207,131 @@ own.
 | External-dependency failure | Timeouts, fallbacks, and whether the system degrades or fails when a third party is down |
 | State-transition integrity | The canonical state machines and their guards |
 
-**Only themes the roadmap actually touches get asked.** For each of the nine: either features in this
-roadmap touch it — then ask — or record it as `N/A because <reason>`. That escape is mandatory, and
-is borrowed from the same skill's own dimensions sweep for the same reason: it stops the checklist
-being padded with invented requirements, while still proving nothing was silently skipped.
+**Only themes the roadmap actually touches get asked.** For each theme: either features in this
+roadmap touch it — then ask — or record it as `N/A because <reason> (as of <this-roadmap>)`. That
+escape is mandatory, and its reasoning is borrowed from the same skill's own dimensions sweep: it
+stops the checklist being padded with invented requirements while still proving nothing was silently
+skipped. Only the reasoning is borrowed — that sweep is scoped by feature size (full for
+Large/Complex, collapsed for Medium, skipped entirely for Small) and this one is unconditional. The
+asymmetry is the point: a Small feature skips the sweep downstream, so the rubric is never walked for
+it — its Discuss still fires on any dimension present, but only over the three or four
+feature-specific gray areas it generates, so a project-wide invariant gets decided feature-locally
+and inconsistently, or not at all.
 
 **Ask them batched, with a recommended default and one line of reasoning each**, so the user accepts
 or overrides in a word — the shape the downstream skill's own "Quick" pace uses. These are few (nine
 at the absolute most, usually three or four) and they are the payload of this step; do not drip-feed
-them one per turn.
+them one per turn. This is the one place the skill batches: Phase 0 asks one at a time and so does the
+seed's loop interview, because there each answer reshapes the next. These do not — they are
+independent themes carrying defaults, and drip-feeding nine of them is what makes a user stop reading.
 
 **A recommended default is not a decided ambiguity.** Rule 1 forbids picking a silent default; it
 does not forbid proposing one the user can accept in a word. The dividing line is the answer: an
-accepted default is the user's decision and goes to `## Cross-Cutting Decisions`. An **unanswered**
-one does not — it goes to `## Open Questions` tagged `cross-cutting`, exactly as if no default had
-ever been proposed. Never let silence promote a proposal into a decision.
+accepted default is the user's decision. An **unanswered** one is not, and never becomes one by
+silence.
+
+**`## Cross-Cutting Decisions` is a ledger of the rubric's themes, not a list of answers.** Every
+theme carries exactly one row, in exactly one of three states:
+
+- `<decision> — <one line of rationale>` — the user answered it, or accepted a proposed default.
+- `N/A because <reason> (as of <this-roadmap>)` — no feature decomposed so far touches it.
+- `not decided — see the <theme> entry in <roadmap-path> ## Open Questions` — asked, left unanswered.
+
+The third state is what lets the block be complete without deciding anything, and completeness is the
+block's whole value: the downstream skill reads it before every Discuss, so "not listed here" has to
+mean "this project has no such theme" and never "we forgot". An unanswered theme that simply vanishes
+reads as settled to a build that never sees the roll-up.
+
+**An unanswered theme is written in two places, and neither of them is a decision.** It passed test 2,
+so no feature carries it — the roll-up entry *is* its carrier, and it must say what it reaches:
+
+- In this roadmap's `## Open Questions`: one entry tagged `cross-cutting`, `status: open`, naming its
+  **rubric theme** where a feature-carried question names its feature, and carrying an **`affects:`**
+  line listing the features the answer would reach.
+- In `## Cross-Cutting Decisions`: that theme's `not decided` row, pointing back at the entry. Theme,
+  state and path only — never the question text, never a proposed answer. A second copy is a second
+  thing to keep in sync; the row exists so a reader who opens only the project-level block still sees
+  the gap, and that is every reader the Handoff sends there.
+
+**`affects:` has exactly two legal forms.** Feature names are globally unique and slug-prefixed
+(rule 6), so no qualifier is needed and the notation is identical in both modes:
+
+- `affects: <feature-name>, <feature-name>, …` — exactly those features, anywhere in the project.
+- `affects: all` — every feature in the project, including sections not yet decomposed.
+
+**`all` is the default; naming a subset is the positive claim.** Assert it here, with the whole
+feature list in front of you, or not at all — the seed reads this line and never re-derives it, and a
+later reader narrowing it with less information is deciding an ambiguity. Under-listing is the
+expensive error: it lets a feature be built against a guess, the one thing rule 1 exists to prevent.
+
+If `affects:` ends up naming most of the roadmap, use Step 3's "formalize a blocking open question as
+its own feature" instead: a question that gates the backlog belongs in the dependency graph, where
+the order already enforces it, not in a gate every seed re-reads. That move changes the theme's row
+too: write ``deferred to feature `<name>` — see its `open questions``` in place of `not decided`. It
+is a fourth legal row state, exempt from the `cross-cutting` sanity check below, and the seed does
+not block on it — after the promotion the question is feature-carried, so it has no `cross-cutting`
+tag and no `affects:` line, and a `not decided` row left behind would block every target including
+the feature created to answer it.
 
 **Where the block lives — exactly one per project, like `## Status`:**
 
 - Single-section mode → `## Cross-Cutting Decisions` in `docs/ROADMAP.md`.
 - Multi-section mode → in `docs/ROADMAP-INDEX.md`. Section roadmaps reference it, never restate it.
 
-Multi-section decomposition is lazy, so a later section runs this step against a block that already
-exists: **read it first and never re-ask a theme already answered.** Extend it only with themes this
-section is the first to touch. A second answer to a settled theme is exactly how two sections end up
-built against contradicting rules. If Phase 1 Step 5 listed project-level decision candidates, they
-are inputs here — a candidate that passes the three tests becomes one of these decisions.
+Multi-section decomposition is lazy, so a later section runs this step against a ledger that already
+exists. **Read it first, and treat its three states differently:**
+
+- A **decision** is settled — never re-ask it. A second answer to a settled theme is exactly how two
+  sections end up built against contradicting rules.
+- An **`N/A because` row is not an answer.** It records only that no roadmap decomposed *so far*
+  touched the theme, which is why it carries the roadmap that wrote it. If this section touches that
+  theme, ask it now and **replace** the row, noting which roadmap changed it. Leaving it is the same
+  failure as re-answering a settled theme arriving from the other side: a project-wide invariant
+  nobody ever decided, silently inherited by every feature that needs it.
+- A **`not decided` row** is re-asked if this section touches the theme, but the outcome goes to the
+  one entry the row already points at — an answer promotes the row; still unanswered, append this
+  section's features to that entry's `affects:` line. Two entries for one theme is two `affects:`
+  lines to keep in sync, and one will be wrong.
+
+If Phase 1 Step 5 listed project-level decision candidates, they are inputs here — a candidate that
+passes the three tests becomes one of these rows.
 
 ### 7b — Everything else is recorded, not asked
 
 A gray area that fails any of the three tests is **not** asked here. It goes into an
-`## Expected Gray Areas` roll-up: one line each, naming the feature that carries it and the rubric
-theme it belongs to.
+`## Expected Gray Areas` roll-up: one line each, naming the feature that carries it, the rubric theme
+it belongs to, and **which test it failed** (feature-local / cheap to reverse / discoverable from the
+code). The failed test is what makes the line auditable; without it the block is indistinguishable
+from a list of things nobody got round to asking.
 
-This block never blocks anything. It exists so the user can see, before building starts, what the
-downstream skill is going to ask them — and so the loop path knows these are deliberately not being
-asked ([handoff-seed.md](handoff-seed.md) Step 9).
+**Record only what this sweep actually turned up.** This block is 7a's residue, not a forecast of
+Discuss's agenda. Discuss generates its own gray areas per feature with the code in front of it —
+predicting them here is invention, it restates what `implicit dimensions present` already flags, and
+it scales the block at three or four lines per feature until the roadmap is mostly this block.
 
-Every gray area lands in **exactly one** of three places, the same discipline the coverage table
-uses: answered and project-wide → `## Cross-Cutting Decisions`; unresolved and passing all three
-tests → `## Open Questions`; everything else → here. Never restate one item in two of them.
+This block never blocks anything. It exists so the user can see, before building starts, the kind and
+volume of implementation-shape calls that are coming — and so the loop path knows these are
+deliberately not being asked ([handoff-seed.md](handoff-seed.md) Step 9).
+
+**Each gray area gets one home, and the three blocks never overlap in form.** They answer different
+questions about the same subject matter:
+
+| Block | Form | Holds |
+|---|---|---|
+| `## Cross-Cutting Decisions` | a rule | the standing answer the build obeys — one row per rubric theme |
+| `## Open Questions` | a question | what nobody has answered yet, `status:` tagged |
+| `## Expected Gray Areas` | a forecast | what Discuss will decide later, and which test says it belongs there |
+
+Routing is exclusive; form is not, and must not be. An unanswered theme is a question in
+`## Open Questions` *and* a `not decided` row in the ledger — one gray area in two forms, not two
+copies, and deleting either half loses a real reader something. Answering it turns the row into a
+decision while the question stays, tagged `status: answered`, as the record of where the decision
+came from ([handoff-seed.md](handoff-seed.md) Step 9 point 3).
+
+**`## Open Questions` and `## Expected Gray Areas` are the pair that must stay strictly disjoint.**
+The loop gate sweeps the first and deliberately skips the second, so an item in both gets asked after
+this step decided not to ask it, and an item in the wrong one is either a re-asked question or a
+genuine gap a loop runs straight past.
 
 ### 7c — This step never expands scope
 
@@ -247,19 +352,33 @@ backlog has stopped being a sweep.
 
   Close with `uncovered: none (N deferred, N pre-existing, listed above)`. A genuinely uncovered unit
   means Step 3 is not finished.
-- **`## Open Questions` roll-up:** every feature's questions in one list, each naming the feature that
-  carries it and tagged `status: open` or `status: answered`. A question that came from Step 7a's
-  sweep is additionally tagged `cross-cutting`, so a later reader can tell a project-wide gap from a
-  feature-local one. **Answered entries stay** — they are never deleted; the answer itself is the
-  record, and it is what discharges a question-only feature. The Handoff seed reads this list by name
-  to decide whether to block. Omit the section only when there are genuinely no questions at all.
+- **`## Open Questions` roll-up:** the project's one authoritative list of unanswered points, and a
+  **superset** of the per-feature fields. Two kinds of entry:
+  - one per question in any feature's `open questions` field — same text, same `status:` tag, plus
+    the name of the feature that carries it. A deliberate copy, not a summary: the agent specifying
+    one feature reads that feature's entry and must not have to walk the whole roadmap, while the
+    seed reads one flat list by name and must not have to walk every feature. Two indexes, one set.
+  - one per Step 7a theme asked and left unanswered, tagged `cross-cutting`. These have **no carrying
+    feature** — they name their rubric theme instead, and carry the `affects:` line. That tag is how
+    a later reader tells a project-wide gap from a feature-local one, how the seed blocks a feature
+    whose own field can never show it, and how [handoff-seed.md](handoff-seed.md) Step 9 knows to
+    settle the ledger row when it is answered.
+
+  **Keep the copy exact, in the same edit.** A field entry with no roll-up entry, or a roll-up entry
+  answered while the feature's field still reads `status: open`, is the one failure this arrangement
+  is exposed to. **Answered entries stay** — never deleted; the answer itself is the record, and it
+  is what discharges a question-only feature. Omit the section only when there are no questions at
+  all.
 - **`## Expected Gray Areas` roll-up** (Step 7b): the decisions deliberately left to the downstream
-  skill's own Discuss, one line each, naming the feature and the rubric theme. Never a blocker. Omit
-  the section when there are none.
+  skill's own Discuss, one line each — feature, rubric theme, the test it failed. Never a blocker,
+  never swept by the loop gate, and never overlapping `## Open Questions` or any feature's own
+  `open questions` field. Omit the section when there are none.
 - **`## Cross-Cutting Decisions`** (Step 7a): single-section mode only — in multi-section mode this
-  block lives in `docs/ROADMAP-INDEX.md`, exactly one per project. Each entry is the theme, the
-  decision, and one line of rationale; plus the `N/A because <reason>` rows for themes this roadmap
-  does not touch.
+  block lives in `docs/ROADMAP-INDEX.md`, exactly one per project. One row per rubric theme, each in
+  one of Step 7a's three states: the decision plus one line of rationale, `N/A because <reason>
+  (as of <roadmap>)`, or `not decided` pointing at its `## Open Questions` entry. One row per theme
+  is both floor and ceiling — this is the block the build reads instead of re-deciding, so a missing
+  row reads as "no such concern in this project".
 - **Execution-order block:** a fenced list, one feature name per line, respecting every "depends on".
   When the source declares increments, mark their boundaries here with a comment line:
   `# --- end of increment 1: <what ships here> ---`.
@@ -307,16 +426,33 @@ directory. Those names **and their relative order are frozen**:
 - No feature name collides with one in any other `docs/ROADMAP-*.md` **or `docs/ROADMAP.md`**, or
   with any existing `.specs/features/*` directory name. On collision with an existing directory,
   stop and ask whether it is that same feature — do not rename around it.
-- Every open question is phrased as a question with enough context to answer it, and appears in the
-  `## Open Questions` roll-up.
+- Every open question is phrased as a question with enough context to answer it, and the per-feature
+  fields and the `## Open Questions` roll-up agree **in both directions**: every field entry has a
+  roll-up entry with the same `status:` tag, and every roll-up entry either names a feature whose
+  field carries it or is tagged `cross-cutting`. A question living in only one of the two is the
+  exact failure this check exists for — the seed reads only the roll-up, the specifying agent reads
+  only the field, so whichever half is missing is invisible to one of them.
 - The coverage table accounts for 100% of the enumerated scope-units, each exactly once, and closes
   with `uncovered: none`.
-- Every one of the nine rubric themes (Step 7a) is either a decision or an `N/A because <reason>` —
-  no theme is simply absent.
-- No gray area appears in two of the three blocks, and none of the three restates a feature's own
-  `open questions` field verbatim — they are roll-ups, not copies.
+- Every theme in the confirmed downstream skill's rubric (Step 7a — nine for `tlc-spec-driven` v3.x)
+  has exactly one row in `## Cross-Cutting Decisions`, in one of its three states. No theme absent,
+  no theme with two rows.
+- Every `not decided` row (a `deferred to feature` row is exempt) names an entry that exists in
+  `## Open Questions` tagged `cross-cutting`, naming that same rubric theme, with an `affects:` line;
+  and every `cross-cutting` question tagged `status: answered` has a decided row. A theme in only one
+  of the two is either an answer that never reached the build, or a rule with no record of who
+  decided it.
+- Every feature whose objective is getting an open question answered carries Step 3's exact
+  `discharge:` line, and no other feature carries it.
+- Nothing appears in both `## Expected Gray Areas` and `## Open Questions` (or any feature's own
+  `open questions` field). That pair is the one that must be disjoint — the loop gate sweeps one and
+  deliberately skips the other.
 - If the roadmap is growing past roughly 3,000 tokens, say so and re-raise Phase 0's single-vs-multi
   question — an oversized roadmap is evidence the mode choice was wrong. Never drop coverage rows to
-  hit a size target. Step 7's two blocks are roll-ups scaled by *theme*, not by feature — a handful
-  of lines each. If they are what pushed the file over, they are being written per-feature and the
-  fix is to consolidate them, not to trim coverage.
+  hit a size target. Check Step 7's two blocks against their own scaling first, because they do not
+  share one. `## Cross-Cutting Decisions` is scaled by *theme* and capped at one row each, so a
+  longer one is padded and gets cut back to the rubric. `## Expected Gray Areas` is scaled by what
+  the sweep found and indexed *by feature*, so it grows with the roadmap and is **never** consolidated
+  by theme — merging its lines destroys the one thing its reader needs from it. If one theme recurs
+  there across three or more features, re-test it against Step 7's three tests: recurrence is
+  evidence it reaches beyond one feature and belongs in 7a.
