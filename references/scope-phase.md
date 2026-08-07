@@ -2,7 +2,7 @@
 
 ## Contents
 
-- [Preamble — settle these before branching](#preamble--settle-these-before-branching) — downstream skill, language, how to ask
+- [Preamble — settle these before branching](#preamble--settle-these-before-branching) — version and model, downstream skill, language, how to ask
 - [Routing — pick 0a, 0b, or 0c](#routing--pick-0a-0b-or-0c)
 - [0a — A scope document already exists](#0a--a-scope-document-already-exists)
 - [0b — Interview Mode (no source, no clear idea yet)](#0b--interview-mode-no-source-no-clear-idea-yet)
@@ -15,6 +15,21 @@
 
 These apply to all three paths, so resolve them **before** routing — not inside 0a, which 0b and 0c
 run before reaching.
+
+**Open the run with the version and the model recommendation.** In one short message, before the
+first question: the version of this skill — the `metadata.version` value in `SKILL.md`'s
+frontmatter, the only version stamp the installers put on disk — where to check the latest
+published one (`/plugin update` for a plugin install, or the comparison command the README documents
+for a standalone install), and that a roadmap run is best done on the strongest available model at
+the highest effort, which the user sets with `/model` and `/effort` **before** starting (SKILL.md,
+"Version and model"). **Resolve that version exactly as handoff-seed.md's Step 5 prescribes** —
+which `SKILL.md` to open, and the standing prohibition on filling the number from memory. That
+procedure is written once, there; do not restate it here. **If the version cannot be read, announce
+`unknown`** rather than dropping the line: the announcement exists to tell the user which release is
+on disk, and a silent omission reads as if there were nothing to check. This is an **announcement,
+not a question**: it asks for nothing and expects no answer, so it neither batches nor consumes a
+turn, and the "One question at a time — never batch" cadence below is untouched. Do not wait for a
+reply — continue straight into the first question.
 
 **Confirm the downstream spec-driven skill.** Default assumption is `tlc-spec-driven`, but the seed
 needs that skill's exact fresh-start trigger phrase and its exact `.specs/STATE.md` field schema, and

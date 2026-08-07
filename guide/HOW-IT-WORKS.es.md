@@ -1,7 +1,12 @@
 # Cómo Funciona Spec-Driven Roadmap
 
 *Una guía en lenguaje simple, para humanos. Si quieres las reglas exactas que sigue la skill, lee
-[`SKILL.md`](../SKILL.md) — esta página es la versión amigable.*
+[`SKILL.md`](../SKILL.md) para el mapa y [`references/`](../references/) para los procedimientos en
+sí — cuando esos dos no coinciden, manda el archivo de referencia. Esta página es la versión
+amigable.*
+
+*¿No sabes qué versión tienes instalada? Mira
+[**¿Qué versión tengo?**](../README.es.md#qué-versión-tengo) en el README.*
 
 Otros idiomas: [English](HOW-IT-WORKS.md) · [Português](HOW-IT-WORKS.pt-BR.md)
 
@@ -56,44 +61,74 @@ la vez, nunca una lista entera de golpe:
 5. ¿Alguna restricción rígida? *(opcional)*
 6. ¿Qué stack técnico, si ya lo sabes? *(opcional)*
 
-Ella escribe tus respuestas en `docs/PROJECT.md` por ti — nunca escribes ese archivo a mano — y
-luego lo descompone, igual que el camino A.
+**Se detiene apenas tu visión, tus usuarios y los límites del MVP están lo bastante claros como para
+descomponer desde ahí** — así que no toda ejecución hace las seis preguntas, y se salta cualquiera
+que ya hayas respondido antes en la conversación. Respuestas breves están bien; a este documento se
+le permite ser delgado. Ella escribe tus respuestas en `docs/PROJECT.md` por ti — nunca escribes ese
+archivo a mano — y luego lo descompone, igual que el camino A.
 
 ### C — "Tengo código, pero nada que describa qué hace"
 
 Di *"map this codebase into a roadmap source"*. La skill verifica si tu skill de build (o la skill
 `codenavi`) ya tiene un mapeo del código que pueda reutilizar; si no, hace un escaneo ligero — lo
 suficiente para saber qué ya existe y qué probablemente falta, no una auditoría profunda de
-arquitectura. Escribe `docs/CODEBASE-SUMMARY.md`, pregunta qué quieres agregar a continuación, y
-descompone desde ahí.
+arquitectura.
 
-## Una pregunta más que siempre hace, sin importar el camino
+Después, en este orden: te pregunta directamente qué quieres agregar o cambiar — un backlog nunca se
+infiere de observaciones sobre deuda técnica, así que esa respuesta es su única fuente —, pone dos
+listas **en el chat** para que las corrijas (**Capabilities Already Built** y
+**Gaps / Likely Next Work**), y solo cuando las confirmas escribe `docs/CODEBASE-SUMMARY.md`.
+Corregir esas listas vale el minuto que toma: todo lo que quede mal archivado como ya construido
+queda excluido del roadmap de forma permanente, y la tabla de cobertura no puede detectarlo — esa
+unidad nunca llegó a enumerarse.
+
+## Una pregunta más que hace, sin importar el camino
 
 **¿Un solo roadmap, o varios?** Para un proyecto pequeño a mediano, una lista única
 (`docs/ROADMAP.md`) es más simple. Para un sistema grande con fronteras internas reales, dividir en
 varios roadmaps (`docs/ROADMAP-INDEX.md` + un archivo por sección) permite razonar sobre — o
 construir — cada parte de forma algo independiente. La skill presenta el trade-off y pregunta; no
-necesitas decidir esto antes de empezar.
+necesitas decidir esto antes de empezar. Hay una excepción: si el proyecto ya tiene un
+`docs/ROADMAP-INDEX.md` o un `docs/ROADMAP.md`, el modo ya quedó fijado antes y la ejecución
+continúa en él — en ese caso no vuelve a preguntar. Si existen *ambos* archivos, eso es una
+contradicción — la ejecución se detiene y te pregunta cuál es el autoritativo.
 
 ## Qué obtienes, en disco
 
 | Archivo | Cuándo |
 |---|---|
 | `docs/ROADMAP.md` + `docs/roadmap.txt` | Siempre (modo roadmap único) |
-| `docs/ROADMAP-INDEX.md` + un `ROADMAP-<slug>.md`/`roadmap-<slug>.txt` por sección | Si elegiste varios roadmaps |
+| `docs/ROADMAP-INDEX.md` + un par `ROADMAP-<slug>.md`/`roadmap-<slug>.txt` por sección descompuesta | Si elegiste varios roadmaps |
 | `docs/PROJECT.md` | Solo si pasaste por la entrevista (camino B) |
 | `docs/CODEBASE-SUMMARY.md` | Solo si mapeó tu código (camino C) |
-| `.specs/STATE.md` (sección `## Handoff` reescrita) | Solo si tu skill de build está confirmada/instalada — este es el handoff |
+| `.specs/STATE.md` (cuerpo de `## Handoff` reescrito) | Solo si hay algo que sembrar *y* una skill de build confirmada cuyo esquema sea legible — cuatro casos que se saltan, abajo |
 
 El propio archivo de roadmap contiene, por feature: un objetivo, de qué depende, una estimación
 honesta de tareas (≤8 — si una feature necesita más, se divide), qué dimensiones "delicadas" están
 presentes (auth, persistencia, llamadas externas, etc.), y cualquier pregunta abierta que no pudo
 responder por ti. Cierra con una tabla de cobertura que prueba que nada quedó fuera.
 
-## Un ejemplo real
+**La descomposición es perezosa.** En modo multi-sección solo la sección que pediste recibe su par
+`.md`/`.txt`; las demás quedan en el índice como `NOT YET DECOMPOSED`, y la skill simplemente reporta
+la siguiente acción — *"decompose section `<slug>`"*. Es deliberado: una sección descompuesta semanas
+antes de construirse queda desactualizada. Agregar una sección al índice tampoco dispara un handoff,
+porque una sección sin `.txt` no tiene orden de construcción de donde elegir un objetivo.
+
+**Cuatro cosas hacen que esa última escritura no ocurra**, y la skill registra cuál de ellas en la
+línea `Handoff` de su propio bloque de Status: ninguna skill downstream instalada; una confirmada
+pero con su esquema de handoff ilegible; trabajo real en curso; o nada que sembrar porque toda
+feature descompuesta ya está lista.
+
+**`docs/` es fijo, no configurable.** Y los archivos `.txt` son de lectura por máquina: solo nombres
+de features, uno por línea, sin comentarios y sin marcadores de estado. La siembra cuenta esas líneas
+para calcular el progreso, así que cualquier otra cosa ahí inflaría el total y nunca coincidiría con
+una feature. El orden de construcción legible para humanos — con marcadores de incremento y todo —
+vive en el `.md` del roadmap, a su lado.
+
+## Un ejemplo ilustrativo
 
 Dado un PRD de dos párrafos para un rastreador de tareas compartido muy simple, sin detalles de
-autenticación especificados, una ejecución produjo esto (resumido):
+autenticación especificados, una ejecución ilustrativa produce algo con esta forma (resumido):
 
 ```markdown
 # TinyTasks — Roadmap
@@ -119,9 +154,14 @@ autenticación especificados, una ejecución produjo esto (resumido):
 `uncovered: none (0 deferred, 0 pre-existing, listed above)`
 ```
 
-Nota que no adivinó cómo funciona la pertenencia a equipos — el PRD nunca lo dijo, así que lo marcó
-como pregunta abierta y **se negó a entregar la primera feature** hasta que eso se responda. Así es
-por diseño: nunca decide algo ambiguo en tu lugar.
+Nota que no adivinó cómo funciona la pertenencia a equipos — el PRD nunca lo dijo, así que en su
+lugar la registró como pregunta abierta. Así es por diseño: nunca decide algo ambiguo en tu lugar.
+
+**El handoff se escribe de todas formas** — siempre que hubiera uno que escribir (ver más abajo). Esa
+pregunta se copia al campo `Blockers` del Handoff, el campo `Next step` apunta a responderla en vez
+de a especificar la feature, y la ejecución reporta esto como **sembrado pero bloqueado**, nunca como
+"no sembrado". Lo único que se retiene es el comando de arranque para copiar y pegar, para que no
+recibas uno que arrancaría una feature que no puede arrancar limpiamente.
 
 ## Las preguntas que hace antes de terminar
 
@@ -129,28 +169,55 @@ Antes de cerrar el roadmap, corre un barrido corto de **decisiones que valen par
 — las que, sin esto, se volverían a decidir de forma distinta dentro de cada feature: borrado lógico
 o físico, modelo de auth, qué pasa ante una falla parcial, política de retry e idempotencia, qué
 nunca debe ir al log. Solo pregunta por los temas que tu roadmap realmente toca, y cada uno viene con
-un default recomendado que puedes aceptar en una palabra. Las respuestas van a un bloque
-`## Cross-Cutting Decisions`, y toda feature se construye contra él. Si dejas alguna sin responder,
-queda registrada como `not decided` y va a retener el handoff de las features que afecta —
-responderla es lo que las libera.
+un default recomendado que puedes aceptar en una palabra. El resultado va a un bloque
+llamado `## Cross-Cutting Decisions`, y toda feature se construye contra él.
+
+**Espera un registro exhaustivo, no una lista de respuestas.** Ese bloque lleva exactamente una fila
+por cada tema de la rúbrica — ninguno ausente, ninguno dos veces — y una fila se lee de una de cuatro
+formas: la decisión más una línea de razonamiento; `N/A because <reason> (as of <roadmap>)` cuando
+nada de lo descompuesto hasta ahora lo toca; `not decided`, apuntando a la pregunta abierta en que se
+convirtió; o `deferred to feature <name>` cuando la pregunta recibió su propia feature en el orden de
+construcción. Así que las filas `N/A` son el bloque funcionando, no algo que falta — la completitud
+es todo su valor: tu skill de build lo lee antes de cada discusión de zona gris, así que "no está
+listado aquí" tiene que significar "este proyecto no tiene ese tema" y nunca "se nos olvidó".
+
+Un tema sin responder cae en dos lugares — la fila `not decided`, más una pregunta abierta que lleva
+una línea `affects:` nombrando lo que la respuesta alcanzaría. Ese par retiene el comando de arranque
+de las features que realmente alcanza; responderla las libera.
 
 Deliberadamente **no** pregunta por todo. Las decisiones que viven dentro de una sola feature —
 layout, formato de respuesta, texto de error — quedan para tu skill de build, que las pregunta
 después con el código delante y las responde mejor por eso. Esas quedan listadas en un bloque
-`## Expected Gray Areas`, para que veas lo que viene sin tener que decidirlo ahora.
+llamado `## Expected Gray Areas`, para que veas lo que viene sin tener que decidirlo ahora.
 
 ## Qué pasa después
 
-Cuando el roadmap está listo y tu skill de build está instalada, la skill confirma que el trabajo de
-planificación terminó y pregunta **cómo quieres construirlo**. Dos opciones:
+**La pregunta "cómo quieres construirlo" solo aparece cuando de verdad se sembró algo y tu skill de
+build está confirmada.** Si no, la ejecución termina con el reporte y el motivo. Seis finales se
+detienen antes de la pregunta: solo corrió la Fase 1, así que hay una sección indexada pero no
+descompuesta; el nombre de un roadmap se desvió de un directorio que ya está en disco; hay trabajo
+real en curso; toda feature descompuesta ya está lista; no hay ninguna skill de build instalada; o sí
+la hay, pero no se pudo leer su esquema de handoff. En los seis casos el roadmap queda terminado y
+usable tal como está — lo que falta es el handoff, no el plan.
+
+**Si no hay ninguna skill de build instalada, genera el roadmap de todos modos.** Las Fases 1 y 2
+escriben solo en `docs/`, así que obtienes todo, y **no se crea absolutamente nada bajo `.specs/`** —
+ni siquiera un `STATE.md` vacío, porque una forma adivinada es peor que un archivo ausente: la
+reanudación de tu skill de build lo trataría como una foto vieja que hay que reconciliar. El motivo
+queda registrado de forma duradera en la línea `Handoff` del bloque de Status, para que una ejecución
+posterior pueda distinguir "nunca se sembró" de "se sembró y luego se sobrescribió". Instala la
+skill, pide la siembra otra vez, y la cadena se completa **sin volver a correr la Fase 2**.
+
+Cuando hay un objetivo y una skill confirmada, dice que el trabajo de planificación terminó y
+pregunta **cómo quieres construirlo**. Dos opciones:
 
 **A — una feature a la vez.** Recibes el comando solo de la siguiente feature, lo ejecutas, y vuelves
 cuando pase:
 
 ```
-specify feature `tt-create-task` — create it at `.specs/features/tt-create-task/` using that exact
+specify feature tt-create-task — create it at `.specs/features/tt-create-task/` using that exact
 directory name. Spec source: docs/ROADMAP.md. Read docs/ROADMAP.md `## Cross-Cutting Decisions`
-before Discuss and treat it as settled.
+before Discuss and treat it as settled — do not re-decide what it answers.
 ```
 
 **B — un roadmap completo en un loop.** Recibes un prompt que empieza con `/loop` (el comando de loop
@@ -161,6 +228,16 @@ el roadmap completo buscando huecos, te entrevista hasta que toda pregunta abier
 escribe las respuestas de vuelta, y luego relee los archivos desde el disco para confirmar que no
 quedó nada abierto. Solo entonces te entrega el prompt.
 
+**Lo que la opción B sacrifica no es "que no queden preguntas".** El loop no elimina las zonas grises
+que la skill dejó deliberadamente para tu skill de build — decide cada una con el default y **la deja
+escrita**, con su justificación, en el `.specs/features/<name>/spec.md` de esa feature, en su sección
+de supuestos y preguntas abiertas; revisar esas secciones después es el paso esperado, no trabajo
+extra. El conteo del bloque `## Expected Gray Areas` de ese roadmap dimensiona ese trade-off por
+adelantado, y es un **piso, no un techo** — solo contiene lo que encontró el barrido de
+planificación, mientras que la discusión propia de cada feature genera más encima. Tampoco es un
+truco: enrutar una zona gris declinada hacia el spec con el default del agente y su justificación es
+el fallback documentado por el propio `tlc-spec-driven`.
+
 **Un loop cubre un roadmap.** Si dividiste el producto en roadmaps por sección, el loop construye la
 sección en la que estás — no el producto entero. Es deliberado: lo que una sección le entrega a otra
 sigue siendo provisional hasta que esa sección se construya de verdad, así que el límite entre dos
@@ -169,25 +246,63 @@ mantener con un humano presente. Cuando la sección termina, vuelves, la skill r
 siguiente sección recibe su propio loop.
 
 ⚠️ **En ambos casos, ejecuta ese prompt en una sesión de chat nueva, con contexto limpio** — no en la
-sesión que generó el roadmap. La propia skill te lo va a advertir. La skill de build relee todo lo que
-necesita de `.specs/STATE.md` y de los archivos del roadmap en disco; reutilizar la sesión de
-planificación solo arriesga que trabaje desde la conversación recordada en vez de los archivos
-escritos, y arranca la construcción con el presupuesto de contexto ya gastado.
+sesión que generó el roadmap. La propia skill te lo va a advertir. En una sesión nueva **el prompt
+mismo es el canal**: tu skill de build vuelve a derivar lo que necesita de las rutas de ese prompt y
+de los archivos del roadmap en disco. `.specs/STATE.md` se lee en un `resume work` posterior — para
+eso sirve el Handoff, no para un arranque nuevo — y por eso el prompt debe pegarse íntegro, con el
+nombre exacto de directorio y todo. Reutilizar la sesión de planificación solo arriesga que el agente
+trabaje desde la conversación recordada en vez de los archivos escritos, y arranca la construcción
+con el presupuesto de contexto ya gastado.
 
 Ese prompt es lo último que hace esta skill. De ahí en adelante, todo el ciclo de build — spec,
 diseño, tareas, implementación, verificación — pertenece por completo a tu skill de build
 (`tlc-spec-driven` por defecto). Incluso en modo loop, quien conduce esa skill es tu CLI; esta ya se
 detuvo. No vuelve a intervenir hasta que le pidas generar o actualizar un roadmap.
 
+## Cómo sabe qué ya está construido
+
+Nunca se fía de la palabra de nadie, y que un archivo exista no prueba nada. Para cada nombre del
+orden de construcción lee `.specs/features/<name>/validation.md`, ejecutando el script de gate de tu
+skill de build si esa skill realmente trae uno **en disco** — mira el disco, no la documentación,
+porque el conjunto de scripts de una skill cambia entre releases y una instalación se queda atrás — y
+si no, leyendo el reporte exactamente con las mismas reglas. Un **PASS sin ninguna cita de evidencia
+`path.ext:NN` cuenta como no hecho**, igual que una plantilla `[PASS | FAIL]` sin rellenar. Las
+features que son solo pregunta son la única excepción: como no producen código, se dan por saldadas
+cuando su pregunta queda respondida — o cuando existe un `context.md` para ellas. Y cuando hay
+trabajo real en curso — algo completado o en progreso en el Handoff, o la feature nombrada en el
+Handoff tiene un `spec.md` en disco y ningún PASS de verdad — **no reescribe `.specs/STATE.md` en
+absoluto**: refresca su propio bloque de Status, nombra la feature en curso, y ahí se detiene.
+
+## Qué aparece en el archivo y podría sorprenderte
+
+- **Una feature que no construye nada.** Cuando una pregunta sin resolver condiciona varias features
+  posteriores, puede recibir una pequeña feature propia cuyo único trabajo es conseguir esa
+  respuesta. Lleva la línea literal `discharge: no code — answered open question or context.md`,
+  textual, porque tres consumidores distintos dependen de ella: el test de "hecho" de la siembra, su
+  elección de objetivo, y la lista de omisiones del prompt de loop.
+- **Un bloque de Status arriba de tu roadmap** (o del índice, en modo multi-sección): conteos, el
+  orden de construcción restante, la siguiente feature, y si el handoff se escribió — o por qué no.
+  Se regenera en cada siembra, así que nunca lo edites a mano.
+- **Inglés dentro de un roadmap que no está en inglés.** La prosa sale en el idioma en que estás
+  trabajando, pero los nombres de features, prefijos, slugs, nombres de archivo y **todo encabezado
+  generado** siguen en inglés: son claves de lectura por máquina, componentes de ruta y nombres de
+  directorio, y traducir uno rompe el handoff, los directorios `.specs/features/<name>/`, o una
+  búsqueda entre archivos.
+
 ## Lo que deliberadamente *no* hace
 
 - Nunca escribe `spec.md`, `design.md`, `tasks.md`, ni código de aplicación.
 - Nunca avanza por las features sola — sin avance automático. Sí puede *escribirte* un prompt
   `/loop`, pero ejecutarlo es tarea de tu CLI, en tu sesión, después de que esta skill ya se detuvo.
-- Nunca adivina una ambigüedad — pregunta, o la registra como pregunta abierta y bloquea el handoff
-  hasta que se resuelva.
-- Nunca vuelve a derivar lo que otra skill ya mapeó — si tu skill de build (o `codenavi`) ya
-  documentó el código, lo reutiliza en vez de escanear de nuevo.
+- Nunca adivina una ambigüedad — pregunta, o la registra como pregunta abierta. Esa pregunta retiene
+  el comando de arranque de la **feature objetivo**, no el backlog: la pregunta propia de una feature
+  bloquea esa feature, y una de alcance de proyecto bloquea solo cuando su línea `affects:` dice
+  `all` o nombra al objetivo. Bloquear más ancho congelaría todo el backlog detrás de una sola
+  pregunta de proyecto.
+- Nunca vuelve a derivar lo que otra skill ya mapeó — si tu skill de build o `codenavi` ya documentó
+  el código, lo reutiliza en vez de escanear de nuevo. Que tu skill de build tenga ese paso **depende
+  de la versión** (`tlc-spec-driven` v2 lo tenía, v3.x no), así que detecta qué hay realmente
+  instalado en vez de dar por supuesta una ruta.
 
 ## Preguntas frecuentes
 
@@ -207,5 +322,9 @@ momento en que ves `spec.md`, `design.md`, `tasks.md`, o código real siendo esc
 build — esta ya se hizo a un lado.
 
 **¿Y si ya tengo un roadmap y solo quiero agregar más?**
-Dilo — "add this new section to the roadmap" o algo similar. Reutiliza lo que ya existe en vez de
-empezar de cero, y nunca renombra ni reordena features que ya fueron construidas.
+Dilo — "add this new section to the roadmap" o algo similar. Extiende lo que ya existe en vez de
+regenerarlo. Los nombres de features **y su orden relativo se congelan en el momento en que existe un
+directorio `.specs/features/<name>/`** — al existir el directorio, no al pasar una verificación, así
+que un spec a medio escribir o una ejecución fallida también congelan su feature. Una feature que
+resultó obsoleta se marca como superseded en su lugar, con una nota; nunca se borra, nunca se
+renombra. El alcance nuevo se agrega después del bloque congelado.

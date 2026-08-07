@@ -49,6 +49,40 @@ function Write-Status  { param($m) Write-Host "-> $m" }
 function Write-Ok      { param($m) Write-Host "OK $m" -ForegroundColor Green }
 function Write-Fail    { param($m) Write-Host "ERROR $m" -ForegroundColor Red }
 
+# ---------------------------------------------------------------------------
+# Read the version out of a SKILL.md frontmatter, which carries it as an
+# indented, QUOTED scalar:
+#
+#     metadata:
+#       version: "3.5.0"
+#
+# so the quotes have to come off. Plain -match over the lines, nothing that
+# needs PowerShell 7. A SKILL.md predating the field - or one that cannot be
+# read - degrades to 'unknown' rather than throwing: $ErrorActionPreference is
+# 'Stop', so an unguarded Get-Content would abort the whole install, and a
+# missing version line is no reason to refuse to install.
+# ---------------------------------------------------------------------------
+function Get-SkillVersion {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return 'unknown' }
+    try { $lines = Get-Content -LiteralPath $Path } catch { return 'unknown' }
+    if (-not $lines) { return 'unknown' }
+    $inFrontmatter = $false
+    foreach ($line in $lines) {
+        if ($null -eq $line) { continue }
+        # TrimEnd() so a CRLF checkout does not smuggle a stray \r into the
+        # version string and make every comparison differ.
+        $line = $line.TrimEnd()
+        if ($line -eq '---') {
+            if ($inFrontmatter) { break }
+            $inFrontmatter = $true
+            continue
+        }
+        if ($inFrontmatter -and $line -match '^\s*version:\s*"?([^"\s]+)') { return $Matches[1] }
+    }
+    return 'unknown'
+}
+
 if ($Global) {
     $Dest = Join-Path $HOME ".claude\skills\$SkillName"
 } else {
@@ -115,6 +149,22 @@ try {
         if (-not (Test-Path (Join-Path $refDir $ref))) { Write-Fail "Archive is missing references/$ref - aborting."; exit 1 }
     }
 
+    # Announce which version is going in, and which one it displaces. This is
+    # the only moment in the flow where the downloaded version and the one
+    # already on disk are both available - say it out loud, or a user sitting
+    # on an old install has no way to tell.
+    $newVersion = Get-SkillVersion (Join-Path $src.FullName 'SKILL.md')
+    if (Test-Path -LiteralPath $Dest) {
+        $oldVersion = Get-SkillVersion (Join-Path $Dest 'SKILL.md')
+        if ($oldVersion -eq $newVersion) {
+            Write-Status "already at $newVersion - reinstalling"
+        } else {
+            Write-Status "installing $newVersion (replacing $oldVersion)"
+        }
+    } else {
+        Write-Status "installing $newVersion"
+    }
+
     # Stage into a sibling, then swap. The destination is never left half-written.
     Write-Status "Installing to $Dest..."
     if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
@@ -127,7 +177,11 @@ try {
     if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Recurse -Force }
     Move-Item -LiteralPath $Stage -Destination $Dest
 
-    Write-Ok "$SkillName installed at $Dest"
+    if ($newVersion -eq 'unknown') {
+        Write-Ok "$SkillName (version unknown) installed at $Dest"
+    } else {
+        Write-Ok "$SkillName v$newVersion installed at $Dest"
+    }
     Write-Host ''
     Write-Host 'Installed:'
     Write-Host '  SKILL.md'
@@ -145,6 +199,9 @@ Next steps:
        "generate a roadmap from docs/PRD.md"
        "plan product"            (interview - when you have no document yet)
        "I don't know what to build yet"
+  4. Later, to see whether a newer version is out, compare the `version:` line
+     in your installed SKILL.md with the one in the repo - the README's
+     "Which version do I have?" section has the one-liner that does it.
 '@
 }
 finally {

@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.4.0"
+  version: "3.5.0"
 ---
 
 # Spec-Driven Roadmap
@@ -31,6 +31,36 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 | 1 | [references/index-phase.md](references/index-phase.md) | Multi-section mode only: section map, dependency graph, boundary contracts. |
 | 2 | [references/decompose-phase.md](references/decompose-phase.md) | Slice into vertical features with full coverage, open questions, and a build order. Then pre-empt the cross-cutting gray areas, and record the ones left to the downstream skill. |
 | Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`. Then hand the user one implementation prompt — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed). |
+
+## Version and model
+
+**The canonical version of this skill is the `metadata.version` value in this file's frontmatter.**
+There is no top-level `version` field in a `SKILL.md` — the [Agent Skills
+spec](https://agentskills.io/specification) defines six keys (`name`, `description`, `license`,
+`compatibility`, `metadata`, `allowed-tools`), and its own example nests `author` and `version`
+under `metadata`, which is what this file does. The installers copy only `SKILL.md` and
+`references/`, so this frontmatter is the single version stamp that ever reaches the user's disk.
+
+**Announce that version before the first question of any run.** State the version read from this
+file's frontmatter, and where to check the latest published one: `/plugin update` for a plugin
+install, or the comparison command the README documents for a standalone install. One line,
+delivered as an announcement — never as a question, so it costs no turn (scope-phase.md, preamble).
+
+**Model and effort are a recommendation this skill states and never applies itself.** A run here
+freezes build order, scope boundaries and feature names into files the whole downstream build cycle
+then obeys, and rule 1 turns on recognising a genuine ambiguity instead of filling the gap. Running
+on the best available model, at the highest effort level, is therefore recommended. The user sets
+both with `/model` and `/effort` **before** starting. This skill never switches them on its own: a
+frontmatter `model` would hold for the current turn only — *"The override applies for the rest of
+the current turn and is not saved to settings; the session model resumes on your next prompt"* — and
+this skill is multi-turn by design. And any field outside the spec's six breaks packaging and upload
+for claude.ai and the Skills API: *"If you include any field the spec doesn't allow, packaging or
+upload fails with a hard error instead of ignoring the field"*, with the documented error naming the
+allowed set — *"Unexpected key(s) in SKILL.md frontmatter: argument-hint. Allowed properties are:
+allowed-tools, compatibility, description, license, metadata, name"*. All three quotations from the
+[Claude Code skills documentation](https://code.claude.com/docs/en/skills), consulted 2026-08-07 —
+the `model` one from its frontmatter reference table, the two on packaging from its
+`Using skill frontmatter outside Claude Code` section.
 
 ## Non-negotiable rules
 

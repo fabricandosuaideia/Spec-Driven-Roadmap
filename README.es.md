@@ -18,7 +18,10 @@ Es una **precuela** del ciclo de build. Nunca escribe specs, diseños, tareas ni
 
 ### Como plugin (recomendado)
 
-Funciona en cualquier SO donde corra Claude Code, y te da `/plugin update`:
+Funciona en cualquier SO donde corra Claude Code y es la **única vía de instalación con
+actualización incorporada** — la vía de la skill simple, abajo, no se actualiza sola, así que subir
+de versión ahí significa volver a ejecutar el instalador. Instala una vez y `/plugin update` la
+mantiene al día:
 
 ```
 /plugin marketplace add fabricandosuaideia/Spec-Driven-Roadmap
@@ -57,6 +60,43 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 ```
 
 La skill en sí es markdown puro y totalmente multiplataforma; solo el instalador cambia según el SO.
+
+### ¿Qué versión tengo?
+
+La versión vive en el campo `metadata.version` del frontmatter del propio `SKILL.md` de la skill.
+
+Si instalaste **el plugin**, la respuesta es `/plugin update` — la única vía de instalación que se
+actualiza sola.
+
+Si instalaste **la skill simple** (`install.sh` o `install.ps1`), compara tu copia con la publicada
+en `main`:
+
+```bash
+printf 'installed: %s\ngithub:    %s\n' \
+  "$(for f in .claude/skills/spec-driven-roadmap/SKILL.md ~/.claude/skills/spec-driven-roadmap/SKILL.md; do [ -f "$f" ] && { sed -n 's/^ *version: *//p' "$f" | head -1 | tr -d '"'; break; }; done || echo 'not installed')" \
+  "$(curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/SKILL.md | sed -n 's/^ *version: *//p' | head -1 | tr -d '"')"
+```
+
+Imprime dos líneas — por ejemplo, una copia que quedó en una versión antigua:
+
+```
+installed: 3.1.0
+github:    3.5.0
+```
+
+Esos números son ilustrativos. Lo que dice algo es la comparación entre las dos líneas, no los
+valores en sí.
+
+El comando revisa primero la instalación de **proyecto** y cae a la **global** — la misma precedencia
+que aplica Claude Code cuando ambas existen — e imprime `not installed` en la primera línea cuando no
+encuentra ninguna. En Windows, ejecútalo desde Git Bash o WSL. Cuando las dos líneas difieran, vuelve
+a ejecutar el instalador con `--force` (`-Force` en `install.ps1`).
+
+La instalación de proyecto vive en `.claude/skills/spec-driven-roadmap/` y la global en
+`~/.claude/skills/`; las dos pueden coexistir en versiones distintas, y la versión que cuenta es
+siempre la de la copia que Claude Code cargó.
+
+El [`CHANGELOG.md`](CHANGELOG.md) es el registro de qué cambió en cada versión.
 
 ## Prerrequisito
 

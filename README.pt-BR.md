@@ -18,7 +18,9 @@ skill spec-driven seguinte para que ela possa começar a construir a feature um.
 
 ### Como plugin (recomendado)
 
-Funciona em todo SO onde o Claude Code roda, e te dá `/plugin update`:
+Funciona em todo SO onde o Claude Code roda e é o **único caminho de instalação com atualização
+embutida** — o caminho da skill simples, abaixo, não se atualiza sozinho, então subir de versão por
+lá significa rodar o instalador de novo. Instale uma vez e o `/plugin update` mantém tudo em dia:
 
 ```
 /plugin marketplace add fabricandosuaideia/Spec-Driven-Roadmap
@@ -57,6 +59,43 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 ```
 
 A skill em si é markdown puro e totalmente multiplataforma; só o instalador muda por SO.
+
+### Qual versão eu tenho?
+
+A versão fica no campo `metadata.version` do frontmatter do próprio `SKILL.md` da skill.
+
+Se você instalou **o plugin**, a resposta é `/plugin update` — o único caminho de instalação que se
+atualiza sozinho.
+
+Se você instalou **a skill simples** (`install.sh` ou `install.ps1`), compare sua cópia com a
+publicada no `main`:
+
+```bash
+printf 'installed: %s\ngithub:    %s\n' \
+  "$(for f in .claude/skills/spec-driven-roadmap/SKILL.md ~/.claude/skills/spec-driven-roadmap/SKILL.md; do [ -f "$f" ] && { sed -n 's/^ *version: *//p' "$f" | head -1 | tr -d '"'; break; }; done || echo 'not installed')" \
+  "$(curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/SKILL.md | sed -n 's/^ *version: *//p' | head -1 | tr -d '"')"
+```
+
+Ele imprime duas linhas — por exemplo, uma cópia parada em uma versão antiga:
+
+```
+installed: 3.1.0
+github:    3.5.0
+```
+
+Esses números são ilustrativos. O que diz alguma coisa é a comparação entre as duas linhas, não os
+valores em si.
+
+O comando checa primeiro a instalação de **projeto** e cai para a **global** — a mesma precedência
+que o Claude Code aplica quando as duas existem — e imprime `not installed` na primeira linha quando
+não encontra nenhuma. No Windows, rode pelo Git Bash ou pelo WSL. Quando as duas linhas divergirem,
+rode o instalador de novo com `--force` (`-Force` no `install.ps1`).
+
+A instalação de projeto fica em `.claude/skills/spec-driven-roadmap/` e a global em
+`~/.claude/skills/`; as duas podem coexistir em versões diferentes, e a versão que vale é sempre a
+da cópia que o Claude Code carregou.
+
+O [`CHANGELOG.md`](CHANGELOG.md) é o registro do que mudou em cada versão.
 
 ## Pré-requisito
 

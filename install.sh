@@ -28,6 +28,41 @@ print_status()  { echo "→ $1"; }
 print_success() { echo "✓ $1"; }
 print_error()   { echo "✗ $1" >&2; }
 
+# ---------------------------------------------------------------------------
+# Read the version out of a SKILL.md frontmatter, which carries it as an
+# indented, QUOTED scalar:
+#
+#     metadata:
+#       version: "3.5.0"
+#
+# so the quotes have to come off. Pure bash — no grep/sed/awk, hence no new
+# dependency and no pipeline to interact with `set -o pipefail`. A SKILL.md
+# predating the field (or an unreadable one) yields "unknown" instead of
+# aborting the run: under `set -e` a non-matching extractor that returns
+# non-zero would kill the install, and a missing version is not a reason to
+# refuse to install.
+# ---------------------------------------------------------------------------
+skill_version() {
+    local file="$1" line version="" in_frontmatter="false"
+    [[ -r "$file" ]] || { echo "unknown"; return 0; }
+    # `|| [[ -n "$line" ]]` so a final line without a trailing newline is still
+    # seen; `${line%$'\r'}` so a CRLF checkout does not smuggle a \r into the
+    # version string and make every comparison differ.
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        if [[ "$line" == "---" ]]; then
+            if [[ "$in_frontmatter" == "true" ]]; then break; fi
+            in_frontmatter="true"
+            continue
+        fi
+        if [[ "$in_frontmatter" == "true" ]] && [[ "$line" =~ ^[[:space:]]*version:[[:space:]]*\"?([^\"[:space:]]+) ]]; then
+            version="${BASH_REMATCH[1]}"
+            break
+        fi
+    done < "$file"
+    echo "${version:-unknown}"
+}
+
 show_help() {
     cat << EOF
 Usage: install.sh [OPTIONS]
@@ -129,6 +164,22 @@ for ref in "${REQUIRED_REFS[@]}"; do
     [[ -f "$SRC_DIR/references/$ref" ]] || { print_error "Archive is missing references/$ref — aborting."; exit 1; }
 done
 
+# Announce which version is going in, and which one it displaces. This is the
+# only moment in the flow where the downloaded version and the one already on
+# disk are both available — say it out loud, or a user sitting on an old install
+# has no way to tell.
+NEW_VERSION="$(skill_version "$SRC_DIR/SKILL.md")"
+if [[ -d "$DEST" ]]; then
+    OLD_VERSION="$(skill_version "$DEST/SKILL.md")"
+    if [[ "$OLD_VERSION" == "$NEW_VERSION" ]]; then
+        print_status "already at $NEW_VERSION — reinstalling"
+    else
+        print_status "installing $NEW_VERSION (replacing $OLD_VERSION)"
+    fi
+else
+    print_status "installing $NEW_VERSION"
+fi
+
 # Stage into a sibling, then swap. The destination is never left half-written.
 print_status "Installing to $DEST..."
 rm -rf "$STAGE"
@@ -140,7 +191,11 @@ mkdir -p "$(dirname "$DEST")"
 rm -rf "$DEST"
 mv "$STAGE" "$DEST"
 
-print_success "$SKILL_NAME installed at $DEST"
+if [[ "$NEW_VERSION" == "unknown" ]]; then
+    print_success "$SKILL_NAME (version unknown) installed at $DEST"
+else
+    print_success "$SKILL_NAME v$NEW_VERSION installed at $DEST"
+fi
 echo ""
 echo "Installed:"
 echo "  SKILL.md"
@@ -157,4 +212,7 @@ Next steps:
        "generate a roadmap from docs/PRD.md"
        "plan product"            (interview - when you have no document yet)
        "I don't know what to build yet"
+  4. Later, to see whether a newer version is out, compare the \`version:\` line
+     in your installed SKILL.md with the one in the repo — the README's
+     "Which version do I have?" section has the one-liner that does it.
 EOF
