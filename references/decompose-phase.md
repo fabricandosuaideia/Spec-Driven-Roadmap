@@ -24,8 +24,12 @@
   target section's own content, and the project's conventions doc. **Never load a sibling section in
   full** — a need for sibling detail is already captured as a boundary contract; cite it.
 - **Single-section mode:** run once against the whole source. No index, no per-section prefix table,
-  no boundary contracts. Assign one project-level prefix up front (confirm it does not collide) and
-  every "external contract consumed" is "none".
+  no boundary contracts. Assign one project-level prefix up front — **lowercase kebab-case**, short
+  and mnemonic, and not colliding with a prefix in `docs/ROADMAP-*.md`, `docs/ROADMAP.md` or on a
+  `.specs/features/*` directory (index-phase.md Step 2 sets the same rule for slugs). Case and
+  underscores are not cosmetic here: a later conversion derives the section slug from this prefix
+  and takes lowercase kebab-case only, while feature names freeze once `.specs/features/<name>/`
+  exists. Every "external contract consumed" is "none".
   *Load:* the whole source and the conventions doc.
 
 ## Step 1 — Enumerate the scope-units first
@@ -136,7 +140,8 @@ This skill keeps no to-do list of its own — the note in the roadmap is the onl
   "none" in single-section mode).
 - **size** — Small / Medium / Large / Complex, consistent within the roadmap. Complex usually means
   it should have been split in Step 3.
-- **task estimate** — a number, target ≤8.
+- **task estimate** — a number, ≤8. That is rule 3's maximum, not a target: above it Step 3 is not
+  finished — split per its **Split at eight tasks** move.
 - **implicit dimensions present** — any of: persistence/state, external calls, auth, payments,
   concurrency, state transitions; or "none". These are the dimensions that trigger the downstream
   skill's own Discuss step.
@@ -295,6 +300,9 @@ exists. **Read it first, and treat its states differently:**
   one entry the row already points at — an answer promotes the row; still unanswered, append this
   section's features to that entry's `affects:` line. Two entries for one theme is two `affects:`
   lines to keep in sync, and one will be wrong.
+- A **`deferred to feature`** row needs nothing from this section: the question is feature-carried
+  and the build order already enforces it. Do not re-ask the theme, do not rewrite the row, and
+  create no `cross-cutting` entry for it.
 
 If Phase 1 Step 5 listed project-level decision candidates, they are inputs here — a candidate that
 passes the three tests becomes one of these rows.
@@ -353,8 +361,9 @@ backlog has stopped being a sweep.
   - `pre-existing — already built, verified in codebase` — from Phase 0c's
     `## Capabilities Already Built`; not new scope.
 
-  Close with `uncovered: none (N deferred, N pre-existing, listed above)`. A genuinely uncovered unit
-  means Step 3 is not finished.
+  Close with `uncovered: none (N deferred, N pre-existing, listed above)` — add a third count,
+  `N covered by reference`, before `listed above` when any row carries that disposition. A genuinely
+  uncovered unit means Step 3 is not finished.
 - **`## Open Questions` roll-up:** the project's one authoritative list of unanswered points, and a
   **superset** of the per-feature fields. Two kinds of entry:
   - one per question in any feature's `open questions` field — same text, same `status:` tag, plus
@@ -379,17 +388,22 @@ backlog has stopped being a sweep.
 - **`## Cross-Cutting Decisions`** (Step 7a): single-section mode only — in multi-section mode this
   block lives in `docs/ROADMAP-INDEX.md`, exactly one per project. One row per rubric theme, each in
   one of Step 7a's four states: the decision plus one line of rationale, `N/A because <reason>
-  (as of <roadmap>)`, or `not decided` pointing at its `## Open Questions` entry. One row per theme
-  is both floor and ceiling — this is the block the build reads instead of re-deciding, so a missing
-  row reads as "no such concern in this project".
+  (as of <roadmap>)`, `not decided` pointing at its `## Open Questions` entry, or
+  ``deferred to feature `<name>` — see its `open questions``` when the theme became its own
+  question-only feature (Step 3). One row per theme is both floor and ceiling — this is the block
+  the build reads instead of re-deciding, so a missing row reads as "no such concern in this
+  project".
 - **Execution-order block:** a fenced list, one feature name per line, respecting every "depends on".
   When the source declares increments, mark their boundaries here with a comment line:
   `# --- end of increment 1: <what ships here> ---`.
 - **Standalone `.txt`:** `docs/roadmap-<slug>.txt` (multi-section) or `docs/roadmap.txt` (single):
   **feature names only, one per line — no status markers, no comments, no increment lines.** Keep the
-  increment markers in the markdown block above; this file is machine-read by the Handoff seed, which
-  counts its lines to compute progress, and a comment line would both inflate the total and never
-  match a feature. The seed never re-parses the markdown, so this file must stay trivially parseable.
+  increment markers in the markdown block above; this file is machine-read by two consumers — the
+  seed counts its feature-name lines to compute progress, and `scripts/convert-to-multi.py` matches
+  every one against the roadmap's `### ` entries and aborts on a name that has none. Both readers
+  skip blank lines and `#` lines defensively, but a status marker or any other non-name line
+  inflates the seed's total and trips the conversion. The seed never re-parses the markdown, so this
+  file must stay trivially parseable.
 
 ### Output shape of the roadmap file
 
@@ -420,16 +434,12 @@ regenerate a roadmap that already covers the current scope; extend it.**
 
 **Extending is one of two right answers, and the prohibition above rules out only the third.** Extend
 for small, continuous growth — a few features arriving on top of scope this roadmap already
-describes. **A distinct wave of work is better as its own section**, not as more entries in the
-roadmap the loop is already carrying: a DONE section is never loaded **whole** again — its progress
-is counted from its `.txt` and each feature's `validation.md` ([handoff-seed.md](handoff-seed.md)
-Step 3). Its body is still read at a point: the seed's discharge test for a question-only feature
-reads the `discharge:` marker and the roll-up under `## Open Questions` (Step 2), and its Step 9
-sweep reads that roll-up again. What never happens is its body entering the context of every feature
-the loop builds — which is exactly what an extended roadmap does, because the loop prompt names one
-roadmap as the spec source for all of them ([handoff-seed.md](handoff-seed.md) Step 10). That
-choice is the user's and is made in Phase 0, never here — see
-`New scope arriving at a project that already has a roadmap` in [scope-phase.md](scope-phase.md).
+describes. **A distinct wave of work is better as its own section**, because the loop prompt names
+one roadmap as the spec source for every feature it builds ([handoff-seed.md](handoff-seed.md)
+Step 10), so an extended roadmap re-enters context once per feature in every wave it absorbed. That
+choice is the user's and is made in Phase 0, never here — the full argument, and what a DONE section
+does and does not still cost, is `New scope arriving at a project that already has a roadmap` in
+[scope-phase.md](scope-phase.md).
 
 Before rewriting anything, list every feature name that already has a `.specs/features/<name>/`
 directory. Those names **and their relative order are frozen**:
@@ -445,9 +455,12 @@ directory. Those names **and their relative order are frozen**:
 ## Sanity checks
 
 - No feature's "depends on" points to a feature listed after it in the same file.
-- No feature name collides with one in any other `docs/ROADMAP-*.md` **or `docs/ROADMAP.md`**, or
-  with any existing `.specs/features/*` directory name. On collision with an existing directory,
-  stop and ask whether it is that same feature — do not rename around it.
+- No name is used by two `### <feature-name>` entries in this roadmap, or listed twice in its
+  `.txt`, and no feature name collides with one in any other `docs/ROADMAP-*.md`
+  **or `docs/ROADMAP.md`**, or with any existing `.specs/features/*` directory name. On collision
+  with an existing directory, stop and ask whether it is that same feature — do not rename
+  around it.
+- No feature's task estimate exceeds eight; over budget means Step 3's split was not applied.
 - Every open question is phrased as a question with enough context to answer it, and the per-feature
   fields and the `## Open Questions` roll-up agree **in both directions**: every field entry has a
   roll-up entry with the same `status:` tag, and every roll-up entry either names a feature whose
@@ -466,6 +479,10 @@ directory. Those names **and their relative order are frozen**:
   decided it.
 - Every feature whose objective is getting an open question answered carries Step 3's exact
   `discharge:` line, and no other feature carries it.
+- Every feature's `needs pre-written context.md` reads `yes` exactly when an implicit dimension is
+  present or one of its open questions reads `status: open`, and `no` otherwise. The field is
+  derived (Step 6), so it is checkable — and the seed's Blocker gate reads the question, not this
+  field, precisely so a wrong `no` cannot switch the gate off.
 - Nothing appears in both `## Expected Gray Areas` and `## Open Questions` (or any feature's own
   `open questions` field). That pair is the one that must be disjoint — the loop gate sweeps one and
   deliberately skips the other.

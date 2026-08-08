@@ -244,7 +244,10 @@ One line per roadmap, so the whole backlog shape is visible — not a single dis
   - all done → `DONE (X/X, verified PASS)`
   - some done → `IN PROGRESS (N/M verified PASS)`
   - none done, `.txt` exists → `NOT STARTED (0/M)`
-  - no `.txt` yet → `NOT YET DECOMPOSED` — note what it depends on per the index
+  - no `.txt` yet → `NOT YET DECOMPOSED` — note what it depends on per the index. A section the
+    index marks excluded (pure foundation / pure decision log) is not this state and is not
+    reported at all: Phase 1 excluded it from generation by design, so there is no roadmap for it
+    to be waiting on.
 
 ## Step 4 — Find the target feature and its remaining order
 
@@ -259,6 +262,14 @@ section can be active.** A user who builds out of index order produces several:
 Then walk that section's `.txt` (or `docs/roadmap.txt` in single-section mode) top to bottom. **The
 target is the first name that is not done per Step 2** — not merely the first without a file. The
 remaining build order is every name from the target to the end of that file.
+
+**Then check what the target section consumes, without changing the target.** *Multi-section mode
+only* — in single-section mode `external contract consumed` is always `none`. Walk its features'
+`external contract consumed` values; for each, open the boundary contract that item belongs to in
+`docs/ROADMAP-INDEX.md` and read the producing section off its edge. If Step 3 classified that
+section `NOT YET DECOMPOSED`, record the contract as a **provisional producer** — index-phase Step 4
+makes those names provisional until that section is decomposed. This blocks nothing and moves no
+target; it is what Steps 7 and 8 need in front of them.
 
 **Guard against name drift.** If a roadmap name has no `.specs/features/<name>/` directory but a
 similarly-named one exists (`auth-login` vs. `auth-signin`), do not count it as unbuilt — that is
@@ -312,21 +323,22 @@ flagged dimensions.
 **Two fields in that italic header line are resolved, not copied.** `<version>` is **this** skill's
 own version — the `metadata.version` value in its own `SKILL.md` frontmatter, read at run time,
 never a number from memory and never the downstream skill's. **Resolve it from disk: read the
-frontmatter of the `SKILL.md` that sits in the directory containing these reference files** — not
-the downstream skill's `SKILL.md` (Step 2's `<skill-dir>`), and not the project root. That file's
-body is in context; its frontmatter is what the installers stamp and what discovery reads, so it may
-not be — open the file rather than recalling the number. **If it cannot be located or read, write
-`unknown` in the stamp and say so in Step 7's report.** Never fill this field from memory or from
-inference: a wrong number on disk is worse than `unknown`, because it asserts a false provenance for
-the whole roadmap — the exact failure the stamp exists to prevent. `<YYYY-MM-DD>` is the date of the
-run that writes the block. Stamp both every time: without them the generated roadmap is the one
-artifact of this whole procedure that cannot say which release produced it, so a user whose install
-lags the documentation has nothing to check it against. The stamp cannot go stale either, because
-Step 5 rewrites this block whole on every seed. **`<name>`, further along that same italic sentence,
-is the third placeholder and the only one that does not resolve** — literal, type the angle
-brackets. It names the path pattern every feature's report follows, not a feature; substituting the
-target's name turns a general rule into a false claim that the whole backlog's status was derived
-from one feature's `validation.md`.
+frontmatter of this skill's own `SKILL.md`** — the file whose body is already in your context, which
+sits in the **parent** of the directory holding these reference files, with `references/` and
+`scripts/` as its siblings — not the downstream skill's `SKILL.md` (Step 2's `<skill-dir>`), and not
+the project root. Its frontmatter is what the installers stamp and what discovery reads, so it may
+not be in context with the body — open the file rather than recalling the number. **If it cannot be
+located or read, write `unknown` in the stamp and say so in Step 7's report.** Never fill this field
+from memory or from inference: a wrong number on disk is worse than `unknown`, because it asserts a
+false provenance for the whole roadmap — the exact failure the stamp exists to prevent.
+`<YYYY-MM-DD>` is the date of the run that writes the block. Stamp both every time: without them the
+generated roadmap is the one artifact of this whole procedure that cannot say which release produced
+it, so a user whose install lags the documentation has nothing to check it against. The stamp cannot
+go stale either, because Step 5 rewrites this block whole on every seed. **`<name>`, further along
+that same italic sentence, is the third placeholder and the only one that does not resolve** —
+literal, type the angle brackets. It names the path pattern every feature's report follows, not a
+feature; substituting the target's name turns a general rule into a false claim that the whole
+backlog's status was derived from one feature's `validation.md`.
 
 When every decomposed feature is done, write `**Next feature**: none — every decomposed roadmap is
 complete` instead of naming a target.
@@ -346,6 +358,13 @@ and only one is a missing skill, so write the one that is actually true:
   merely stale: `not rewritten this run — work in flight on <feature>; its Handoff still names the
   pre-conversion <old-path>` (index-phase.md's conversion procedure, exit (b))
 - `not seeded — every decomposed feature is done`
+
+One more line is not a skip at all — Step 9 can invalidate a Handoff that was written, and its
+re-run exit writes this instead:
+
+- `superseded — decomposition invalidated this run (<category-5 gap on X | category-4 collision
+  on Y>); do not act on this block until Phase 2 re-runs and this skill's seed runs again from
+  Step 1`
 
 Step 5 runs before Step 6, so decide from Step 1's evidence test and Step 6's own two skip cases. One
 line, regenerated on every seed, so it cannot go stale.
@@ -429,8 +448,7 @@ Notes on the fields that carry real weight:
 - **Blockers** — check three sources in this order and stop at the first that fires; put that exact
   question here instead of `none`, and set **Next step** to answering it rather than the specify
   trigger. Quote one question, not three sources' worth — the ~500-token budget is real.
-  1. The target's own `open questions` field has a `status: open` question **and** the target has
-     `needs pre-written context.md: yes`.
+  1. The target's own `open questions` field has a `status: open` question.
   2. A boundary contract the target consumes has an unresolved marked-open item.
   3. `<STATUS-PATH>` `## Cross-Cutting Decisions` has a `not decided` row (decompose-phase Step 7a).
      A `deferred to feature <name>` row is not one of these and does not block; the build order
@@ -484,6 +502,8 @@ Tell the user, plainly:
   from a `not decided` row, say so and name the other features its `affects:` line reaches: one
   answer unblocks all of them, which is the difference between a five-minute question and a stalled
   backlog;
+- any **provisional producers** Step 4 recorded, and which sections have to be decomposed before
+  those names are firm;
 - that construction from here on is the downstream skill's own job, through its own triggers.
 
 Then go to Step 8 — **unless** any of these hold, in which case there is no prompt to hand over and
@@ -524,11 +544,17 @@ because it looks faster.** Ask, in the confirmed output language:
     Name that section, name every other section as not covered, and say what happens when it ends:
     they come back, this skill re-seeds, and the next section gets its own loop. Give the reason or
     it reads as a limitation — a boundary contract's producer names are *"provisional until that
-    section is decomposed"* (index-phase Step 4), so the gap between two sections is where a plan
-    meets what actually shipped. That is a checkpoint, not a step a loop can take unattended.
+    section is decomposed"* (index-phase Step 4; Step 10's scope rule carries the same reason in
+    full — keep the two in step), so the gap between two sections is where a plan meets what
+    actually shipped. That is a checkpoint, not a step a loop can take unattended.
 
   State the precondition up front: **that roadmap must have zero open questions**, because a loop has
   no one to ask. If any remain, you will interview them closed first, and only then produce the prompt.
+
+  **When Step 4 recorded a provisional producer, say so here and do not present option B as the
+  default** — every feature that consumes one would be built unattended against names that can still
+  move. Option A is unaffected, because a human is present. The user may still choose B; then Step 10
+  names the provisional producers beside the prompt, in the surrounding message.
 
 Everywhere below, **"the roadmap"** means that one file and its build order — `<ROADMAP-PATH>` and
 `<BUILD-ORDER-TXT>` exactly as Step 6's table resolves them for the target section.
@@ -603,7 +629,9 @@ no such entry → create the entry in this roadmap's `## Open Questions`, tagged
 answer against the decided rows. And a theme sitting there as an `N/A because` row whose reason no
 longer holds is a gap the sweep must close: a decomposed roadmap now touches it, so ask it in this
 interview like any other open question and write the answer over the row (decompose-phase Step 7a's
-supersession rule). A loop cannot ask it later.
+supersession rule). A loop cannot ask it later. A ``deferred to feature`` row is neither of those and
+is not swept: its question is carried by a feature in the build order, so this sweep already meets it
+in that feature's own `open questions` field.
 
 **Do not sweep `## Expected Gray Areas`.** Those were deliberately left to the downstream skill's own
 Discuss (decompose-phase Step 7b) — they failed the three tests, meaning they are feature-local and
@@ -721,7 +749,9 @@ build-order file is movable (*"reordering it only among not-yet-started features
 - **Stop if that position does not exist** — the provider is frozen, would have to cross a frozen
   feature, or is not in this roadmap at all. Report the edge and what it collides with: something
   already built, or already delegated elsewhere, now needs something planned after it. No reordering
-  fixes that, and renaming around it is forbidden. Option B is off the table.
+  fixes that, and renaming around it is forbidden. Option B is off the table — and so is option A:
+  the recorded order still carries the dependency this pass just proved it cannot legally satisfy,
+  so follow **What follows either re-run exit** below.
 
 A legal move writes exactly three things: the `depends on` field, the roadmap's execution-order block
 (keep its increment markers), and the `.txt` (names only, one per line). Editing anything else means
@@ -734,19 +764,41 @@ append one clause to its `## Open Questions` entry naming the capability that ha
 option B off the table and follow **What follows either re-run exit** below. The answer is not lost:
 that answered entry is what the re-run reads instead of putting the same question to the user twice.
 
-**What follows either re-run exit.** Hand over no prompt — not option B, and not option A: the target
+**What follows either re-run exit.** Two paths reach here: a category-5 stop, and a category-4
+collision no legal move repairs. Hand over no prompt — not option B, and not option A: the target
 came out of a decomposition you have just proved wrong, and a re-run may reorder any feature that has
 no `.specs/features/<name>/` directory yet, which the target by definition has not. Answers already
 written back stay on disk; they are correct and the re-run extends around them. Say explicitly that
 the `## Status` block and the `## Handoff` written in Steps 5-6 describe the pre-answer decomposition
 and must not be acted on until Phase 2 re-runs and this seed runs again from Step 1 — Step 1's
-evidence test is what makes that second run safe. Then stop.
+evidence test is what makes that second run safe.
+
+Make it durable before stopping — a warning that lives only in chat dies with the session (Step 5).
+Rewrite the `**Handoff**` line of the `## Status` block to its `superseded` state, and rewrite the
+body of `## Handoff` in `.specs/STATE.md` inside the same eight fields: the cause in **Blockers**,
+and **Next step** reading `re-run Phase 2 for <ROADMAP-PATH>, then re-run this skill's seed` instead
+of the specify trigger. Then stop.
 
 **Cap it at three passes.** If a third pass still produces a new question or a category-4 move, stop
 and say so plainly: a set of answers that keeps generating more work is evidence the scope is not
-settled, and that is information the user needs — not something to grind out. Option B is off the
-table in that case; fall back to option A and report where it kept branching. An uncapped fixpoint is
-how a check designed to protect an unattended run becomes an unattended run of its own.
+settled, and that is information the user needs — not something to grind out.
+
+Write down what the capped pass found before falling back — dropping it is rule 1's silent default
+with extra steps. Each question the last pass turned up and did not ask takes point 3's
+feature-carried shape, minus the answer: the carrying feature's `open questions` field,
+`status: open`, plus its matching `## Open Questions` entry — and set that feature's
+`needs pre-written context.md` to `yes`, which is what that field then derives to. A category-4 edge
+left unapplied is written the same way, as a question on the dependent feature naming the provider
+and what the move collided with. A question no feature carries takes point 3's `cross-cutting` shape
+instead — the roll-up entry with its `affects:` line **and** its `not decided` row, since the row is
+the half Step 6's Blockers source 3 reads. This does not restart the pass: the cap has already taken
+option B off the table, and option A is the path that tolerates a recorded open question.
+
+Option B is off the table in that case; fall back to option A and report where it kept branching —
+through point 5, whose re-run of Steps 2-6 is what promotes any of these that reaches the target into
+the Handoff's **Blockers** field, so Step 10's blocker branch reports the question instead of handing
+over a command. An uncapped fixpoint is how a check designed to protect an unattended run becomes an
+unattended run of its own.
 
 **5. Recompute the seed if anything moved.** Closing a question can discharge a question-only feature
 (Step 2's exception), which changes the target and the remaining order — and it clears the Step 6

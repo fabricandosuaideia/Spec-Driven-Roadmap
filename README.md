@@ -58,7 +58,12 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 .\install.ps1 -Global -Force
 ```
 
-The skill itself is plain markdown and is fully cross-platform; only the installer differs by OS.
+The skill itself is markdown plus one Python 3 helper script (standard library only), so it is fully
+cross-platform; only the installer differs by OS. That script is used for exactly one thing —
+converting a single-roadmap project into section roadmaps — and it needs a working `python3` on
+PATH. On Windows the bare `python3` is usually the Microsoft Store stub, which opens the Store
+instead of running anything: install Python from python.org, after which its
+`py -3` launcher works too.
 
 ### Which version do I have?
 
@@ -138,11 +143,19 @@ Output lands in `docs/` — a `ROADMAP.md` plus a machine-readable `roadmap.txt`
 `ROADMAP-INDEX.md` with one roadmap per section, if you pick multi-section mode). Backlog position
 lives in a `## Status` block that gets refreshed on every run.
 
-Then hand off to the build cycle:
+When the run finishes, the skill hands you this prompt with the feature name and paths already
+resolved — paste it into a fresh session to start feature one:
 
 ```
-specify feature <name> — spec source: docs/ROADMAP.md
+specify feature <name> — create it at `.specs/features/<name>/` using that exact directory name.
+Spec source: docs/ROADMAP.md. Read docs/ROADMAP.md `## Cross-Cutting Decisions` before Discuss and
+treat it as settled — do not re-decide what it answers.
 ```
+
+That is option A, one feature at a time. Option B is a single `/loop` prompt that builds the whole
+roadmap unattended. It is always offered; what it needs first is a roadmap with no open
+questions, which the skill closes with you before handing the prompt over — the guide explains
+what it trades away.
 
 ## How it fits with tlc-spec-driven
 

@@ -53,9 +53,29 @@ JOURNAL = "journal.json"
 MOVED_BLOCKS = ["## Status", "## Cross-Cutting Decisions"]
 
 STALE_HANDOFF = (
-    "**Handoff**: not rewritten this run — conversion in progress; the Handoff "
-    "still names the pre-conversion `docs/ROADMAP.md`"
+    "**Handoff**: not rewritten this run — conversion in progress; re-seed after it. "
+    "Any Handoff written before this run still names the pre-conversion `docs/ROADMAP.md`"
 )
+
+# What the index carries when a moved block simply is not there. One text per
+# heading, because the two absences mean different things and are repaired by
+# different steps: `## Cross-Cutting Decisions` is decompose-phase's, and
+# `## Status` is written by nothing but handoff-seed.md's own Step 5. A single
+# shared string said "the next Phase 2 run fills this block" about both, which
+# is false — and unfalsifiable — for the Status one.
+PLACEHOLDER = {
+    "## Status": (
+        "_No `Status` block existed in `docs/ROADMAP.md` at conversion time. This is "
+        "handoff-seed.md Step 5's legacy case: the next run of this skill's Handoff "
+        "seed writes it here. Never read it as \"nothing is in progress\"._"
+    ),
+    "## Cross-Cutting Decisions": (
+        "_No `Cross-Cutting Decisions` existed in `docs/ROADMAP.md` at conversion "
+        "time. This is handoff-seed.md's legacy case: read it as \"the roadmap "
+        "predates decompose-phase Step 7a\" and report it — never as \"no open "
+        "themes\". The next Phase 2 run fills this block._"
+    ),
+}
 
 
 # --------------------------------------------------------------------------
@@ -120,11 +140,14 @@ def read_feature_names(txt_path):
 
 
 def derive_prefix(names):
-    """Longest leading hyphen-token run common to every name.
+    """Longest leading hyphen-token run common to every name, backed off until it
+    is not the whole of any name.
 
-    NOT a split on the first hyphen. A slug is kebab-case and may contain one,
-    so `auth-core-login` + `auth-core-signup` must yield `auth-core`, not `auth`.
-    Returns (prefix, error). Exactly one of the two is None.
+    NOT a split on the first hyphen: a slug is kebab-case and may contain one, so
+    `auth-core-login` + `auth-core-signup` yields `auth-core` here rather than
+    `auth`. That is this helper's answer, not the command's -- `candidate_prefixes`
+    then reports every leading run of it, and the command asks when more than one
+    is viable. Returns (prefix, error); exactly one of the two is None.
     """
     if not names:
         return None, "no feature names found"
@@ -153,11 +176,18 @@ def derive_prefix(names):
         )
 
     # The run must stop short of some feature's whole name, or the "prefix" is
-    # itself a feature and every other name is nested under it.
-    if any(len(t) == len(common) for t in token_lists):
+    # itself a feature and every other name is nested under it. Back off a token
+    # at a time rather than abort: `tt-list` + `tt-list-open-tasks` is an
+    # ordinary shape (a parent feature and its children), and refusing it left
+    # the conversion with no exit at all — the abort fired before the `--slug`
+    # branch could override it.
+    while common and any(len(t) == len(common) for t in token_lists):
+        common = common[:-1]
+
+    if not common:
         return None, (
-            "the common run '%s' is the whole of at least one feature name"
-            % "-".join(common)
+            "every leading token run is the whole of some feature name, so no "
+            "prefix is left to name the section after"
         )
 
     return "-".join(common), None
@@ -256,20 +286,34 @@ def split_block(text, heading):
 
 
 def rewrite_paths(block, slug):
-    """Point every pre-conversion path at its post-conversion name."""
-    block = re.sub(r"docs/ROADMAP\.md(?![\w.-])", "docs/ROADMAP-%s.md" % slug, block)
-    block = re.sub(r"docs/roadmap\.txt(?![\w.-])", "docs/roadmap-%s.txt" % slug, block)
+    """Point every pre-conversion path at its post-conversion name.
+
+    The lookahead bars a longer filename (`docs/ROADMAP.md.bak`, `.mdx`) but not
+    a sentence-ending period: a trailing dot followed by anything other than a
+    word character is punctuation, and `recorded in docs/ROADMAP.md.` has to
+    migrate like every other mention.
+    """
+    block = re.sub(r"docs/ROADMAP\.md(?![\w-]|\.\w)", "docs/ROADMAP-%s.md" % slug, block)
+    block = re.sub(r"docs/roadmap\.txt(?![\w-]|\.\w)", "docs/roadmap-%s.txt" % slug, block)
     return block
 
 
 def mark_handoff_stale(status_block):
     """Replace the '**Handoff**:' line: the copied one asserts a seed that is
-    now wrong, and Step 5's rewrite is several steps away."""
+    now wrong, and Step 5's rewrite is several steps away.
+
+    The line is matched with any list marker and re-emitted with that marker
+    intact. Step 5's template writes it unbulleted, so a plain prefix test is
+    enough for a generated roadmap -- the marker is tolerated for hand-edited
+    ones, where an unmatched line would fall through to the append below and
+    leave the block asserting two contradictory Handoff states.
+    """
     out, replaced = [], False
     for line in status_block.splitlines(keepends=True):
-        if line.lstrip().startswith("**Handoff**"):
+        mm = re.match(r"(\s{0,3}(?:[-*]\s+)?)\*\*Handoff\*\*", line)
+        if mm:
             nl = "\n" if line.endswith("\n") else ""
-            out.append(STALE_HANDOFF + nl)
+            out.append(mm.group(1) + STALE_HANDOFF + nl)
             replaced = True
         else:
             out.append(line)
@@ -285,12 +329,7 @@ def build_index(project_title, slug, blocks):
         if blocks.get(heading):
             parts.append(blocks[heading].rstrip("\n") + "\n\n")
         else:
-            parts.append(
-                "%s\n\n_No `%s` existed in `docs/ROADMAP.md` at conversion time. "
-                "This is handoff-seed.md's legacy case: read it as \"the roadmap "
-                "predates decompose-phase Step 7a\" and report it — never as \"no "
-                "open themes\". The next Phase 2 run fills this block._\n\n"
-                % (heading, heading[3:]))
+            parts.append("%s\n\n%s\n\n" % (heading, PLACEHOLDER[heading]))
     parts.append(
         "## Roadmaps\n\n"
         "| Section | Roadmap file | Build-order file | Slug / prefix | Depends on |\n"
@@ -367,6 +406,20 @@ def preconditions(root, chosen_slug=None):
             fail("'%s' appears %d times in docs/ROADMAP.md (lines %s). Exactly one "
                  "may exist per project — only the first would move, and the rest "
                  "would be orphaned." % (h, len(loose), ", ".join(map(str, loose))))
+        # The fence check above only counts fences; it cannot see a ledger that
+        # lives INSIDE a balanced one. `scan_heading` is fence-aware and returns
+        # nothing for it, which is precisely the path that writes a placeholder
+        # denying the block ever existed while the real one rides along in the
+        # renamed roadmap. Only reached when the fence-aware scan found nothing —
+        # a fenced EXAMPLE beside a real block is legal and must keep converting.
+        if not loose:
+            blind = [i + 1 for i, l in enumerate(body.splitlines())
+                     if LOOSE[h].match(l)]
+            if blind:
+                fail("'%s' appears in docs/ROADMAP.md only inside a fenced block "
+                     "(line %d). The extractor cannot tell the real ledger from an "
+                     "example, and would write a placeholder saying it never existed. "
+                     "Resolve it by hand before converting." % (h, blind[0]))
         if loose and not exact:
             fail("'%s' exists at line %d but not in that exact form (trailing "
                  "punctuation, or different spacing or case). It would be left "
@@ -374,29 +427,44 @@ def preconditions(root, chosen_slug=None):
                  "exist twice. Normalise the heading first." % (h, loose[0]))
 
     names = read_feature_names(txt)
-    cands, err = candidate_prefixes(names)
-    if err:
-        fail(
-            "cannot derive the section slug: %s.\nThe slug must be the prefix the "
-            "existing features already carry — it is not free to choose, because "
-            "those names are frozen. Put this to the user." % err)
+    if not names:
+        fail("docs/roadmap.txt carries no feature names, so the section slug cannot "
+             "be derived and the re-seed would have nothing to order. Regenerate it "
+             "from the roadmap's execution-order block first (feature names only, one "
+             "per line), then re-run.")
+
+    # `--slug` is validated against the NAMES, not against the derived candidates.
+    # Derivation is the thing this flag exists to override, so gating it on a
+    # SUCCESSFUL derivation left every derivation failure with no exit at all.
+    # Strict prefix: a slug equal to some whole feature name would name the
+    # section after one of the features inside it.
     if chosen_slug:
-        if chosen_slug not in cands:
-            fail("--slug '%s' is not a prefix every feature name carries. Viable: %s"
-                 % (chosen_slug, ", ".join(cands)))
+        toks = chosen_slug.split("-")
+        bad = [n for n in names
+               if n.split("-")[:len(toks)] != toks or n.split("-") == toks]
+        if bad:
+            fail("--slug '%s' is not a strict prefix of these feature names: %s"
+                 % (chosen_slug, ", ".join(sorted(bad)[:5])))
         slug = chosen_slug
-    elif len(cands) > 1:
-        fail("the feature names admit %d possible section slugs: %s.\nEvery one is a "
-             "legal prefix of every name, so this CANNOT be derived from the file — "
-             "Step 2 assigned it and only the project knows which. Check "
-             "`.specs/features/*` and docs/ROADMAP.md, put it to the user (the "
-             "longest, '%s', is the usual answer), then re-run with --slug <choice>."
-             % (len(cands), ", ".join(cands), cands[-1]))
     else:
+        cands, err = candidate_prefixes(names)
+        if err:
+            fail(
+                "cannot derive the section slug: %s.\nThe slug must be the prefix the "
+                "existing features already carry — it is not free to choose, because "
+                "those names are frozen. Put this to the user; if you know which prefix "
+                "Step 2 assigned, re-run with --slug <choice>." % err)
+        if len(cands) > 1:
+            fail("the feature names admit %d possible section slugs: %s.\nEvery one is "
+                 "a legal prefix of every name, so this CANNOT be derived from the file "
+                 "— Step 2 assigned it and only the project knows which. Check "
+                 "`.specs/features/*` and docs/ROADMAP.md, put it to the user (the "
+                 "longest, '%s', is the usual answer), then re-run with --slug <choice>."
+                 % (len(cands), ", ".join(cands), cands[-1]))
         slug = cands[0]
     err = validate_slug(slug)
     if err:
-        fail("derived prefix %s" % err)
+        fail("section slug %s" % err)
 
     # --- D3: a stale .txt would rename the roadmap after a section it does not hold.
     entries = re.findall(r"^###\s+`?([A-Za-z0-9][\w.-]*)`?\s*$", body, re.M)
@@ -407,6 +475,14 @@ def preconditions(root, chosen_slug=None):
                  "`### ` entries: %s. The slug is derived from that file, so a stale "
                  ".txt renames the roadmap after a section it does not contain. "
                  "Reconcile them first." % ", ".join(sorted(stray)[:5]))
+    else:
+        # Not a failure: a legacy or hand-made roadmap that never carried `### `
+        # feature entries is exactly what the placeholder path exists to serve.
+        # But index-phase.md lists this reconciliation among the guaranteed
+        # aborts, so skipping it in silence is what has to stop.
+        info("build-order reconciliation: skipped — docs/ROADMAP.md carries no "
+             "`### ` feature entries (legacy or hand-made); the slug came from "
+             "docs/roadmap.txt alone")
 
     # --- D5: never overwrite a rename target.
     for target in ("ROADMAP-%s.md" % slug, "roadmap-%s.txt" % slug):
@@ -516,6 +592,11 @@ def do_convert(ctx, dry_run):
     rel = lambda p: os.path.relpath(p, root)
     journal = {"slug": slug, "new_md": rel(new_md), "new_txt": rel(new_txt),
                "index": rel(ctx["index"]), "used_git": use_git}
+    # Bound before the try: `os.makedirs` itself can raise (read-only or full
+    # filesystem), and the handler below reads `created` to decide whether the
+    # backup is this run's to remove. Unbound, that handler died with an
+    # UnboundLocalError traceback instead of the oriented message.
+    created = False
     try:
         # No exist_ok: if another run created it between the pre-condition check
         # and here, this raises FileExistsError and the handler below must NOT
@@ -577,7 +658,7 @@ def do_convert(ctx, dry_run):
     except Exception as exc:  # noqa: BLE001 - any failure must restore
         print("\n✗ conversion failed: %s\n  rolling back..." % exc, file=sys.stderr)
         try:
-            rollback(root, quiet=False, force=True)
+            rollback(root, quiet=False, force=True, auto=True)
         except SystemExit:
             raise
         except Exception as rexc:  # noqa: BLE001
@@ -597,7 +678,15 @@ def do_convert(ctx, dry_run):
     return 0
 
 
-def rollback(root, quiet=True, force=False):
+def rollback(root, quiet=True, force=False, auto=False):
+    """auto=True is the in-run recovery path, and it knows things the manual one
+    cannot assume: this run created the backup seconds ago, so it is not foreign;
+    hashes are absent because the run never reached the point that writes them,
+    not because anything is suspect; and no product has existed long enough for
+    anyone to edit it. The guards below exist for a human running --rollback
+    later, and firing them here is what left a backup behind after every failed
+    conversion -- blocking re-conversion, since a surviving backup aborts the
+    pre-conditions."""
     backup = os.path.join(root, BACKUP_DIR)
     jpath = os.path.join(backup, JOURNAL)
     if not os.path.isfile(jpath):
@@ -619,12 +708,12 @@ def rollback(root, quiet=True, force=False):
     # put docs/ROADMAP.md beside a surviving index (rule 9's first contradiction)
     # and then delete the only backup, reporting success.
     missing = [p for p in products.values() if not os.path.exists(p)]
-    if len(missing) == len(products):
+    if not auto and len(missing) == len(products):
         fail("this backup describes files that are not here:\n  %s\nIt does not "
              "belong to %s — most likely the project was reached by a different "
              "path than the one it was converted under. Nothing was touched."
              % ("\n  ".join(sorted(missing)), root))
-    if os.path.exists(os.path.join(docs, "ROADMAP.md")):
+    if not auto and os.path.exists(os.path.join(docs, "ROADMAP.md")):
         fail("docs/ROADMAP.md already exists — restoring on top of it would leave "
              "two roadmaps for the same scope. Resolve that first; nothing was "
              "touched.")
@@ -633,7 +722,7 @@ def rollback(root, quiet=True, force=False):
     # through Steps 1-5, then re-seed. That work is uncommitted and lives in the
     # exact files a rollback removes, so removing it silently is not an option.
     hashes = {os.path.join(root, k): v for k, v in (j.get("hashes") or {}).items()}
-    if not hashes and not force:
+    if not hashes and not force and not auto:
         fail("this backup has no recorded hashes, so changes made since the "
              "conversion cannot be detected — the run was interrupted before it "
              "finished. Re-run with `--rollback --force` to proceed anyway; any "
@@ -653,7 +742,7 @@ def rollback(root, quiet=True, force=False):
     for key in ("index", "new_md", "new_txt"):
         path = products[key]
         if os.path.isfile(path):
-            if path in changed or not hashes:
+            if path in changed or (not hashes and not auto):
                 os.makedirs(quarantine, exist_ok=True)
                 shutil.move(path, os.path.join(quarantine, os.path.basename(path)))
             else:
@@ -693,8 +782,10 @@ def main():
     ap.add_argument("--force", action="store_true",
                     help="with --rollback: discard changes made since the conversion")
     ap.add_argument("--slug",
-                    help="pick among the viable prefixes when the feature names "
-                         "admit more than one")
+                    help="the section slug, instead of deriving one: pick among the "
+                         "viable prefixes when the feature names admit more than one, "
+                         "or supply the prefix Step 2 assigned when derivation fails "
+                         "outright. Must be a strict prefix of every feature name.")
     args = ap.parse_args()
 
     root = os.path.abspath(args.root)

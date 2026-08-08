@@ -9,6 +9,36 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.6.2 — 2026-08-08
+
+**The other 34 findings, triaged before being applied — and two grave defects that 3.6.1 shipped.**
+Every remaining finding was put through two questions before any edit: is it still true at HEAD, and
+is its proposed remedy correct? Three were dropped — two already closed by 3.6.1, one whose remedy
+was worse than the defect it fixed. The rest were applied, twenty-six of them with a corrected
+remedy, which is the number that matters: the original review had already had six remedies refuted,
+and this pass caught twenty-six more that would have introduced defects had they been applied as
+written.
+
+- **`--rollback`'s guards fired on the auto-rollback path.** 3.6.1 added three checks for a human
+  running `--rollback` later: refuse a backup describing files that are not here, refuse when
+  `docs/ROADMAP.md` already exists, and refuse when the journal has no hashes. The in-run recovery
+  path shares that function, and for it all three are wrong — it created the backup seconds ago,
+  hashes are absent because the run never reached the step that writes them, and no product has
+  existed long enough to be edited. The result: **every failed conversion left its backup behind,
+  and a surviving backup aborts the pre-conditions — so the project could not be re-converted at
+  all.** A failure in the first rename compounded it, exiting 1 with "this backup describes files
+  that are not here" instead of rolling back and exiting 3. `rollback()` now takes `auto`, and the
+  three guards are scoped to the manual path. Verified by injecting failures at both stages: exit 3,
+  originals restored, backup removed, re-conversion works.
+- **The prefix derivation refused a legal shape.** `tt-list` beside `tt-list-open-tasks` is a parent
+  feature and its child; the common run is the whole of one name, and the script aborted with no way
+  forward — the abort fired before `--slug` could override it. It now backs off a token at a time,
+  which yields `tt`, the section they actually share.
+- The rest is text: the Blockers gate, the ledger's fourth state reaching Step 8's list, the guide's
+  definition of work-in-flight, the READMEs' handoff prompt brought level with Step 10's template,
+  and `python3` declared as the prerequisite it became in 3.6.0. Two docstrings that justified
+  themselves with a bug that never existed were rewritten to say what the code does.
+
 ## 3.6.1 — 2026-08-08
 
 **A full review of 3.6.0 found 47 confirmed defects; three were grave, and this release closes them
@@ -50,8 +80,7 @@ was applied without re-reading the passage it changes.
   until now nothing kept the copies in sync but the maintainer's memory, and it had failed on at
   least five distinct facts across two releases.
 
-The remaining 44 findings — fourteen medium, twenty light, and the accretion trimming — are recorded
-and not yet applied.
+The remaining 34 findings — fourteen medium, twenty light — are recorded and not yet applied.
 
 ## 3.6.0 — 2026-08-08
 

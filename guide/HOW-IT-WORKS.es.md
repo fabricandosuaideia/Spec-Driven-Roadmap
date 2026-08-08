@@ -90,8 +90,11 @@ varios roadmaps (`docs/ROADMAP-INDEX.md` + un archivo por sección) permite razo
 construir — cada parte de forma algo independiente. La skill presenta el trade-off y pregunta; no
 necesitas decidir esto antes de empezar. Hay una excepción: si el proyecto ya tiene un
 `docs/ROADMAP-INDEX.md` o un `docs/ROADMAP.md`, el modo ya quedó fijado antes y la ejecución
-continúa en él — en ese caso no vuelve a preguntar. Si existen *ambos* archivos, eso es una
-contradicción — la ejecución se detiene y te pregunta cuál es el autoritativo.
+continúa en él — en ese caso no se repite al inicio de la ejecución. Vuelve solo si pides cambiar el
+formato (las preguntas frecuentes, abajo, cubren ese caso), o si el roadmap crece lo bastante como
+para que la skill la plantee de nuevo; en cualquier caso la respuesta es tuya, y "seguir como está"
+es una respuesta válida. Si existen *ambos* archivos, eso es una contradicción — la ejecución se
+detiene y te pregunta cuál es el autoritativo.
 
 ## Qué obtienes, en disco
 
@@ -275,7 +278,9 @@ features que son solo pregunta son la única excepción: como no producen códig
 cuando su pregunta queda respondida — o cuando existe un `context.md` para ellas. Y cuando hay
 trabajo real en curso — algo completado o en progreso en el Handoff, o la feature nombrada en el
 Handoff tiene un `spec.md` en disco y ningún PASS de verdad — **no reescribe `.specs/STATE.md` en
-absoluto**: refresca su propio bloque de Status, nombra la feature en curso, y ahí se detiene.
+absoluto**: refresca su propio bloque de Status, nombra la feature en curso, y ahí se detiene. Nada
+de eso se dispara si la feature que el Handoff nombra ya tiene un PASS de verdad — terminada y luego
+pausada no es trabajo en curso.
 
 ## Qué aparece en el archivo y podría sorprenderte
 
@@ -341,7 +346,8 @@ renombra.
 y no unos pocos ítems más. El proyecto se convierte a multi-sección: lo que ya tienes pasa a ser el
 roadmap de una sección, la ola nueva pasa a ser la siguiente, y un índice las ordena. El
 procedimiento exacto es `Converting a single-section project to multi-section`, en
-`references/index-phase.md`.
+`references/index-phase.md`. La conversión la hace un pequeño script de Python 3 que viene con la
+skill, así que una máquina sin `python3` no puede ejecutarla.
 
 Por qué importa la elección: un roadmap solo te cuesta lo que se carga, y en modo loop ese único
 archivo queda nombrado como spec source de **cada** feature que el loop construye — así que uno que
@@ -349,8 +355,11 @@ crece ola tras ola se relee hacia el contexto de todo el trabajo futuro, incluid
 cerraron hace meses. Una sección terminada nunca se vuelve a cargar entera: el progreso se cuenta
 desde su `.txt` y desde el `validation.md` de cada feature, mientras que las lecturas puntuales en su
 cuerpo — el test de `discharge:`, el roll-up de `## Open Questions` — siguen ocurriendo. Lo que nunca
-ocurre es que ese cuerpo entero caiga en el contexto de cada feature que el loop construye. Convertir
-renombra **archivos, no features**, así que nada de lo ya construido se ve afectado — con una
-salvedad: el puntero de handoff en `.specs/STATE.md` nombra archivos por ruta, así que queda obsoleto
-y la skill vuelve a ejecutar su siembra para repararlo. Si una feature está a medio construir cuando
-conviertes, esa reparación tiene que esperar a que pase, y la skill te lo dice.
+ocurre es que ese cuerpo entero caiga en el contexto de cada feature que el loop construye. En
+números: cada feature cuesta unos 200-250 tokens del roadmap, así que la skill avisa cerca de 2.000
+— diciendo cuántas features caben aún antes de dividir — y vuelve a plantear la pregunta de
+uno-o-varios pasados unos 3.000, unas 12-15 features. Convertir renombra **archivos, no features**,
+así que nada de lo ya construido se ve afectado — con una salvedad: el puntero de handoff en
+`.specs/STATE.md` nombra archivos por ruta, así que queda obsoleto y la skill vuelve a ejecutar su
+siembra para repararlo. Si una feature está a medio construir cuando conviertes, esa reparación
+tiene que esperar a que pase, y la skill te lo dice.

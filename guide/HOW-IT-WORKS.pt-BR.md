@@ -90,8 +90,11 @@ em vários roadmaps (`docs/ROADMAP-INDEX.md` + um arquivo por seção) permite p
 construir — cada parte de forma um pouco independente. A skill apresenta o trade-off e pergunta;
 você não precisa decidir isso antes de começar. Há uma exceção: se o projeto já tem um
 `docs/ROADMAP-INDEX.md` ou um `docs/ROADMAP.md`, o modo já foi definido antes e a execução continua
-nele — nesse caso ela não pergunta de novo. Se os *dois* arquivos existirem, isso é uma contradição
-— a execução para e pergunta qual deles é o autoritativo.
+nele — nesse caso ela não repete a pergunta no início da execução. Ela volta só se você pedir para
+mudar o formato (as perguntas frequentes, abaixo, cobrem esse caso), ou se o roadmap crescer o
+bastante para a skill levantá-la de novo; de todo jeito a resposta é sua, e "continuar como está" é
+uma resposta válida. Se os *dois* arquivos existirem, isso é uma contradição — a execução para e
+pergunta qual deles é o autoritativo.
 
 ## O que você recebe, em disco
 
@@ -279,7 +282,8 @@ código, elas se quitam quando a pergunta é respondida — ou quando existe um 
 E quando há trabalho de verdade em andamento — algo concluído ou em progresso no Handoff, ou a
 feature nomeada no Handoff tem `spec.md` no disco e não tem um PASS de verdade — ela **não reescreve
 o `.specs/STATE.md` de jeito nenhum**: atualiza só o bloco de status dela, nomeia a feature em
-andamento, e para por aí.
+andamento, e para por aí. Nada disso dispara se a feature que o Handoff nomeia já tem um PASS de
+verdade — concluída e depois pausada não é trabalho em andamento.
 
 ## O que aparece no arquivo e pode te surpreender
 
@@ -344,7 +348,9 @@ uma feature obsoleta é marcada como superseded no lugar, nunca apagada, nunca r
 **Dar à nova onda uma seção própria** — é o certo quando o trabalho novo é um lote distinto, e não
 só mais alguns itens. O projeto converte para multi-seção: o que você já tem vira o roadmap de uma
 seção, a nova onda vira a seguinte, e um índice ordena os dois. O procedimento exato é
-`Converting a single-section project to multi-section`, em `references/index-phase.md`.
+`Converting a single-section project to multi-section`, em `references/index-phase.md`. A conversão
+é feita por um script Python 3 pequeno que vem junto com a skill, então uma máquina sem `python3`
+não consegue rodá-la.
 
 Por que a escolha importa: um roadmap só custa o que é carregado, e no modo loop aquele arquivo é
 nomeado como spec source de **cada** feature que o loop constrói — então um roadmap que cresce onda
@@ -352,8 +358,11 @@ após onda é relido para dentro do contexto de todo trabalho futuro, inclusive 
 meses. Uma seção terminada nunca é carregada inteira de novo: o progresso é contado pelo `.txt` dela
 e pelo `validation.md` de cada feature, enquanto leituras pontuais no corpo — o teste do
 `discharge:`, o roll-up de `## Open Questions` — continuam acontecendo. O que nunca acontece é o
-corpo inteiro cair no contexto de cada feature que o loop constrói. Converter renomeia **arquivos,
-não features**, então nada do que já foi construído é afetado — com uma ressalva: o ponteiro de
-handoff em `.specs/STATE.md` nomeia arquivos por caminho, então ele fica obsoleto e a skill re-roda
-o seed dela para consertá-lo. Se uma feature estiver em construção na hora da conversão, esse
-conserto tem que esperar ela passar, e a skill te avisa disso.
+corpo inteiro cair no contexto de cada feature que o loop constrói. Em números: cada feature custa
+uns 200-250 tokens do roadmap, então a skill avisa por volta de 2.000 — dizendo quantas features
+ainda cabem antes de precisar dividir — e reabre a pergunta de um-ou-vários passando de uns 3.000,
+algo como 12-15 features. Converter renomeia **arquivos, não features**, então nada do que já foi
+construído é afetado — com uma ressalva: o ponteiro de handoff em `.specs/STATE.md` nomeia arquivos
+por caminho, então ele fica obsoleto e a skill re-roda o seed dela para consertá-lo. Se uma feature
+estiver em construção na hora da conversão, esse conserto tem que esperar ela passar, e a skill te
+avisa disso.

@@ -132,7 +132,9 @@ try {
         Write-Host 'If the repository is private, GitHub returns 404 to unauthenticated requests.' -ForegroundColor Yellow
         Write-Host 'This installer only downloads - it has no local-source mode, so re-running it' -ForegroundColor Yellow
         Write-Host 'from a checkout fails the same way. From a clone, install by hand:' -ForegroundColor Yellow
-        Write-Host "  New-Item -ItemType Directory -Path '$Dest' -Force; Copy-Item SKILL.md,references '$Dest' -Recurse -Force" -ForegroundColor Yellow
+        Write-Host "  New-Item -ItemType Directory -Path '$Dest\scripts' -Force" -ForegroundColor Yellow
+        Write-Host "  Copy-Item SKILL.md,references '$Dest' -Recurse -Force" -ForegroundColor Yellow
+        Write-Host "  Copy-Item scripts\convert-to-multi.py '$Dest\scripts' -Force" -ForegroundColor Yellow
         exit 1
     }
 

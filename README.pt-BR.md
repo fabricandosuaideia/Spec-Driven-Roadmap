@@ -58,7 +58,12 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 .\install.ps1 -Global -Force
 ```
 
-A skill em si é markdown puro e totalmente multiplataforma; só o instalador muda por SO.
+A skill em si é markdown mais um script auxiliar em Python 3 (só biblioteca padrão), então é
+totalmente multiplataforma; só o instalador muda por SO. Esse script serve para exatamente uma
+coisa — converter um projeto de roadmap único em roadmaps por seção — e precisa de um `python3`
+funcionando no PATH. No Windows, o `python3` puro costuma ser o stub da Microsoft Store, que abre a
+Store em vez de rodar qualquer coisa: instale o Python pelo python.org — depois disso o
+launcher `py -3` dele também funciona.
 
 ### Qual versão eu tenho?
 
@@ -141,11 +146,19 @@ A saída fica em `docs/` — um `ROADMAP.md` mais um `roadmap.txt` legível por 
 build (ou um `ROADMAP-INDEX.md` com um roadmap por seção, se você escolher o modo multi-seção). A
 posição no backlog fica em um bloco `## Status` que é atualizado a cada execução.
 
-Depois, repasse para o ciclo de build:
+Ao fim da execução, a skill entrega este prompt com o nome da feature e os caminhos já resolvidos —
+cole-o em uma sessão nova para começar a feature um:
 
 ```
-specify feature <name> — spec source: docs/ROADMAP.md
+specify feature <name> — create it at `.specs/features/<name>/` using that exact directory name.
+Spec source: docs/ROADMAP.md. Read docs/ROADMAP.md `## Cross-Cutting Decisions` before Discuss and
+treat it as settled — do not re-decide what it answers.
 ```
+
+Essa é a opção A, uma feature por vez. A opção B é um único prompt `/loop` que constrói o roadmap
+inteiro sem supervisão. Ela é sempre oferecida; o que ela exige antes é um roadmap sem perguntas
+em aberto, e a skill fecha essas perguntas com você antes de entregar o prompt — o guia explica o
+que ela troca.
 
 ## Como se encaixa com o tlc-spec-driven
 

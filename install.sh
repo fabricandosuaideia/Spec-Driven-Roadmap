@@ -8,7 +8,7 @@
 #   curl -fsSL .../install.sh | bash -s -- --global
 #   curl -fsSL .../install.sh | bash -s -- --force
 #
-# Installs SKILL.md + references/ into .claude/skills/spec-driven-roadmap/ in
+# Installs SKILL.md + references/ + scripts/ into .claude/skills/spec-driven-roadmap/ in
 # the current project, or ~/.claude/skills/... with --global. Needs curl + tar.
 # =============================================================================
 
@@ -149,7 +149,8 @@ if ! curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/skill.tar.gz"; then
     echo "If the repository is private, GitHub returns 404 to unauthenticated" >&2
     echo "requests. This installer only downloads — it has no local-source mode," >&2
     echo "so re-running it from a checkout fails the same way. From a clone:" >&2
-    echo "  mkdir -p \"$DEST\" && cp -r SKILL.md references \"$DEST/\"" >&2
+    echo "  mkdir -p \"$DEST/scripts\" && cp -r SKILL.md references \"$DEST/\"" >&2
+    echo "  cp scripts/convert-to-multi.py \"$DEST/scripts/\"" >&2
     exit 1
 fi
 

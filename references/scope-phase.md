@@ -115,7 +115,7 @@ Do not infer this from source size — ask. **Exception:** if `docs/ROADMAP-INDE
 "when to re-run" rules) unless the user explicitly asks to change shape, which is disruptive enough
 to confirm again before touching anything already written.
 
-**A third contradiction — the half-finished conversion.** Section roadmaps
+**Another contradiction — the half-finished conversion.** Section roadmaps
 (`docs/ROADMAP-<slug>.md`) present with **no** `docs/ROADMAP-INDEX.md` beside them are not a mode
 either: that is a single-to-multi conversion that stopped part-way, leaving orphaned section
 roadmaps. Treat it exactly as SKILL.md's rule 9 treats an index and a `docs/ROADMAP.md` coexisting —

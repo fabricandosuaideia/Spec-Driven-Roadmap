@@ -177,7 +177,11 @@ they do not. Listing one here is not deciding it — this phase still never answ
 4. Table of roadmaps: section → roadmap file → build-order file → slug/prefix → depends-on, plus
    excluded sections and why.
 5. `## Ordering` — DAG + topological list, each edge citing its resolving source. Keep that exact
-   heading; the seed locates the section by name (handoff-seed.md Steps 3 and 4).
+   heading; the seed locates the section by name (handoff-seed.md Steps 3 and 4). **The ordered list
+   carries buildable sections only** — it is build order, and an excluded section has none. An
+   excluded section appears in the DAG where a boundary contract cites it, marked
+   `(excluded — pure foundation)` or `(excluded — pure decision log)`, and never in the ordered
+   list.
 6. Boundary contracts, one subsection per edge.
 7. Project-level decision candidates, if any.
 
@@ -199,11 +203,13 @@ python3 <skill-dir>/scripts/convert-to-multi.py --root <project-root> --dry-run
 python3 <skill-dir>/scripts/convert-to-multi.py --root <project-root>
 ```
 
-`<skill-dir>` is the directory holding this skill's own `SKILL.md` — the one containing these
-reference files, resolved from disk the same way Step 5 of handoff-seed.md resolves the version.
+`<skill-dir>` is the directory holding this skill's own `SKILL.md` — the one holding `references/`
+and `scripts/`, resolved from disk the same way Step 5 of handoff-seed.md resolves the version.
 
 **If that file is not on disk, the conversion does not happen.** Say the install predates it and
-point at the README's reinstall path. **Never perform these renames by hand instead.** That is not
+point at the README's `## Install` section: a plugin install updates with `/plugin update`, and a
+plain-skill one by re-running `install.sh --force` (`install.ps1 -Force` on Windows). **Never
+perform these renames by hand instead.** That is not
 caution for its own sake: this procedure was written as prose first, and three rounds of review found
 paths that silently destroyed `## Cross-Cutting Decisions` — a rollback that restored nothing, a
 rollback that recreated `docs/ROADMAP.md` and then overwrote it, and a prefix rule that split on the
@@ -225,8 +231,9 @@ is on disk and reconcilable, while the inverse order would leave the ledger in n
 own context, where an interruption destroys it. If a run is killed in that window, both copies exist
 — `--rollback` reverses it.
 
-`<slug>` is **derived, not chosen**: it is the longest leading hyphen-token run common to every name
-in `docs/roadmap.txt`. Step 2 makes the slug and the feature-name prefix the same string, and those
+`<slug>` is **derived, not chosen**: the longest leading hyphen-token run common to every name in
+`docs/roadmap.txt`, backed off until it is not the whole of any one of them — `tt-list` beside
+`tt-list-open-tasks` is a parent feature and its child, and the section they share is `tt`. Step 2 makes the slug and the feature-name prefix the same string, and those
 names freeze once `.specs/features/<name>/` exists, so a slug that differs from the prefix is
 irreparable. **The derivation is sometimes ambiguous, and then the script refuses rather than
 guess:** `pay-invoice-create` and `pay-invoice-list` admit both `pay` and `pay-invoice`, and only the
@@ -253,7 +260,7 @@ was touched; `2` usage error; `3` the conversion failed part-way and rolled itse
 
 `--rollback` reverses a conversion using the backup the run left at `.sdr-conversion-backup/`. It
 removes the index **before** restoring `docs/ROADMAP.md`, because a restored roadmap beside a
-surviving index is rule 9's first contradiction and a rollback that halts the next run is not a
+surviving index is exactly what rule 9 stops on, and a rollback that halts the next run is not a
 rollback. When the conversion used `git mv`, it also unstages the rename so the index matches `HEAD`
 again; when it did not — the files were untracked or dirty — there is no git state to undo.
 
@@ -287,7 +294,8 @@ If work is in flight, take one of these two exits and record which:
   from its own session at the next `pause work` without ever learning about the rename. Exit (a) is a
   re-seed deferred, never a repair delegated.
 - **(b) Convert anyway and declare the pointer dead** — in chat, and durably on the `**Handoff**`
-  line of the `## Status` block (handoff-seed.md Step 5's fifth state). The script already writes the
+  line of the `## Status` block (handoff-seed.md Step 5's work-in-flight state, in the conversion
+  form that also names the pre-conversion path). The script already writes the
   conversion-in-progress form into the index it creates; leave it there until that seed runs.
 
 ### Afterwards

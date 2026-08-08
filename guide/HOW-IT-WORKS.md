@@ -84,9 +84,11 @@ can't catch it — the unit was never enumerated in the first place.
 several roadmaps (`docs/ROADMAP-INDEX.md` + one file per section) lets you reason about — or build
 — each part somewhat independently. The skill presents the trade-off and asks; you don't have to
 decide this before you start. One exception: if the project already has a `docs/ROADMAP-INDEX.md`
-or a `docs/ROADMAP.md`, the mode was fixed earlier and the run continues in it — it does not ask
-again. If *both* files exist, that is a contradiction — the run stops and asks you which one is
-authoritative.
+or a `docs/ROADMAP.md`, the mode was fixed earlier and the run continues in it — it is not re-asked
+at the start of the run. It comes back only if you ask to change shape (the FAQ below covers that
+fork), or if the roadmap has grown big enough that the skill raises the question again; either way
+the answer is yours, and "keep it as it is" is a valid one. If *both* files exist, that is a
+contradiction — the run stops and asks you which one is authoritative.
 
 ## What you get, on disk
 
@@ -262,7 +264,8 @@ producing no code, they're discharged by their question being answered — or by
 existing for them. And when real work is in flight — something completed or in progress in the
 Handoff, or the feature named in the Handoff has a `spec.md` on disk and no real PASS — it **does
 not rewrite `.specs/STATE.md` at all**: it refreshes its own Status block, names the feature in
-flight, and stops there.
+flight, and stops there. None of that fires once the feature the Handoff names has a real PASS —
+finished and then paused is not work in flight.
 
 ## What shows up in the file and might surprise you
 
@@ -321,7 +324,9 @@ that frozen block; an obsolete feature is marked superseded in place, never dele
 **Give the new wave its own section** — right when the new work is a distinct batch rather than a few
 more items. The project converts to multi-section: what you have becomes one section roadmap, the new
 wave becomes the next, and an index orders them. The exact procedure is
-`Converting a single-section project to multi-section`, in `references/index-phase.md`.
+`Converting a single-section project to multi-section`, in `references/index-phase.md`. The
+conversion is done by a small Python 3 script that ships with the skill, so a machine with no
+`python3` cannot run it.
 
 Why the choice matters: a roadmap only costs you what gets loaded, and in loop mode that one file is
 named as the spec source for **every** feature the loop builds — so one that grows wave after wave is
@@ -329,7 +334,10 @@ read back into the context of all future work, waves that closed months ago incl
 section is never loaded whole again: progress is counted from its `.txt` and each feature's
 `validation.md`, while pinpoint reads into its body — the `discharge:` test, the `## Open Questions`
 roll-up — still happen. What never happens is the whole body landing in the context of every feature
-the loop builds. Converting renames **files, not features**, so nothing already built is affected —
-with one caveat: the handoff pointer in `.specs/STATE.md` names files by path, so it goes stale and
-the skill re-runs its seed to repair it. If a feature is mid-build when you convert, that repair has
-to wait until it passes, and the skill tells you so.
+the loop builds. Concretely: one feature costs the roadmap roughly 200-250 tokens, so the skill
+flags the size at around 2,000 — naming how many features are left before a split is needed — and
+re-raises the one-or-several question past roughly 3,000, about 12-15 features. Converting renames
+**files, not features**, so nothing already built is affected — with one caveat: the handoff pointer
+in `.specs/STATE.md` names files by path, so it goes stale and the skill re-runs its seed to repair
+it. If a feature is mid-build when you convert, that repair has to wait until it passes, and the
+skill tells you so.
