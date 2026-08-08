@@ -71,6 +71,14 @@ def info(msg):
     print("  " + msg)
 
 
+def write_journal(backup, data):
+    """Atomic: a half-written journal is a backup --rollback refuses to use."""
+    tmp = os.path.join(backup, JOURNAL + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2)
+    os.replace(tmp, os.path.join(backup, JOURNAL))
+
+
 def sha256(path):
     h = hashlib.sha256()
     with open(path, "rb") as fh:
@@ -438,7 +446,12 @@ def report_work_in_flight(root):
         return ".specs/STATE.md has no ## Handoff block"
     findings = []
     for field in ("Completed", "In-progress"):
-        m = re.search(r"\*\*%s\*\*[^:]*:\s*(.+)" % re.escape(field), handoff)
+        # The canonical field is `**In-progress** (file:line): none` — the
+        # parenthetical carries its own colon, so a lazy [^:]* stops inside it and
+        # captures "line): none", which never equals "none". Anchor on the field
+        # name and skip any parenthetical before the real separator.
+        m = re.search(r"\*\*%s\*\*\s*(?:\([^)]*\))?\s*:\s*(.+)" % re.escape(field),
+                      handoff)
         if m and m.group(1).strip().lower() not in ("none", "none.", "—", "-"):
             findings.append("%s = %s" % (field, m.group(1).strip()))
     if findings:
@@ -494,20 +507,35 @@ def do_convert(ctx, dry_run):
 
     backup = os.path.join(root, BACKUP_DIR)
     use_git = ctx["git"]["repo"] and ctx["git"]["tracked"] and ctx["git"]["clean"]
-    journal = {"slug": slug, "new_md": new_md, "new_txt": new_txt,
-               "index": ctx["index"], "used_git": use_git}
+    # Relative to root, never absolute: a journal carrying absolute paths is
+    # unreadable once the project is reached by a different absolute path (a
+    # move, a different container mount, a copied worktree), and every isfile()
+    # in the rollback then quietly returns False — restoring the originals
+    # BESIDE the index it failed to remove, deleting the backup, and reporting
+    # success. Relative paths plus the existence check below close that.
+    rel = lambda p: os.path.relpath(p, root)
+    journal = {"slug": slug, "new_md": rel(new_md), "new_txt": rel(new_txt),
+               "index": rel(ctx["index"]), "used_git": use_git}
     try:
+        # No exist_ok: if another run created it between the pre-condition check
+        # and here, this raises FileExistsError and the handler below must NOT
+        # delete it — that directory is the other run's only safety net.
         os.makedirs(backup)
+        created = True
         # copyfile, not copy2: copystat fails whenever the caller does not own
         # the file, and a backup that half-exists is worse than none.
         shutil.copyfile(ctx["roadmap"], os.path.join(backup, "ROADMAP.md"))
         shutil.copyfile(ctx["txt"], os.path.join(backup, "roadmap.txt"))
-        with open(os.path.join(backup, JOURNAL), "w", encoding="utf-8") as fh:
-            json.dump(journal, fh, indent=2)
+        write_journal(backup, journal)
+    except FileExistsError:
+        fail("%s/ appeared while this run was preparing — another conversion is "
+             "in progress in this project. Nothing was touched." % BACKUP_DIR)
     except Exception as exc:  # noqa: BLE001
         # Never leave a backup without its journal: --rollback would refuse and
-        # the project would be stuck between the two commands.
-        shutil.rmtree(backup, ignore_errors=True)
+        # the project would be stuck between the two commands. Only remove what
+        # this run created.
+        if created:
+            shutil.rmtree(backup, ignore_errors=True)
         fail("could not create the backup at %s/ (%s) — nothing was touched."
              % (BACKUP_DIR, exc))
 
@@ -543,9 +571,9 @@ def do_convert(ctx, dry_run):
                     "post-condition failed: '%s' does not appear exactly once in "
                     "docs/ROADMAP-INDEX.md" % heading)
 
-        journal["hashes"] = {p: sha256(p) for p in (new_md, new_txt, ctx["index"])}
-        with open(os.path.join(backup, JOURNAL), "w", encoding="utf-8") as fh:
-            json.dump(journal, fh, indent=2)
+        journal["hashes"] = {rel(p): sha256(p)
+                             for p in (new_md, new_txt, ctx["index"])}
+        write_journal(backup, journal)
     except Exception as exc:  # noqa: BLE001 - any failure must restore
         print("\n✗ conversion failed: %s\n  rolling back..." % exc, file=sys.stderr)
         try:
@@ -574,15 +602,43 @@ def rollback(root, quiet=True, force=False):
     jpath = os.path.join(backup, JOURNAL)
     if not os.path.isfile(jpath):
         fail("no %s/%s — nothing to roll back." % (BACKUP_DIR, JOURNAL))
-    with open(jpath, encoding="utf-8") as fh:
-        j = json.load(fh)
+    try:
+        with open(jpath, encoding="utf-8") as fh:
+            j = json.load(fh)
+    except (OSError, ValueError) as exc:
+        fail("%s/%s is unreadable (%s). Restore docs/ROADMAP.md and docs/roadmap.txt "
+             "from %s/ by hand." % (BACKUP_DIR, JOURNAL, exc, BACKUP_DIR))
 
     docs = os.path.join(root, "docs")
+    # Journals from 3.6.0 carry absolute paths; anything relative is joined to
+    # root. os.path.join returns an absolute path unchanged, so both load.
+    products = {k: os.path.join(root, j[k]) for k in ("index", "new_md", "new_txt")}
+
+    # The journal describes what this run produced. If none of it is on disk, this
+    # backup does not belong to this directory -- restoring on top of that would
+    # put docs/ROADMAP.md beside a surviving index (rule 9's first contradiction)
+    # and then delete the only backup, reporting success.
+    missing = [p for p in products.values() if not os.path.exists(p)]
+    if len(missing) == len(products):
+        fail("this backup describes files that are not here:\n  %s\nIt does not "
+             "belong to %s — most likely the project was reached by a different "
+             "path than the one it was converted under. Nothing was touched."
+             % ("\n  ".join(sorted(missing)), root))
+    if os.path.exists(os.path.join(docs, "ROADMAP.md")):
+        fail("docs/ROADMAP.md already exists — restoring on top of it would leave "
+             "two roadmaps for the same scope. Resolve that first; nothing was "
+             "touched.")
 
     # The procedure sends the user straight into this window: fill the index out
     # through Steps 1-5, then re-seed. That work is uncommitted and lives in the
     # exact files a rollback removes, so removing it silently is not an option.
-    changed = [p for p, want in (j.get("hashes") or {}).items()
+    hashes = {os.path.join(root, k): v for k, v in (j.get("hashes") or {}).items()}
+    if not hashes and not force:
+        fail("this backup has no recorded hashes, so changes made since the "
+             "conversion cannot be detected — the run was interrupted before it "
+             "finished. Re-run with `--rollback --force` to proceed anyway; any "
+             "changed file is kept under %s/discarded/." % BACKUP_DIR)
+    changed = [p for p, want in hashes.items()
                if os.path.isfile(p) and sha256(p) != want]
     if changed and not force:
         fail("these files changed since the conversion:\n  %s\n"
@@ -594,9 +650,10 @@ def rollback(root, quiet=True, force=False):
     # index survives recreates rule 9's first contradiction, and a rollback that
     # halts the next run is not a rollback.
     quarantine = os.path.join(backup, "discarded")
-    for path in (j["index"], j["new_md"], j["new_txt"]):
+    for key in ("index", "new_md", "new_txt"):
+        path = products[key]
         if os.path.isfile(path):
-            if path in changed:
+            if path in changed or not hashes:
                 os.makedirs(quarantine, exist_ok=True)
                 shutil.move(path, os.path.join(quarantine, os.path.basename(path)))
             else:
@@ -609,8 +666,8 @@ def rollback(root, quiet=True, force=False):
     # rename whose target no longer exists. Unstage the four paths.
     if j.get("used_git"):
         rel = [os.path.relpath(p, root) for p in
-               (os.path.join(docs, "ROADMAP.md"), os.path.join(docs, "roadmap.txt"),
-                j["new_md"], j["new_txt"])]
+               ([os.path.join(docs, "ROADMAP.md"), os.path.join(docs, "roadmap.txt")]
+                + [products["new_md"], products["new_txt"]])]
         run_git(root, "reset", "-q", "--", *rel)
 
     kept = os.path.isdir(quarantine)

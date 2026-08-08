@@ -9,6 +9,50 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.6.1 — 2026-08-08
+
+**A full review of 3.6.0 found 47 confirmed defects; three were grave, and this release closes them
+plus the pattern behind fifteen of the rest.** Eight independent lenses read the skill, an adversarial
+pass refuted six of their findings — and six of their proposed *remedies*, which is why nothing here
+was applied without re-reading the passage it changes.
+
+- **The seed's Step 5 cut the `## Status` block at the next `##`.** In a roadmap the feature entries
+  are bare `### <feature-name>` sections with no `##` container, so on a legacy roadmap — one from
+  3.1.0-3.2.0, where `## Status` exists and `## Cross-Cutting Decisions` does not yet — re-seeding
+  deleted every feature entry. `docs/roadmap.txt` survives, so the next seed still finds targets and
+  nothing surfaces until someone opens the file. The cut is now "next heading of any level", the same
+  one `scripts/convert-to-multi.py` documents and for the reason documented there. Phase 2 now also
+  *declares* the `### <feature-name>` form, which four consumers depended on and no producer stated.
+- **`convert-to-multi.py` wrote absolute paths into its rollback journal.** Reached by a different
+  absolute path — a move, another container mount, a copied worktree — every existence check returned
+  false, so `--rollback` restored the originals *beside* the index it had failed to remove, deleted
+  the backup, and reported success. Paths are now relative to the root, journals from 3.6.0 still
+  load, and a journal describing files that are not present is a hard error. Also fixed there: the
+  journal is written atomically, a backup this run did not create is never removed, and the
+  work-in-flight report no longer misreads the colon inside `**In-progress** (file:line):`.
+- **The "real PASS" test reached no verdict line.** `validate_state.py` selects only `Validation`
+  headings and `Result:` lines, and in the persisted template the two lines that say whether the
+  feature passed — `**Status**: ❌ Gaps present` and `**Overall**: ❌ Not Ready` — carry neither. The
+  only selected verdict is the Discrimination Sensor's, which reports whether mutants died. A feature
+  that killed every mutant while leaving an acceptance criterion without `file:line` evidence read as
+  done. This skill's own test now selects those lines too and treats a ❌ or ⚠️ on them as not-done,
+  which makes it deliberately stricter than that gate: exit 0 from the script is documented as
+  necessary but not sufficient. The defect originates upstream and is described here rather than
+  worked around silently.
+- **`scripts/check-consistency.py`** — 19 checks over the invariants that keep duplicated facts in
+  step: version declarations, cited section names resolving, no section name split across a newline,
+  generated-block names never starting a line in `references/`, enumerated counts agreeing, both
+  installers requiring the same payload, prose about that payload matching it, and trilingual parity
+  of guides and READMEs. On its first run it independently found two of the review's confirmed
+  findings: four places still saying the ledger has "three states" after 3.4.0 added a fourth, and
+  `SKILL.md` still saying the installers copy only `SKILL.md` and `references/` after 3.6.0 added
+  `scripts/`. Both fixed. The skill duplicates facts on purpose so each reference is self-sufficient;
+  until now nothing kept the copies in sync but the maintainer's memory, and it had failed on at
+  least five distinct facts across two releases.
+
+The remaining 44 findings — fourteen medium, twenty light, and the accretion trimming — are recorded
+and not yet applied.
+
 ## 3.6.0 — 2026-08-08
 
 **A project built in waves now has somewhere to put the next wave.** Re-running the skill on a

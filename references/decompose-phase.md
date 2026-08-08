@@ -231,11 +231,14 @@ accepted default is the user's decision. An **unanswered** one is not, and never
 silence.
 
 **`## Cross-Cutting Decisions` is a ledger of the rubric's themes, not a list of answers.** Every
-theme carries exactly one row, in exactly one of three states:
+theme carries exactly one row, in exactly one of **four** states — three written here, and a fourth
+that only a later promotion produces:
 
 - `<decision> — <one line of rationale>` — the user answered it, or accepted a proposed default.
 - `N/A because <reason> (as of <this-roadmap>)` — no feature decomposed so far touches it.
 - `not decided — see the <theme> entry in <roadmap-path> ## Open Questions` — asked, left unanswered.
+- ``deferred to feature `<name>` — see its `open questions``` — the theme became its own
+  question-only feature (below). Never written directly; it replaces a `not decided` row.
 
 The third state is what lets the block be complete without deciding anything, and completeness is the
 block's whole value: the downstream skill reads it before every Discuss, so "not listed here" has to
@@ -268,7 +271,7 @@ If `affects:` ends up naming most of the roadmap, use Step 3's "formalize a bloc
 its own feature" instead: a question that gates the backlog belongs in the dependency graph, where
 the order already enforces it, not in a gate every seed re-reads. That move changes the theme's row
 too: write ``deferred to feature `<name>` — see its `open questions``` in place of `not decided`. It
-is a fourth legal row state, exempt from the `cross-cutting` sanity check below, and the seed does
+is the fourth row state listed above, exempt from the `cross-cutting` sanity check below, and the seed does
 not block on it — after the promotion the question is feature-carried, so it has no `cross-cutting`
 tag and no `affects:` line, and a `not decided` row left behind would block every target including
 the feature created to answer it.
@@ -279,7 +282,7 @@ the feature created to answer it.
 - Multi-section mode → in `docs/ROADMAP-INDEX.md`. Section roadmaps reference it, never restate it.
 
 Multi-section decomposition is lazy, so a later section runs this step against a ledger that already
-exists. **Read it first, and treat its three states differently:**
+exists. **Read it first, and treat its states differently:**
 
 - A **decision** is settled — never re-ask it. A second answer to a settled theme is exactly how two
   sections end up built against contradicting rules.
@@ -375,7 +378,7 @@ backlog has stopped being a sweep.
   `open questions` field. Omit the section when there are none.
 - **`## Cross-Cutting Decisions`** (Step 7a): single-section mode only — in multi-section mode this
   block lives in `docs/ROADMAP-INDEX.md`, exactly one per project. One row per rubric theme, each in
-  one of Step 7a's three states: the decision plus one line of rationale, `N/A because <reason>
+  one of Step 7a's four states: the decision plus one line of rationale, `N/A because <reason>
   (as of <roadmap>)`, or `not decided` pointing at its `## Open Questions` entry. One row per theme
   is both floor and ceiling — this is the block the build reads instead of re-deciding, so a missing
   row reads as "no such concern in this project".
@@ -398,7 +401,13 @@ backlog has stopped being a sweep.
    `docs/ROADMAP-INDEX.md` instead — exactly one `## Status` exists per project.)
 3. `## Cross-Cutting Decisions` — **single-section mode only**, same reason: in multi-section mode it
    lives in `docs/ROADMAP-INDEX.md`, exactly one per project.
-4. The feature entries, each with all ten fields (Step 6).
+4. The feature entries, each with all ten fields (Step 6). **Each one is a `### <feature-name>`
+   heading** — level three, the bare name, nothing else on the line. That form is not cosmetic: four
+   consumers depend on it. The seed's Step 5 replaces the `## Status` body up to the next heading of
+   any level, so a feature written at `##` would be swallowed by that block; `scripts/convert-to-multi.py`
+   reads these entries to reconcile `docs/roadmap.txt` against the roadmap, and finds none if they
+   are a table or a list; index-phase.md's conversion resolves the section slug against them; and a
+   human reading the file navigates by them.
 5. `## Open Questions` roll-up.
 6. `## Expected Gray Areas` roll-up.
 7. Coverage table, closing with the `uncovered:` line.
@@ -448,7 +457,7 @@ directory. Those names **and their relative order are frozen**:
 - The coverage table accounts for 100% of the enumerated scope-units, each exactly once, and closes
   with `uncovered: none`.
 - Every theme in the confirmed downstream skill's rubric (Step 7a — nine for `tlc-spec-driven` v3.x)
-  has exactly one row in `## Cross-Cutting Decisions`, in one of its three states. No theme absent,
+  has exactly one row in `## Cross-Cutting Decisions`, in one of its four states. No theme absent,
   no theme with two rows.
 - Every `not decided` row (a `deferred to feature` row is exempt) names an entry that exists in
   `## Open Questions` tagged `cross-cutting`, naming that same rubric theme, with an `affects:` line;

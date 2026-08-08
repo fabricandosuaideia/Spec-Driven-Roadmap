@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.6.0"
+  version: "3.6.1"
 ---
 
 # Spec-Driven Roadmap
@@ -38,8 +38,9 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 There is no top-level `version` field in a `SKILL.md` — the [Agent Skills
 spec](https://agentskills.io/specification) defines six keys (`name`, `description`, `license`,
 `compatibility`, `metadata`, `allowed-tools`), and its own example nests `author` and `version`
-under `metadata`, which is what this file does. The installers copy only `SKILL.md` and
-`references/`, so this frontmatter is the single version stamp that ever reaches the user's disk.
+under `metadata`, which is what this file does. The installers copy `SKILL.md`, `references/` and
+the runtime `scripts/`, so this frontmatter is the single version stamp that ever reaches the
+user's disk.
 
 **Announce that version before the first question of any run.** State the version read from this
 file's frontmatter, and where to check the latest published one: `/plugin update` for a plugin

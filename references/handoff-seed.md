@@ -181,13 +181,27 @@ script's.** Another downstream skill's gate, or a later `tlc-spec-driven` one, h
 from that skill's reference before trusting an exit status, and if it does not document them, read
 the report instead.
 
-**Read the report whenever there is no such script, its codes are undocumented, or no code-execution
-tool is available.** This is the test itself, not a degraded stand-in — the script implements exactly
-it. Reproduce its logic rather than eyeballing the file, because a paraphrase is how the two
-disagree. Collect only the lines that are either a heading (1-4 `#`) whose text *starts with*
-`Validation`, or contain `Result:` (with or without the `**`) — that selection is case-**in**sensitive
-— then judge the joined text of those lines **case-sensitively**, on the whole words `PASS` and
-`FAIL`:
+**Read the report as well, whenever its consolidated verdict lines are present** — and always when
+there is no gate script, its codes are undocumented, or no code-execution tool is available.
+
+**The script is a floor, not an equivalent, and this is a deliberate divergence.** `validate_state.py`
+v3.3.0 selects only lines that are a `Validation` heading or contain `Result:`. In that skill's own
+persisted template the two lines that actually say whether the feature passed carry neither marker:
+`**Status**: … ❌ Gaps present` and `**Overall**: … ❌ Not Ready`. The only selected line that carries
+a verdict word is the Discrimination Sensor's `**Result**: [N/N killed] - [PASS ✅ | FAIL ❌]` — which
+reports whether mutants died, not whether the feature is done. So a feature that killed every mutant
+while leaving an acceptance criterion without `file:line` evidence reads as **done** to that script.
+Exit `0` from it is therefore **necessary but not sufficient**; where these lines exist, the report
+decides. Say so in the Step 7 report when the two disagree, and never record a PASS the report
+contradicts.
+
+Collect the lines that are a heading (1-4 `#`) whose text *starts with* `Validation`, or that contain
+`Result:`, `Overall:` or `Status:` (with or without the `**`) — that selection is
+case-**in**sensitive — then judge the joined text **case-sensitively**, on the whole words `PASS` and
+`FAIL`, plus this rule first:
+
+- a `❌` or a `⚠️` on an `Overall:` or `Status:` line → **not done**, whatever any `PASS` says
+  elsewhere. Those are the consolidated verdicts; the sensor's `Result:` is scoped to mutants.
 
 - both `PASS` and `FAIL` present → unfilled template → **not done**
 - `FAIL` only → **not done**
@@ -202,8 +216,8 @@ Two traps in that file, both verified against `tlc-spec-driven` v3.x's `referenc
 persisted report is titled `# <feature> Validation` — the word comes *last*, so it fails a naive
 heading test; `## Validation: <feature> — PASS/FAIL` is the Verifier's **chat** summary and is never
 written to disk. And the report carries two `Result:` lines, the Discrimination Sensor's verdict and
-Gate Check's `[X] passed, [Y] failed` counts. Judge them together, as the script does — lower-case
-`failed` in a count is not a `FAIL` verdict.
+Gate Check's `[X] passed, [Y] failed` counts. Judge them together — lower-case `failed` in a count is
+not a `FAIL` verdict.
 
 **One exception — question-only features.** Phase 2 may formalize a blocking open question as its own
 feature (decompose-phase Step 3). It produces no code, so it can never earn a PASS report and would
@@ -266,7 +280,14 @@ end there.
 
 Insert or replace a `## Status` block in `docs/ROADMAP-INDEX.md` (multi-section) or `docs/ROADMAP.md`
 (single-section): if the heading is already there — both output shapes leave it in place — replace
-only its body, up to the next `##`. If it is missing (a legacy or hand-made file), insert it
+only its body, **up to the next heading of any level** (`#`, `##`, `###`, …), respecting code
+fences. Not "up to the next `##`": in a roadmap the feature entries are bare `### <feature-name>`
+sections with no `##` container of their own, so a cut that stops only at `##` swallows every one of
+them and deletes the feature list. That is the same cut `split_block` makes in
+`scripts/convert-to-multi.py`, for the same reason and with the same fence handling — this block's
+own body never contains a heading, so the stricter rule loses nothing. The failure is silent where it
+bites: `docs/roadmap.txt` survives, so the next seed still finds targets and nobody notices until
+someone opens the roadmap. If the heading is missing (a legacy or hand-made file), insert it
 immediately after the H1 title, or at the very top when the file has none. Leave the rest of the file
 untouched — `## Cross-Cutting Decisions` lives in this same file and is never yours to rewrite here.
 
