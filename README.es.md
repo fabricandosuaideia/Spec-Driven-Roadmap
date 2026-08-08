@@ -68,18 +68,18 @@ abre la Store en vez de ejecutar nada: instala Python desde python.org; después
 
 ### ¿Mi roadmap está sano?
 
-Las sanity checks de la propia skill, como comando. Ejecútalo sobre cualquier roadmap que haya
-generado — incluso uno que creció a lo largo de varias olas:
+Pide — *"revisa mi roadmap"* — y la skill ejecuta sus propias sanity checks sobre lo que generó,
+incluso un roadmap que creció a lo largo de varias olas. Informa qué falló, qué es advertencia y qué
+no pudo juzgar; no edita nada.
 
-```bash
-python3 ~/.claude/skills/spec-driven-roadmap/scripts/check-roadmap.py
-```
-
-Revisa dependencias hacia adelante, nombres repetidos, el presupuesto de ocho tareas, el acuerdo en
+Cubre dependencias hacia adelante, nombres repetidos, el presupuesto de ocho tareas, el acuerdo en
 ambos sentidos entre las preguntas abiertas de cada feature y el roll-up, una fila de ledger por
 tema, `uncovered: none`, que el `.txt` de orden de construcción coincida con el roadmap, los umbrales
-de tamaño, y la unicidad de nombre contra todo otro roadmap y todo directorio `.specs/features/`. Un
-fallo es una pregunta para ti, no un veredicto.
+de tamaño, y la unicidad de nombre contra todo otro roadmap y todo directorio `.specs/features/` —
+incluida una feature construida que ningún roadmap nombra ya. Un fallo es una pregunta para ti, no un
+veredicto.
+
+La Fase 2 ejecuta las mismas comprobaciones al cerrar un roadmap; esto es para preguntar después.
 
 ### ¿Qué versión tengo?
 

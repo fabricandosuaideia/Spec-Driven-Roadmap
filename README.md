@@ -67,17 +67,17 @@ instead of running anything: install Python from python.org, after which its
 
 ### Is my roadmap sound?
 
-The skill's own sanity checks, as a command. Run it on any roadmap it generated — including one that
-has grown across several waves:
+Ask — *"check my roadmap"* — and the skill runs its own sanity checks over what it generated,
+including a roadmap that has grown across several waves. It reports what failed, what it warns about,
+and what it could not judge; nothing is edited.
 
-```bash
-python3 ~/.claude/skills/spec-driven-roadmap/scripts/check-roadmap.py
-```
-
-It checks forward dependencies, duplicate names, the eight-task budget, the two-way agreement between
+It covers forward dependencies, duplicate names, the eight-task budget, the two-way agreement between
 each feature's open questions and the roll-up, one ledger row per theme, `uncovered: none`, the
-build-order `.txt` agreeing with the roadmap, size thresholds, and name uniqueness against every
-other roadmap and every `.specs/features/` directory. A failure is a question for you, not a verdict.
+build-order `.txt` agreeing with the roadmap, size thresholds, and name uniqueness against every other
+roadmap and every `.specs/features/` directory — including a built feature no roadmap names any more.
+A failure is a question for you, not a verdict.
+
+Phase 2 runs the same checks whenever it closes a roadmap, so this is for asking later.
 
 ### Which version do I have?
 

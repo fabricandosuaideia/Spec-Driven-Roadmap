@@ -149,7 +149,7 @@ recur.
 
 **Why the choice matters — and this part has to be said, because it is not obvious.** A roadmap costs
 what is *loaded*, not what is written, and the `/loop` prompt names one roadmap as the spec source
-for **every** feature it builds (handoff-seed.md Step 10), so a roadmap of N features is re-opened N
+for **every** feature it builds (handover-prompt.md Step 10), so a roadmap of N features is re-opened N
 times. A section already marked DONE is never loaded *whole* again: the seed's Step 3 counts it from
 that section's `.txt` and from each feature's own `validation.md`, never by re-reading the roadmap
 body. Point lookups into that body do still happen — Step 2 tests question-only features by their

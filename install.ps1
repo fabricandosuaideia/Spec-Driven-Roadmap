@@ -43,7 +43,8 @@ $RequiredRefs = @(
     'scope-phase.md',
     'index-phase.md',
     'decompose-phase.md',
-    'handoff-seed.md'
+    'handoff-seed.md',
+    'handover-prompt.md'
 )
 
 function Write-Status  { param($m) Write-Host "-> $m" }

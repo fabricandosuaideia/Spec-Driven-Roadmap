@@ -1,10 +1,10 @@
 ---
 name: spec-driven-roadmap
-description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a machine-readable build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) and seeds the downstream spec-driven skill so it can start building feature one. Sources the scope from an existing PRD, architecture doc or flowchart export, from an interview when the user has no document, or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "turn this PRD into a backlog", or "I do not know what to build yet". Do NOT use for writing a feature's spec, design, tasks or code, for driving construction, or for "resume work" - those belong to the downstream spec-driven skill.
+description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a machine-readable build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) and seeds the downstream spec-driven skill so it can start building feature one. Sources the scope from an existing PRD, architecture doc or flowchart export, from an interview when the user has no document, or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "turn this PRD into a backlog", or "I do not know what to build yet" - and also to CHECK a roadmap this skill already produced: "check my roadmap", "validate my roadmap", "is my roadmap sound", "lint the roadmap". Do NOT use for writing a feature's spec, design, tasks or code, for driving construction, or for "resume work" - those belong to the downstream spec-driven skill.
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.7.0"
+  version: "3.8.0"
 ---
 
 # Spec-Driven Roadmap
@@ -30,7 +30,8 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 | 0 | [references/scope-phase.md](references/scope-phase.md) | Locate a source doc (0a), interview to create one (0b), or derive one from the codebase (0c). Confirms the downstream skill, output language, and single-vs-multi mode. |
 | 1 | [references/index-phase.md](references/index-phase.md) | Multi-section mode only: section map, dependency graph, boundary contracts. |
 | 2 | [references/decompose-phase.md](references/decompose-phase.md) | Slice into vertical features with full coverage, open questions, and a build order. Then pre-empt the cross-cutting gray areas, and record the ones left to the downstream skill. |
-| Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`. Then hand the user one implementation prompt — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed). |
+| Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`. Steps 1-7 only; it ends there whenever nothing was seeded. |
+| Handover | [references/handover-prompt.md](references/handover-prompt.md) | Reached only from the seed's Step 7. Asks which implementation prompt the user wants — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed) — and emits it. |
 
 ## Version and model
 
@@ -62,6 +63,24 @@ allowed-tools, compatibility, description, license, metadata, name"*. All three 
 [Claude Code skills documentation](https://code.claude.com/docs/en/skills), consulted 2026-08-07 —
 the `model` one from its frontmatter reference table, the two on packaging from its
 `Using skill frontmatter outside Claude Code` section.
+
+## Checking an existing roadmap
+
+The user can ask for this on its own — *"check my roadmap"*, *"is my roadmap sound"* — with no
+generation involved. It is a read, so no phase runs and nothing is written:
+
+```
+python3 <skill-dir>/scripts/check-roadmap.py --root <project-root>
+```
+
+`<skill-dir>` is the directory holding this file, resolved from disk the same way handoff-seed.md's
+Step 5 resolves the version. **You run it, not the user** — they asked a question, and the answer is
+what the output means for their backlog, not a command to type. Report what failed, what it warns
+about, and what it explicitly could not judge; a failure is a question for them to answer, never a
+verdict, and the script never edits. If the file is not on disk, the install predates it: say so,
+point at the README's reinstall path, and fall back to decompose-phase.md's written sanity checks.
+
+Phase 2 runs it too, as its own closing check — see decompose-phase.md, "Sanity checks".
 
 ## Non-negotiable rules
 

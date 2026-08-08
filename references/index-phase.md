@@ -44,7 +44,7 @@ because it looks large or partly built — a section can look mature and still h
 work in **waves** — a batch of gaps from Phase 0c, a new epic, a round of fixes — each wave is a
 legitimate section, even though no box in the source draws it. This is what keeps each roadmap at a
 size the loop can carry per feature: the `/loop` prompt names **one** roadmap as the spec source for
-every feature it builds (handoff-seed.md Step 10's scope rule), so a single file that absorbed three
+every feature it builds (handover-prompt.md Step 10's scope rule), so a single file that absorbed three
 waves is re-opened, whole, once per feature in all three.
 
 ## Step 2 — Assign file, slug and prefix per section
@@ -334,7 +334,7 @@ section's features to the same entry's `affects:` line. Say it is pending, and l
 **And warn about what this skill does not control.** Several things outside `docs/` carry the
 pre-conversion paths. This skill edits none of them; it names them:
 
-- **`CLAUDE.md`**, if the user pasted the optional bridge lines into it (handoff-seed.md Step 10).
+- **`CLAUDE.md`**, if the user pasted the optional bridge lines into it (handover-prompt.md Step 10).
   Give them the new lines — but **never edit their `CLAUDE.md` yourself**.
 - **Anything under `.specs/` that cites `docs/ROADMAP.md`** — an `AD-NNN` entry in `.specs/STATE.md`,
   or the provenance lines in the `spec.md` of features already written, which took that path from an

@@ -22,7 +22,8 @@ import os
 import re
 import sys
 
-REFERENCES = ["scope-phase.md", "index-phase.md", "decompose-phase.md", "handoff-seed.md"]
+REFERENCES = ["scope-phase.md", "index-phase.md", "decompose-phase.md", "handoff-seed.md",
+              "handover-prompt.md"]
 GUIDES = ["HOW-IT-WORKS.md", "HOW-IT-WORKS.pt-BR.md", "HOW-IT-WORKS.es.md"]
 READMES = ["README.md", "README.pt-BR.md", "README.es.md"]
 
@@ -256,6 +257,24 @@ def check_trilingual_parity(root, folder, names, label):
                % (base, only_base[:6], n, only_n[:6])) if (only_base or only_n) else "")
 
 
+def check_step_numbering(root):
+    """The seed is one procedure across two files. Overlapping or missing step
+    numbers is what a split gets wrong, and every bare `Step N` inside either
+    file resolves by that numbering."""
+    import re as _re
+    got = {}
+    for name in ("handoff-seed.md", "handover-prompt.md"):
+        text = read(root, "references", name) or ""
+        for m in _re.finditer(r"^## Step (\d+) — ", strip_fences(text), _re.M):
+            got.setdefault(int(m.group(1)), []).append(name)
+    dupes = ["Step %d in %s" % (k, " and ".join(v)) for k, v in sorted(got.items()) if len(v) > 1]
+    missing = [n for n in range(1, 11) if n not in got]
+    check("the seed's steps 1-10 exist exactly once across its two files",
+          not dupes and not missing,
+          ("duplicated: %s\n" % "; ".join(dupes) if dupes else "")
+          + ("missing: %s" % ", ".join(map(str, missing)) if missing else ""))
+
+
 def check_changelog(root):
     text = read(root, "CHANGELOG.md") or ""
     skill = read(root, "SKILL.md") or ""
@@ -285,6 +304,7 @@ def main():
     print("trilingual parity")
     check_trilingual_parity(root, "guide", GUIDES, "guide")
     check_trilingual_parity(root, "", READMES, "README")
+    print("procedure"); check_step_numbering(root)
     print("changelog"); check_changelog(root)
 
     print("\n%d checks, %d failed" % (checks_run, len(failures)))

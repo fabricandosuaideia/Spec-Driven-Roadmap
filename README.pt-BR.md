@@ -67,18 +67,18 @@ launcher `py -3` dele também funciona.
 
 ### Meu roadmap está sadio?
 
-As sanity checks da própria skill, como comando. Rode em qualquer roadmap que ela gerou — inclusive
-um que cresceu ao longo de várias ondas:
+Peça — *"confere meu roadmap"* — e a skill roda as próprias sanity checks sobre o que ela gerou,
+inclusive um roadmap que cresceu ao longo de várias ondas. Ela reporta o que falhou, o que é aviso e
+o que não conseguiu julgar; nada é editado.
 
-```bash
-python3 ~/.claude/skills/spec-driven-roadmap/scripts/check-roadmap.py
-```
-
-Ele confere dependências para frente, nomes repetidos, o orçamento de oito tasks, o acordo nos dois
+Cobre dependências para frente, nomes repetidos, o orçamento de oito tasks, o acordo nos dois
 sentidos entre as perguntas abertas de cada feature e o roll-up, uma linha de ledger por tema,
 `uncovered: none`, o `.txt` de ordem de build batendo com o roadmap, os limiares de tamanho, e
-unicidade de nome contra todo outro roadmap e todo diretório `.specs/features/`. Uma falha é uma
-pergunta para você, não um veredito.
+unicidade de nome contra todo outro roadmap e todo diretório `.specs/features/` — inclusive uma
+feature construída que nenhum roadmap nomeia mais. Uma falha é uma pergunta para você, não um
+veredito.
+
+A Phase 2 roda as mesmas checagens sempre que fecha um roadmap; isto aqui é para perguntar depois.
 
 ### Qual versão eu tenho?
 

@@ -9,6 +9,36 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.8.0 — 2026-08-08
+
+**Checking a roadmap had no way to ask for it, and the seed's procedure was five times the size it
+holds its own output to.** Both were mine, and 3.7.0 shipped the first one.
+
+- **`check-roadmap.py` now has a trigger.** 3.7.0 added the linter, wired it into Phase 2's sanity
+  checks, and then told the user to type `python3 …` in the README. The skill's `description` listed
+  no phrase that reaches it, so *"check my roadmap"* invoked nothing — a capability with no door.
+  The description now carries it, `SKILL.md` has a short section saying **the skill runs it, not the
+  user**, and the READMEs ask a question instead of handing over a command. It is a read: no phase
+  runs and nothing is written.
+- **`handoff-seed.md` split at the Step 7/8 seam.** It was 1,010 lines / ~15,300 tokens, and
+  `SKILL.md` tells the agent to read the relevant reference completely — while the skill caps the
+  roadmap it *generates* at ~3,000. Steps 1-7 are the seed and run every time; Steps 8-10 emit an
+  implementation prompt and run only when Step 7 did not end the procedure, which its own exit list
+  does whenever nothing was seeded or Step 6 was skipped. Two triggers, two readers, one file. Steps
+  8-10 moved to `references/handover-prompt.md`:
+
+      common path   15,300 → 7,624 tokens
+      handover       8,082 tokens, loaded only when a prompt is actually handed over
+
+  Nothing was renumbered — the numbering stays continuous across the two files because it is one
+  procedure, and the new file states that convention rather than qualifying thirty-eight bare `Step
+  N` references one at a time. The `/loop` and option-A templates are byte-identical; they changed
+  file, not content.
+- **`check-consistency.py` gained the check that a split gets wrong**: steps 1-10 must exist exactly
+  once across the two files. Verified by breaking it deliberately — renumbering Step 8 to Step 7
+  produces `duplicated: Step 7 in handoff-seed.md and handover-prompt.md / missing: 8`. Twenty-one
+  checks now, and both installers ship the new reference.
+
 ## 3.7.0 — 2026-08-08
 
 **The skill's own sanity checks became a command.** `decompose-phase.md` closes with eleven checks on
