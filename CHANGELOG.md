@@ -9,6 +9,34 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.7.0 — 2026-08-08
+
+**The skill's own sanity checks became a command.** `decompose-phase.md` closes with eleven checks on
+the roadmap it just wrote, and every one of them was applied by reading. The 3.6.0 review named the
+pattern: the checks that exist cover what is countable and skip what is derived, and the derived ones
+are where the cheapest mistakes live precisely because nothing catches them.
+
+`scripts/check-roadmap.py` runs them. Forward dependencies, duplicate names, the eight-task budget,
+the `discharge:` line verbatim, the two-way agreement between each feature's `open questions` and the
+roll-up, one ledger row per rubric theme, every `not decided` row having its `cross-cutting` entry
+with an `affects:` line, `uncovered: none`, the derived `needs pre-written context.md` flag, the
+build-order `.txt` agreeing with the roadmap, the size thresholds, and name uniqueness across every
+roadmap and every `.specs/features/` directory — including the reverse: a built feature that no
+roadmap names any more, which is what a rename looks like after the fact.
+
+Three properties, chosen deliberately:
+
+- **It is a linter, not a gate.** It never edits, and it says so in its own output: a failure is a
+  question for whoever owns the roadmap, not a verdict.
+- **It skips rather than guesses.** A check that cannot parse a file with confidence reports `·` and
+  judges nothing. A false failure on a real backlog costs more than a missed one.
+- **It states what it cannot see.** Whether a question is phrased well enough to answer, whether a
+  slice is genuinely vertical, whether a coverage disposition is honest — those stay a read, and
+  `decompose-phase.md` now says which half is which.
+
+Both installers ship it. This is the fourth time a rule became a script in this repository, and the
+reason is the same each time: a written procedure cannot be run against a test case.
+
 ## 3.6.2 — 2026-08-08
 
 **The other 34 findings, triaged before being applied — and two grave defects that 3.6.1 shipped.**

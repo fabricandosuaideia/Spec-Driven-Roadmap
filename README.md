@@ -65,6 +65,20 @@ PATH. On Windows the bare `python3` is usually the Microsoft Store stub, which o
 instead of running anything: install Python from python.org, after which its
 `py -3` launcher works too.
 
+### Is my roadmap sound?
+
+The skill's own sanity checks, as a command. Run it on any roadmap it generated — including one that
+has grown across several waves:
+
+```bash
+python3 ~/.claude/skills/spec-driven-roadmap/scripts/check-roadmap.py
+```
+
+It checks forward dependencies, duplicate names, the eight-task budget, the two-way agreement between
+each feature's open questions and the roll-up, one ledger row per theme, `uncovered: none`, the
+build-order `.txt` agreeing with the roadmap, size thresholds, and name uniqueness against every
+other roadmap and every `.specs/features/` directory. A failure is a question for you, not a verdict.
+
 ### Which version do I have?
 
 The version lives in the `metadata.version` field of the skill's own `SKILL.md` frontmatter.

@@ -66,6 +66,21 @@ funcionando en el PATH. En Windows, el `python3` a secas suele ser el stub de Mi
 abre la Store en vez de ejecutar nada: instala Python desde python.org; después su lanzador
 `py -3` también funciona.
 
+### ¿Mi roadmap está sano?
+
+Las sanity checks de la propia skill, como comando. Ejecútalo sobre cualquier roadmap que haya
+generado — incluso uno que creció a lo largo de varias olas:
+
+```bash
+python3 ~/.claude/skills/spec-driven-roadmap/scripts/check-roadmap.py
+```
+
+Revisa dependencias hacia adelante, nombres repetidos, el presupuesto de ocho tareas, el acuerdo en
+ambos sentidos entre las preguntas abiertas de cada feature y el roll-up, una fila de ledger por
+tema, `uncovered: none`, que el `.txt` de orden de construcción coincida con el roadmap, los umbrales
+de tamaño, y la unicidad de nombre contra todo otro roadmap y todo directorio `.specs/features/`. Un
+fallo es una pregunta para ti, no un veredicto.
+
 ### ¿Qué versión tengo?
 
 La versión vive en el campo `metadata.version` del frontmatter del propio `SKILL.md` de la skill.

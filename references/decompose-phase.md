@@ -454,6 +454,26 @@ directory. Those names **and their relative order are frozen**:
 
 ## Sanity checks
 
+**Run them, then read for what a command cannot see.**
+
+```
+python3 <skill-dir>/scripts/check-roadmap.py --root <project-root>
+```
+
+It covers the countable half of the list below — forward dependencies, duplicate names, the task
+budget, the `discharge:` line verbatim, the two-way agreement between each feature's `open questions`
+and the roll-up, one row per rubric theme, every `not decided` row having its `cross-cutting` entry
+with an `affects:` line, `uncovered: none`, the derived `needs pre-written context.md` flag, the
+`.txt` agreeing with the roadmap, the size thresholds, and global name uniqueness against every other
+roadmap and every `.specs/features/` directory. A failure is a question, not a verdict: read the
+detail before changing anything, and where a check reports `·` it could not parse the file with
+confidence and judged nothing.
+
+What it cannot check is whether a question is *phrased well enough to answer*, whether a slice is
+genuinely vertical, and whether the coverage table's dispositions are honest. Those stay a read. If
+the script is not on disk — an install predating it — do the whole list by hand and say so.
+
+
 - No feature's "depends on" points to a feature listed after it in the same file.
 - No name is used by two `### <feature-name>` entries in this roadmap, or listed twice in its
   `.txt`, and no feature name collides with one in any other `docs/ROADMAP-*.md`
