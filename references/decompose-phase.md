@@ -409,6 +409,19 @@ backlog has stopped being a sweep.
 Re-running is normal — the source gains requirements as the project moves. **Never wholesale-
 regenerate a roadmap that already covers the current scope; extend it.**
 
+**Extending is one of two right answers, and the prohibition above rules out only the third.** Extend
+for small, continuous growth — a few features arriving on top of scope this roadmap already
+describes. **A distinct wave of work is better as its own section**, not as more entries in the
+roadmap the loop is already carrying: a DONE section is never loaded **whole** again — its progress
+is counted from its `.txt` and each feature's `validation.md` ([handoff-seed.md](handoff-seed.md)
+Step 3). Its body is still read at a point: the seed's discharge test for a question-only feature
+reads the `discharge:` marker and the roll-up under `## Open Questions` (Step 2), and its Step 9
+sweep reads that roll-up again. What never happens is its body entering the context of every feature
+the loop builds — which is exactly what an extended roadmap does, because the loop prompt names one
+roadmap as the spec source for all of them ([handoff-seed.md](handoff-seed.md) Step 10). That
+choice is the user's and is made in Phase 0, never here — see
+`New scope arriving at a project that already has a roadmap` in [scope-phase.md](scope-phase.md).
+
 Before rewriting anything, list every feature name that already has a `.specs/features/<name>/`
 directory. Those names **and their relative order are frozen**:
 
@@ -447,10 +460,23 @@ directory. Those names **and their relative order are frozen**:
 - Nothing appears in both `## Expected Gray Areas` and `## Open Questions` (or any feature's own
   `open questions` field). That pair is the one that must be disjoint — the loop gate sweeps one and
   deliberately skips the other.
-- If the roadmap is growing past roughly 3,000 tokens, say so and re-raise Phase 0's single-vs-multi
-  question — an oversized roadmap is evidence the mode choice was wrong. Never drop coverage rows to
-  hit a size target. Check Step 7's two blocks against their own scaling first, because they do not
-  share one. `## Cross-Cutting Decisions` is scaled by *theme* and capped at one row each, so a
+- **Warn at roughly 2,000 tokens; act at roughly 3,000.** The threshold is arithmetic, not a feeling:
+  one feature costs ~200-250 tokens of the roadmap file — its ten-field entry (Step 6), its row in
+  the coverage table, its lines in `## Expected Gray Areas`, and its matching entry in the roll-up
+  under `## Open Questions` — which puts 3,000 tokens at 12-15 features, and a little fewer in
+  practice, since the file's fixed overhead (title, the section headings, the cross-cutting ledger,
+  the coverage table's header) eats into the same budget. The feature's line in the `.txt` is not in
+  that sum: the limit measures the roadmap, and that line lives in another file. So at roughly 2,000
+  tokens say so and name **how many features are left** before a split is needed, instead of only
+  reacting once the limit is crossed. Past roughly 3,000 tokens, re-raise
+  Phase 0's single-vs-multi question — an oversized roadmap is evidence the mode choice was wrong.
+  Splitting renames **files, never features**: a feature's name and its relative order freeze the
+  moment `.specs/features/<name>/` exists (the freeze rules above), and a split only moves entries
+  between roadmap files, so a project can be converted at any point without touching work already
+  built — see `Converting a single-section project to multi-section` in
+  [index-phase.md](index-phase.md). Never drop coverage rows to hit a size target. Check Step 7's
+  two blocks against their own scaling first, because they do not share one.
+  `## Cross-Cutting Decisions` is scaled by *theme* and capped at one row each, so a
   longer one is padded and gets cut back to the rubric. `## Expected Gray Areas` is scaled by what
   the sweep found and indexed *by feature*, so it grows with the roadmap and is **never** consolidated
   by theme — merging its lines destroys the one thing its reader needs from it. If one theme recurs

@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.5.0"
+  version: "3.6.0"
 ---
 
 # Spec-Driven Roadmap
@@ -100,7 +100,12 @@ the `model` one from its frontmatter reference table, the two on packaging from 
 9. **Ask how the scope is shaped.** Single unified roadmap versus multiple section roadmaps is the
    user's call, made explicitly in Phase 0. Never infer it from how big the source looks. Exception:
    an existing `docs/ROADMAP-INDEX.md` or `docs/ROADMAP.md` already fixed the mode — continue in it.
-   If *both* exist, that is a contradiction: stop and ask which is authoritative.
+   If *both* exist, that is a contradiction: stop and ask which is authoritative. Section roadmaps
+   (`docs/ROADMAP-<slug>.md`) present with **no** `docs/ROADMAP-INDEX.md` beside them are the same
+   class of contradiction — a single-to-multi conversion that stopped half-way, leaving orphaned
+   section roadmaps: stop and ask before writing anything. That glob is a filename pattern, not a
+   proof: a `docs/ROADMAP-*.md` carrying no feature entries and named by no index is some other
+   document that happens to match, so proceed and record having checked.
 10. **Delegate, never author, never loop.** Never write `spec.md`, `design.md`, `tasks.md`, or
     application code. Never re-invoke this skill to march through features. Phase 0's own modes write
     only to `docs/` — never into the downstream skill's namespace. Handing the user a `/loop` prompt

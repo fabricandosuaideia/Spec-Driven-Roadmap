@@ -23,6 +23,9 @@ FORCE="false"
 # The skill is these files and nothing else. Used to validate the download
 # before anything on disk is touched.
 REQUIRED_REFS=(scope-phase.md index-phase.md decompose-phase.md handoff-seed.md)
+# Runtime scripts the skill itself invokes. Maintainer-only tooling (bump-version.sh)
+# deliberately stays in the repo and is not installed.
+REQUIRED_SCRIPTS=(convert-to-multi.py)
 
 print_status()  { echo "→ $1"; }
 print_success() { echo "✓ $1"; }
@@ -163,6 +166,9 @@ SRC_DIR="$(find "$TMP_DIR" -maxdepth 1 -mindepth 1 -type d -name 'Spec-Driven-Ro
 for ref in "${REQUIRED_REFS[@]}"; do
     [[ -f "$SRC_DIR/references/$ref" ]] || { print_error "Archive is missing references/$ref — aborting."; exit 1; }
 done
+for scr in "${REQUIRED_SCRIPTS[@]}"; do
+    [[ -f "$SRC_DIR/scripts/$scr" ]] || { print_error "Archive is missing scripts/$scr — aborting."; exit 1; }
+done
 
 # Announce which version is going in, and which one it displaces. This is the
 # only moment in the flow where the downloaded version and the one already on
@@ -186,6 +192,11 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE"
 cp "$SRC_DIR/SKILL.md" "$STAGE/"
 cp -r "$SRC_DIR/references" "$STAGE/"
+mkdir -p "$STAGE/scripts"
+for scr in "${REQUIRED_SCRIPTS[@]}"; do
+    cp "$SRC_DIR/scripts/$scr" "$STAGE/scripts/"
+    chmod +x "$STAGE/scripts/$scr"
+done
 
 mkdir -p "$(dirname "$DEST")"
 rm -rf "$DEST"
@@ -200,6 +211,7 @@ echo ""
 echo "Installed:"
 echo "  SKILL.md"
 find "$DEST/references" -name '*.md' -type f | sed "s|$DEST/|  |" | sort
+find "$DEST/scripts" -type f | sed "s|$DEST/|  |" | sort
 cat << EOF
 
 Next steps:

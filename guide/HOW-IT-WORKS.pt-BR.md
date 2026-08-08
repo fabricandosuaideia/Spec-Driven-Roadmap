@@ -113,7 +113,9 @@ nada ficou de fora.
 `.md`/`.txt`; as outras ficam no índice como `NOT YET DECOMPOSED`, e a skill apenas reporta a
 próxima ação — *"decompose section `<slug>`"*. Isso é de propósito: uma seção decomposta semanas
 antes de ser construída envelhece. Acrescentar uma seção ao índice também nunca dispara um handoff,
-porque uma seção sem `.txt` não tem ordem de build de onde escolher um alvo.
+porque uma seção sem `.txt` não tem ordem de build de onde escolher um alvo. E se você toca o
+projeto em ondas, cada onda pode ser uma seção própria — a skill pergunta qual caminho seguir quando
+o escopo novo chega.
 
 **Quatro situações pulam essa última escrita**, e a skill registra qual delas foi na linha `Handoff`
 do bloco de status dela própria: nenhuma skill de build instalada; uma confirmada, mas com o schema
@@ -230,7 +232,9 @@ features daquele roadmap estiverem verificadas. Como um loop roda sem supervisã
 perguntar, essa opção exige um roadmap com **zero perguntas em aberto** — então a skill primeiro lê
 o roadmap inteiro atrás de lacunas, te entrevista até toda pergunta em aberto ser respondida, grava
 as respostas de volta, e então relê os arquivos do disco para confirmar que não sobrou nada em
-aberto. Só aí ela te entrega o prompt.
+aberto. Só aí ela te entrega o prompt. Essas respostas ficam no arquivo para sempre, como o registro
+do que foi decidido e por quê — vale a pena ter, e também é o maior motivo isolado para um roadmap
+crescer de uma onda para a próxima.
 
 **O que a opção B troca não é "não sobrou pergunta".** O loop não elimina as áreas cinzentas que a
 skill deliberadamente deixou para a sua skill de build — ele decide cada uma pelo default e **deixa
@@ -327,9 +331,29 @@ momento em que você vê `spec.md`, `design.md`, `tasks.md`, ou código de verda
 sua skill de build — essa já se afastou.
 
 **E se eu já tiver um roadmap e só quiser acrescentar mais coisa?**
-Diga isso — "add this new section to the roadmap" ou algo parecido. Ela estende o que já existe em
-vez de regerar tudo. Nomes de feature **e a ordem relativa entre elas congelam no instante em que
-existe um diretório `.specs/features/<name>/`** — na existência do diretório, não numa verificação
-aprovada, então uma spec pela metade ou uma execução que falhou congelam a feature delas também. Uma
-feature que se mostrou obsoleta é marcada como superseded no lugar, com uma nota; nunca apagada,
-nunca renomeada. Escopo novo entra depois do bloco congelado.
+Diga isso — "add this new section to the roadmap" ou algo parecido; ela nunca regera o que já está
+lá. Existem dois jeitos de acomodar escopo novo, e a skill põe a escolha na sua mão assim que esse
+escopo chega.
+
+**Estender o roadmap que você já tem** — é o certo para um acréscimo pequeno e contínuo. Nomes de
+feature **e a ordem relativa entre elas congelam no instante em que existe um diretório
+`.specs/features/<name>/`** — não numa verificação aprovada, então uma spec pela metade ou uma
+execução que falhou congelam a feature delas também. Escopo novo entra depois do bloco congelado;
+uma feature obsoleta é marcada como superseded no lugar, nunca apagada, nunca renomeada.
+
+**Dar à nova onda uma seção própria** — é o certo quando o trabalho novo é um lote distinto, e não
+só mais alguns itens. O projeto converte para multi-seção: o que você já tem vira o roadmap de uma
+seção, a nova onda vira a seguinte, e um índice ordena os dois. O procedimento exato é
+`Converting a single-section project to multi-section`, em `references/index-phase.md`.
+
+Por que a escolha importa: um roadmap só custa o que é carregado, e no modo loop aquele arquivo é
+nomeado como spec source de **cada** feature que o loop constrói — então um roadmap que cresce onda
+após onda é relido para dentro do contexto de todo trabalho futuro, inclusive ondas que fecharam há
+meses. Uma seção terminada nunca é carregada inteira de novo: o progresso é contado pelo `.txt` dela
+e pelo `validation.md` de cada feature, enquanto leituras pontuais no corpo — o teste do
+`discharge:`, o roll-up de `## Open Questions` — continuam acontecendo. O que nunca acontece é o
+corpo inteiro cair no contexto de cada feature que o loop constrói. Converter renomeia **arquivos,
+não features**, então nada do que já foi construído é afetado — com uma ressalva: o ponteiro de
+handoff em `.specs/STATE.md` nomeia arquivos por caminho, então ele fica obsoleto e a skill re-roda
+o seed dela para consertá-lo. Se uma feature estiver em construção na hora da conversão, esse
+conserto tem que esperar ela passar, e a skill te avisa disso.

@@ -89,6 +89,14 @@ yet, so it is `NOT YET DECOMPOSED` — a state Step 4 can never pick a target fr
 write on nothing. After Phase 1 extends an index, just report: *"next action: decompose section
 `<slug>`"*, and do not touch `.specs/STATE.md`.
 
+**One exception — the single-to-multi conversion.** Renaming the roadmap of a project whose
+`## Status` block or `## Handoff` names the pre-conversion paths invalidates them, so
+the seed re-runs to repair those pointers — not to seed new work. That re-run is mandatory:
+`Converting a single-section project to multi-section` in `index-phase.md` is what orders it, and
+Step 1's work-in-flight test still applies in full. When it fires, Step 6 is skipped and the
+pointers are **not** repaired — which is what that section's pre-condition tells you to settle
+before renaming anything.
+
 Never run this speculatively "just to check" — it is a write step, not a status query. To answer
 "what's next?" without writing, read `docs/roadmap*.txt` and the relevant `validation.md` files
 directly.
@@ -107,11 +115,22 @@ Work is in flight if **any** of these hold:
 - The feature named in `## Handoff` has a `.specs/features/<name>/spec.md` on disk **and** does not
   have a real PASS (per Step 2's test).
 
+**All three are scoped to the feature `## Handoff` names, and none of them fires once that feature
+has a real PASS.** A downstream skill that finished a feature and then paused leaves `**Completed**`
+populated, which reads as in-flight on the first bullet alone — but the work it describes is done,
+and treating it as in flight would block every later seed on a snapshot of finished work. Test the
+named feature first: PASS means not in flight, whatever the first two fields say. This is the same
+"stale snapshot naming a feature that is already verified PASS" the paragraph below already exempts,
+stated where the bullets are read.
+
 If work is in flight → **do not write `.specs/STATE.md`.** Everything else still runs: Steps 2-5 are
 what produce a truthful `## Status`, so run them — Step 5's block needs Step 3's counts and Step 4's
 remaining order and target, and that file is this skill's own and reflects the roadmap, not the
 session. Skip only Step 6. Then go to Step 7 and report which feature is in flight and that the
-current position is unchanged; Step 7's own exit list ends the procedure there, so no prompt is
+current position is unchanged — **except after a single-to-multi conversion**, where the paths the
+Handoff names no longer exist: report the pointer as dead, name the deleted path, and say the repair
+is a second seed once that feature passes (index-phase.md, exit (a)). Step 7's own exit list ends the
+procedure there, so no prompt is
 handed over.
 
 If none hold — including when the Handoff is a stale snapshot naming a feature that is already
@@ -301,7 +320,10 @@ and only one is a missing skill, so write the one that is actually true:
 
 - `pending — no downstream spec-driven skill installed; install one and re-run this skill's seed`
 - `pending — <skill> confirmed but its handoff schema could not be read`
-- `not rewritten this run — work in flight on <feature>`
+- `not rewritten this run — work in flight on <feature>` — and when the cause of the skip is a
+  single-to-multi conversion, name the dead path too, because the pointer is now wrong rather than
+  merely stale: `not rewritten this run — work in flight on <feature>; its Handoff still names the
+  pre-conversion <old-path>` (index-phase.md's conversion procedure, exit (b))
 - `not seeded — every decomposed feature is done`
 
 Step 5 runs before Step 6, so decide from Step 1's evidence test and Step 6's own two skip cases. One
@@ -503,6 +525,17 @@ block holds only what Phase 2's own sweep turned up (decompose-phase Step 7b), w
 Discuss generates its own on top of it. A roadmap that omits the block has none, not an error. Under
 option A those same gray areas are put to the user in context, with the code in front of them — which
 is the better answer whenever a human is available.
+
+**Option B is also the path of greatest accumulation** — a cost that only surfaces after several
+waves of work over the same roadmap. Step 9 closes *every* open question in that roadmap before the
+prompt exists, and decompose-phase Step 8 requires the results to stay: *"Answered entries stay —
+never deleted"*, because the answer itself is the record. Each loop therefore deposits a full set of
+answered questions that never leaves the file — in the `## Open Questions` roll-up, and in each
+carrying feature's own `open questions` field. Across successive waves aimed at one roadmap that is
+the single largest driver of its growth, and it is why a new wave usually reads better as its own
+section than as an extension of the one already there —
+see `New scope arriving at a project that already has a roadmap` in scope-phase.md. That is a cost
+to name, not a veto: option B remains the user's to choose, exactly as this step already frames it.
 
 If Step 6 recorded a blocker, say so here: option A cannot give a clean start command until that
 question is answered, and option B's sweep is what answers it.

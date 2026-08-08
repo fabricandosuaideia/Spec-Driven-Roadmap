@@ -9,7 +9,71 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
-## 3.5.0 — 2026-08-07
+## 3.6.0 — 2026-08-08
+
+**A project built in waves now has somewhere to put the next wave.** Re-running the skill on a
+project that already had a roadmap left exactly one written outcome — *extend it* — so a user coming
+back weeks later with a fresh batch of scope appended it to the same `docs/ROADMAP.md`, wave after
+wave. That file then competes with the very loop it feeds: the `/loop` prompt names one roadmap as
+the spec source for every feature it builds, so the whole thing is re-read once per feature. The
+remedy already existed inside the skill — in multi-section mode the seed walks each section's
+build-order `.txt` and never opens the body of a section it is not targeting — it was simply never
+offered when a new wave arrived. Now it is.
+
+- **Phase 0 asks instead of assuming.** When new scope reaches a project that already carries a
+  roadmap, the re-run rule now puts the choice to the user: extend the current roadmap, or let the
+  new scope become its own section. Extension used to be the only written outcome, which is exactly
+  what made a wave-built project accumulate into one file. The single-vs-multi call itself is
+  unchanged and still the user's (rule 9).
+- **Phase 1 gained a conversion step, and it is a script.** `scripts/convert-to-multi.py` renames
+  `docs/ROADMAP.md` and `docs/roadmap.txt` to their section names, writes a minimal
+  `docs/ROADMAP-INDEX.md` carrying the `## Status` and `## Cross-Cutting Decisions` blocks with
+  every path inside them rewritten, and strips both blocks from the renamed roadmap — in one
+  operation, with `--dry-run` and a real `--rollback`. The slug is **derived**, as the longest
+  leading hyphen-token run common to every feature name, never chosen: the slug and the feature-name
+  prefix are the same string and those names are frozen. It aborts, touching nothing, on an existing
+  index, an orphan section roadmap, a missing `.txt`, or a prefix it cannot derive.
+
+  This started as a written procedure and shipped as a script because three rounds of review kept
+  finding catastrophic paths in the prose: a rollback that silently restored nothing (`git checkout`
+  does not reverse a staged `git mv`), a rollback that recreated `docs/ROADMAP.md` and then
+  overwrote it — losing `## Cross-Cutting Decisions` entirely — and a prefix rule that split on the
+  first hyphen and so handed `auth-core-*` features the slug `auth`, permanently. Writing it as code
+  surfaced a fourth in the first test run: the block extraction stopped at the next `## `, which
+  swallowed every `### <feature>` entry into the index. A procedure cannot be run against a test
+  repository; this is why the completion gate in `tlc-spec-driven` is a script too.
+
+  The safety net is a backup directory, not git — git recovery needs the files tracked *and* clean,
+  which is exactly what a project is not right after Phase 0c wrote `docs/CODEBASE-SUMMARY.md`.
+  `git mv` is still used when it is safe, and `--rollback` unstages it.
+- **Both installers now ship `scripts/`.** They copied only `SKILL.md` and `references/`, so a
+  runtime script would never have reached a user's disk. Maintainer tooling (`bump-version.sh`)
+  deliberately stays in the repository.
+- **Rule 9 gained a third contradiction.** Section roadmaps present with no `docs/ROADMAP-INDEX.md`
+  beside them are an interrupted conversion: stop and ask, rather than reading the project as having
+  no roadmap and regenerating over verified features. This is the only change to a non-negotiable
+  rule in three releases, and it is additive — the other twelve are byte-identical.
+- **Wave-shaped sections are explicitly legitimate.** A section does not have to be an architectural
+  boundary; a wave of work is a valid one. It takes a slug on the same rule as any other section —
+  short, mnemonic, kebab-case, prefixing every feature in it — and the edge back to the previous
+  wave is labelled for what it is: temporal, existing because one wave was built first, drawn in no
+  source. Phase 1 records which source resolved each edge, so this one is not dressed up as a
+  dependency the source never stated.
+- **The size sanity check warns before it fires.** It now speaks up as a roadmap approaches roughly
+  2,000 tokens instead of only reacting once it is past 3,000, and it publishes what one feature
+  costs — roughly 200-250 tokens across its ten fields, its coverage row, its Expected Gray Areas
+  lines and its entry in the Open Questions roll-up. That puts the threshold around 12-15 features
+  and makes it something a reader can check rather than take on faith.
+- **Step 8 now names the loop as the path that grows fastest.** Option B is gated on every open
+  question in that roadmap being closed first, and an answered entry is never deleted — so every
+  loop leaves a complete set of answered questions in the file, permanently. That is said where the
+  user chooses between the two prompts, not discovered three waves later.
+
+**No decomposition rule changed.** What a feature is, and how features are sliced, ordered, covered
+and named, is identical to 3.5.0. What changed is where a new wave of scope is allowed to land, and
+what the skill tells you about the size of the file it lands in.
+
+## 3.5.0 — 2026-08-07 — `c33f658`
 
 **The skill now tells you which version you are running.** It never did, and that turned out to
 matter. A user on 3.1.0 concluded the skill produced nothing worth running unattended — an accurate
@@ -153,6 +217,14 @@ bump:
 ```
 git tag -a v3.5.0 -m "spec-driven-roadmap 3.5.0"
 ```
+
+**A heading's hash is backfilled, never guessed.** An entry is written in the same working tree as
+the release it describes, so the commit that carries it does not exist yet — the newest heading
+carries its date and no hash, and the preamble's promise is kept one commit later. Filling it is
+the first step of the next edit to this file: read the hash with
+`git log --format='%h %cI' -1 <ref>`, append it to that heading after an em-dash exactly as 3.4.0
+and below already do, then tag it. 3.5.0's `c33f658` was backfilled this way; 3.6.0's heading is
+unhashed for the same reason and comes due next.
 
 **Earlier releases are not tagged retroactively, and will not be.** 3.1.0 names two different
 contents, so any tag placed on either commit would assert a one-to-one mapping between number and

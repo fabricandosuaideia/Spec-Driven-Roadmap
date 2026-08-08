@@ -3,7 +3,7 @@
     Installs the spec-driven-roadmap Claude Code skill on Windows.
 
 .DESCRIPTION
-    Downloads SKILL.md + references/ and installs them into
+    Downloads SKILL.md + references/ + scripts/ and installs them into
     .claude\skills\spec-driven-roadmap\ in the current directory, or into
     $HOME\.claude\skills\spec-driven-roadmap\ with -Global.
 
@@ -38,6 +38,7 @@ $SkillName = 'spec-driven-roadmap'
 
 # The skill is these files and nothing else. Used to validate the download
 # before anything on disk is touched.
+$RequiredScripts = @('convert-to-multi.py')
 $RequiredRefs = @(
     'scope-phase.md',
     'index-phase.md',
@@ -148,6 +149,10 @@ try {
     foreach ($ref in $RequiredRefs) {
         if (-not (Test-Path (Join-Path $refDir $ref))) { Write-Fail "Archive is missing references/$ref - aborting."; exit 1 }
     }
+    $scrDir = Join-Path $src.FullName 'scripts'
+    foreach ($scr in $RequiredScripts) {
+        if (-not (Test-Path (Join-Path $scrDir $scr))) { Write-Fail "Archive is missing scripts/$scr - aborting."; exit 1 }
+    }
 
     # Announce which version is going in, and which one it displaces. This is
     # the only moment in the flow where the downloaded version and the one
@@ -171,6 +176,9 @@ try {
     New-Item -ItemType Directory -Path $Stage -Force | Out-Null
     Copy-Item (Join-Path $src.FullName 'SKILL.md') $Stage
     Copy-Item $refDir $Stage -Recurse
+    $stageScripts = Join-Path $Stage 'scripts'
+    New-Item -ItemType Directory -Path $stageScripts -Force | Out-Null
+    foreach ($scr in $RequiredScripts) { Copy-Item (Join-Path $scrDir $scr) $stageScripts }
 
     $parent = Split-Path $Dest -Parent
     if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
@@ -187,6 +195,8 @@ try {
     Write-Host '  SKILL.md'
     Get-ChildItem -LiteralPath (Join-Path $Dest 'references') -Filter *.md |
         Sort-Object Name | ForEach-Object { Write-Host "  references/$($_.Name)" }
+    Get-ChildItem -LiteralPath (Join-Path $Dest 'scripts') |
+        Sort-Object Name | ForEach-Object { Write-Host "  scripts/$($_.Name)" }
     Write-Host @'
 
 Next steps:

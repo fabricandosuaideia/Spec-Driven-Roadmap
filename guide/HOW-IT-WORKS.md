@@ -107,7 +107,8 @@ you. It closes with a coverage table proving nothing was missed.
 `.md`/`.txt` pair; the others sit in the index as `NOT YET DECOMPOSED`, and the skill just reports
 the next action — *"decompose section `<slug>`"*. That's deliberate: a section decomposed weeks
 before it's built goes stale. Adding a section to the index never triggers a handoff either, because
-a section with no `.txt` has no build order to pick a target from.
+a section with no `.txt` has no build order to pick a target from. And if you run the project in
+waves, each wave can be its own section — the skill asks which way to go as the new scope arrives.
 
 **Four things skip that last write**, and the skill records which one on the `Handoff` line of its
 own Status block: no downstream skill installed; one confirmed but its handoff schema unreadable;
@@ -216,7 +217,9 @@ command — Claude Code, Cursor and OpenCode all have one) and doesn't stop unti
 roadmap is verified. Because a loop runs unattended with nobody to ask, this option requires a
 roadmap with **zero open questions** — so the skill first reads the whole roadmap for gaps,
 interviews you until every open question is answered, writes the answers back, then re-reads the
-files from disk to confirm nothing is left open. Only then does it hand you the prompt.
+files from disk to confirm nothing is left open. Only then does it hand you the prompt. Those
+answers stay in the file for good, as the record of what was decided and why — worth having, and
+also the single biggest reason a roadmap grows from one wave to the next.
 
 **What option B trades away is not "no questions left".** The loop doesn't eliminate the gray areas
 the skill deliberately left to your build skill — it decides each one with the default and **writes
@@ -307,9 +310,26 @@ moment you see `spec.md`, `design.md`, `tasks.md`, or actual code being written,
 skill — this one has already stepped back.
 
 **What if I already have a roadmap and just want to add more to it?**
-Say so — "add this new section to the roadmap" or similar. It extends what's there instead of
-regenerating it. Feature names **and their relative order freeze the moment a
-`.specs/features/<name>/` directory exists** — at directory existence, not at a passing
-verification, so a half-written spec or a failed run freezes its feature too. A feature that turned
-out obsolete is marked superseded in place, with a note; never deleted, never renamed. New scope is
-appended after the frozen block.
+Say so — "add this new section to the roadmap" or similar; it never regenerates what's there. Two
+ways to land new scope exist, and the skill puts the choice to you as that scope arrives.
+
+**Extend the roadmap you have** — right for a small, continuous addition. Feature names **and their
+relative order freeze the moment a `.specs/features/<name>/` directory exists** — not at a passing
+verification, so a half-written spec or a failed run freezes its feature too. New scope appends after
+that frozen block; an obsolete feature is marked superseded in place, never deleted, never renamed.
+
+**Give the new wave its own section** — right when the new work is a distinct batch rather than a few
+more items. The project converts to multi-section: what you have becomes one section roadmap, the new
+wave becomes the next, and an index orders them. The exact procedure is
+`Converting a single-section project to multi-section`, in `references/index-phase.md`.
+
+Why the choice matters: a roadmap only costs you what gets loaded, and in loop mode that one file is
+named as the spec source for **every** feature the loop builds — so one that grows wave after wave is
+read back into the context of all future work, waves that closed months ago included. A finished
+section is never loaded whole again: progress is counted from its `.txt` and each feature's
+`validation.md`, while pinpoint reads into its body — the `discharge:` test, the `## Open Questions`
+roll-up — still happen. What never happens is the whole body landing in the context of every feature
+the loop builds. Converting renames **files, not features**, so nothing already built is affected —
+with one caveat: the handoff pointer in `.specs/STATE.md` names files by path, so it goes stale and
+the skill re-runs its seed to repair it. If a feature is mid-build when you convert, that repair has
+to wait until it passes, and the skill tells you so.

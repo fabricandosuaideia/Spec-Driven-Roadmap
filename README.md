@@ -71,9 +71,10 @@ If you installed **the plain skill** (`install.sh` or `install.ps1`), compare yo
 one published on `main`:
 
 ```bash
+gh_version=$(curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/SKILL.md | sed -n 's/^ *version: *//p' | head -1 | tr -d '"')
 printf 'installed: %s\ngithub:    %s\n' \
   "$(for f in .claude/skills/spec-driven-roadmap/SKILL.md ~/.claude/skills/spec-driven-roadmap/SKILL.md; do [ -f "$f" ] && { sed -n 's/^ *version: *//p' "$f" | head -1 | tr -d '"'; break; }; done || echo 'not installed')" \
-  "$(curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/SKILL.md | sed -n 's/^ *version: *//p' | head -1 | tr -d '"')"
+  "${gh_version:-unreachable}"
 ```
 
 It prints two lines — for example, a copy left behind on an older release:
@@ -88,8 +89,9 @@ the values themselves.
 
 The command checks the **project** install first and falls back to the **global** one — the same
 precedence Claude Code applies when both exist — and prints `not installed` on the first line when
-it finds neither. On Windows, run it from Git Bash or WSL. When the two lines differ, re-run the
-installer with `--force` (`-Force` for `install.ps1`).
+it finds neither. A second line reading `unreachable` means the download failed rather than that
+you are current — check the network and run it again. On Windows, run it from Git Bash or WSL. When
+the two lines differ, re-run the installer with `--force` (`-Force` for `install.ps1`).
 
 A project install lives in `.claude/skills/spec-driven-roadmap/` and a global one in
 `~/.claude/skills/`; the two can sit at different versions at the same time, and the version that

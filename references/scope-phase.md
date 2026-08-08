@@ -4,7 +4,7 @@
 
 - [Preamble — settle these before branching](#preamble--settle-these-before-branching) — version and model, downstream skill, language, how to ask
 - [Routing — pick 0a, 0b, or 0c](#routing--pick-0a-0b-or-0c)
-- [0a — A scope document already exists](#0a--a-scope-document-already-exists)
+- [0a — A scope document already exists](#0a--a-scope-document-already-exists) — single versus multi, new scope arriving at an existing roadmap
 - [0b — Interview Mode (no source, no clear idea yet)](#0b--interview-mode-no-source-no-clear-idea-yet)
 - [0c — Brownfield Mode (no source, but a codebase exists)](#0c--brownfield-mode-no-source-but-a-codebase-exists)
 - [Closing checks](#closing-checks)
@@ -115,8 +115,70 @@ Do not infer this from source size — ask. **Exception:** if `docs/ROADMAP-INDE
 "when to re-run" rules) unless the user explicitly asks to change shape, which is disruptive enough
 to confirm again before touching anything already written.
 
+**A third contradiction — the half-finished conversion.** Section roadmaps
+(`docs/ROADMAP-<slug>.md`) present with **no** `docs/ROADMAP-INDEX.md` beside them are not a mode
+either: that is a single-to-multi conversion that stopped part-way, leaving orphaned section
+roadmaps. Treat it exactly as SKILL.md's rule 9 treats an index and a `docs/ROADMAP.md` coexisting —
+**stop and ask** whether a conversion was interrupted and which state is authoritative, before
+writing anything. Never read such a project as having no roadmap: it would re-ask single-vs-multi,
+and a "single" answer regenerates a `docs/ROADMAP.md` on top of features already built and verified.
+The recovery is `--rollback` on the conversion script (index-phase.md), which reverses it exactly.
+
+That glob is a filename pattern, not a proof. A `docs/ROADMAP-*.md` carrying no feature entries, no
+coverage table and no execution-order block is some other document that happens to match the shape —
+proceed, and record having checked rather than skipping the check silently.
+
 Also locate the project's conventions doc if one exists (`CLAUDE.md`, README, contributing guide) —
 Phase 2 loads it to keep naming and stack choices consistent with the rest of the project.
+
+### New scope arriving at a project that already has a roadmap
+
+Once a project is running, this is the ordinary case rather than the exceptional one: a wave of new
+work — a fresh set of gaps from a 0c re-scan, a new epic, a batch of fixes — arriving at a roadmap
+whose features are already built. Every wave after the first lands on this fork, so expect it to
+recur.
+
+**Two dispositions, and the choice is the user's — ask, never infer:**
+
+1. **Extend the existing roadmap.** Right when the new scope is small and continuous with what is
+   already there — a few features, same subject. Phase 2's "When to re-run, and what is frozen" then
+   governs: new scope appends after the frozen block.
+2. **Give the wave its own section.** Right when it is a distinct batch of work. Each wave becomes
+   its own `docs/ROADMAP-<slug>.md`, with its own build order, its own coverage table and its own
+   loop.
+
+**Why the choice matters — and this part has to be said, because it is not obvious.** A roadmap costs
+what is *loaded*, not what is written, and the `/loop` prompt names one roadmap as the spec source
+for **every** feature it builds (handoff-seed.md Step 10), so a roadmap of N features is re-opened N
+times. A section already marked DONE is never loaded *whole* again: the seed's Step 3 counts it from
+that section's `.txt` and from each feature's own `validation.md`, never by re-reading the roadmap
+body. Point lookups into that body do still happen — Step 2 tests question-only features by their
+`discharge:` marker and the `## Open Questions` roll-up, and Step 9 sweeps the target roadmap's
+body — but a lookup is not a load. The economic point is what matters here: the body of a finished
+roadmap never enters the per-feature context the loop builds. Extending forever therefore puts
+every past wave inside the context of every future feature. The number: roughly 200-250 tokens per
+feature, counting its entry, its coverage-table row, its `## Expected Gray Areas` lines and its
+matching `## Open Questions` roll-up entry — so decompose-phase.md's ~3,000-token
+sanity check fires at around 12-15 features. The loop path grows fastest of all: handoff-seed.md
+Step 9 requires every open question closed before the loop is handed over, and answered entries
+stay — never deleted (decompose-phase.md Step 8) — so every loop leaves a full set of them in the
+file for good.
+
+**If the project is single-section today, choosing (2) means converting it.** Follow index-phase.md's
+"Converting a single-section project to multi-section" — and never leave `docs/ROADMAP-INDEX.md`
+sitting beside a surviving `docs/ROADMAP.md`. SKILL.md's rule 9 treats the two coexisting as a
+contradiction: the next run stops and asks which one is authoritative before touching anything.
+
+This fork is the **only** sanctioned exit from rule 9's "already fixed the mode — continue in it"
+clause. The mode changes here because the user explicitly asked for it at this fork — never by
+inference, and never because the roadmap grew large. Size is the argument *for asking*, never the
+authority to switch on your own.
+
+Conversion changes no feature name. Names and their relative order freeze on the **existence** of
+`.specs/features/<name>/`, not on which file the feature is listed in
+(decompose-phase.md, "When to re-run, and what is frozen") — so moving an entry into a section
+roadmap leaves everything already built untouched. What the conversion *does* invalidate is the
+Handoff pointer, which names files by path; index-phase.md's procedure carries the repair.
 
 ---
 

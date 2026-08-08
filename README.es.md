@@ -72,9 +72,10 @@ Si instalaste **la skill simple** (`install.sh` o `install.ps1`), compara tu cop
 en `main`:
 
 ```bash
+gh_version=$(curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/SKILL.md | sed -n 's/^ *version: *//p' | head -1 | tr -d '"')
 printf 'installed: %s\ngithub:    %s\n' \
   "$(for f in .claude/skills/spec-driven-roadmap/SKILL.md ~/.claude/skills/spec-driven-roadmap/SKILL.md; do [ -f "$f" ] && { sed -n 's/^ *version: *//p' "$f" | head -1 | tr -d '"'; break; }; done || echo 'not installed')" \
-  "$(curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/SKILL.md | sed -n 's/^ *version: *//p' | head -1 | tr -d '"')"
+  "${gh_version:-unreachable}"
 ```
 
 Imprime dos líneas — por ejemplo, una copia que quedó en una versión antigua:
@@ -89,8 +90,9 @@ valores en sí.
 
 El comando revisa primero la instalación de **proyecto** y cae a la **global** — la misma precedencia
 que aplica Claude Code cuando ambas existen — e imprime `not installed` en la primera línea cuando no
-encuentra ninguna. En Windows, ejecútalo desde Git Bash o WSL. Cuando las dos líneas difieran, vuelve
-a ejecutar el instalador con `--force` (`-Force` en `install.ps1`).
+encuentra ninguna. Una segunda línea con `unreachable` significa que la descarga falló, no que estés
+al día — revisa la red y vuelve a ejecutarlo. En Windows, ejecútalo desde Git Bash o WSL. Cuando las
+dos líneas difieran, vuelve a ejecutar el instalador con `--force` (`-Force` en `install.ps1`).
 
 La instalación de proyecto vive en `.claude/skills/spec-driven-roadmap/` y la global en
 `~/.claude/skills/`; las dos pueden coexistir en versiones distintas, y la versión que cuenta es
