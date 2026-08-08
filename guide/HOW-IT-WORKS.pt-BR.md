@@ -29,6 +29,7 @@ frases aciona a skill:
 - "I don't know what to build yet, help me figure it out"
 - "map this codebase into a roadmap source"
 - "decompose this architecture into features"
+- "confere meu roadmap" *(uma leitura — veja [Perguntando se o seu roadmap está sadio](#perguntando-se-o-seu-roadmap-está-sadio))*
 
 **2. Use o comando de barra**, se preferir ser explícito:
 
@@ -301,6 +302,28 @@ verdade — concluída e depois pausada não é trabalho em andamento.
   continuam em inglês: são chaves lidas por máquina, componentes de caminho e nomes de diretório, e
   traduzir um deles quebra o handoff, os diretórios `.specs/features/<name>/`, ou alguma busca entre
   arquivos.
+
+## Perguntando se o seu roadmap está sadio
+
+Você pode pedir isso sozinho, sem gerar nada — *"confere meu roadmap"*, *"meu roadmap está sadio?"*.
+Nada é escrito: a skill lê o que ela produziu e te conta o que achou.
+
+É a mesma lista que a Fase 2 roda ao fechar um roadmap, então isso aqui é para perguntar **depois** —
+meses adiante, após várias ondas, quando você quer saber se o arquivo ainda se sustenta. Ela confere
+que nenhuma feature depende de outra listada depois dela, que nenhum nome é usado duas vezes, que
+nenhuma feature passa do orçamento de oito tasks, que toda pergunta aberta de uma feature também
+aparece no roll-up *e o contrário*, que a tabela de cobertura fecha sem nada descoberto, que o `.txt`
+de ordem de build ainda bate com o roadmap, e que nenhum nome de feature colide com outro roadmap ou
+com um diretório em `.specs/`. Ela também aponta o inverso: uma feature que você já construiu e que
+nenhum roadmap nomeia mais — que é a cara de um rename depois do fato.
+
+Duas coisas que valem saber. **Uma falha é uma pergunta, não um veredito** — o roadmap é seu, e a
+saída existe para ser lida antes de qualquer mudança. E ela diz quando *não conseguiu* julgar algo em
+vez de chutar, porque alarme falso no backlog real de alguém custa mais que um miss.
+
+O que ela não consegue conferir é a parte que precisa de gente: se uma pergunta aberta está formulada
+bem o suficiente para ser respondida, se uma feature é de fato uma fatia vertical, e se uma
+disposição da tabela de cobertura é honesta. Isso continua leitura.
 
 ## O que ela deliberadamente *não* faz
 

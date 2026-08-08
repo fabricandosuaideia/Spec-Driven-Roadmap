@@ -29,6 +29,7 @@ frases la activa:
 - "I don't know what to build yet, help me figure it out"
 - "map this codebase into a roadmap source"
 - "decompose this architecture into features"
+- "revisa mi roadmap" *(una lectura — mira [Preguntar si tu roadmap está sano](#preguntar-si-tu-roadmap-está-sano))*
 
 **2. Usa el comando de barra**, si prefieres ser explícito:
 
@@ -297,6 +298,29 @@ pausada no es trabajo en curso.
   generado** siguen en inglés: son claves de lectura por máquina, componentes de ruta y nombres de
   directorio, y traducir uno rompe el handoff, los directorios `.specs/features/<name>/`, o una
   búsqueda entre archivos.
+
+## Preguntar si tu roadmap está sano
+
+Puedes pedirlo por sí solo, sin generar nada — *"revisa mi roadmap"*, *"¿mi roadmap está sano?"*. No
+se escribe nada: la skill lee lo que produjo y te cuenta qué encontró.
+
+Es la misma lista que la Fase 2 ejecuta al cerrar un roadmap, así que esto es para preguntar
+**después** — meses más tarde, tras varias olas, cuando quieres saber si el archivo todavía se
+sostiene. Comprueba que ninguna feature dependa de otra listada después de ella, que ningún nombre se
+use dos veces, que ninguna feature pase el presupuesto de ocho tareas, que toda pregunta abierta de
+una feature aparezca también en el roll-up *y al revés*, que la tabla de cobertura cierre sin nada
+descubierto, que el `.txt` de orden de construcción siga coincidiendo con el roadmap, y que ningún
+nombre de feature choque con otro roadmap o con un directorio bajo `.specs/`. También señala lo
+inverso: una feature que ya construiste y que ningún roadmap nombra ya, que es como se ve un cambio
+de nombre después del hecho.
+
+Dos cosas que vale saber. **Un fallo es una pregunta, no un veredicto** — el roadmap es tuyo, y la
+salida existe para leerse antes de cambiar nada. Y dice cuándo *no pudo* juzgar algo en vez de
+adivinar, porque una falsa alarma sobre un backlog real cuesta más que una omisión.
+
+Lo que no puede comprobar es la parte que necesita a una persona: si una pregunta abierta está
+formulada lo bastante bien como para responderse, si una feature es de verdad un corte vertical, y si
+una disposición de la tabla de cobertura es honesta. Eso sigue siendo lectura.
 
 ## Lo que deliberadamente *no* hace
 

@@ -9,6 +9,26 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.8.1 — 2026-08-08
+
+**The human guide never learned that you can ask it to check a roadmap.** 3.7.0 shipped the linter
+and 3.8.0 gave it a trigger phrase, but `guide/HOW-IT-WORKS.md` and its two translations still said
+nothing about it — a grep for the phrase returned zero in all three. The README had it; the document
+a person actually reads to understand the skill did not.
+
+All three now carry *"check my roadmap"* in the trigger list and a section explaining it: that it is
+a read and writes nothing, that it is the same list Phase 2 runs when it closes a roadmap so this is
+for asking **later**, what it looks at, and the two things worth knowing — a failure is a question
+rather than a verdict, and it says when it could not judge something instead of guessing.
+
+It also states what it cannot check: whether an open question is phrased well enough to answer,
+whether a feature is genuinely a vertical slice, whether a coverage disposition is honest. Naming
+that boundary is the point — a linter that seems to cover everything is worse than one whose limits
+are written down.
+
+Fourteen sections in each language now, anchors resolving, and a sweep confirms every behaviour
+change from 3.6.0 onward reached the guides and the READMEs.
+
 ## 3.8.0 — 2026-08-08
 
 **Checking a roadmap had no way to ask for it, and the seed's procedure was five times the size it

@@ -27,6 +27,7 @@ Two ways, and both work the same:
 - "I don't know what to build yet, help me figure it out"
 - "map this codebase into a roadmap source"
 - "decompose this architecture into features"
+- "check my roadmap" *(a read — see [Asking whether your roadmap is sound](#asking-whether-your-roadmap-is-sound))*
 
 **2. Use the slash command**, if you'd rather be explicit:
 
@@ -280,6 +281,28 @@ finished and then paused is not work in flight.
   feature names, prefixes, slugs, filenames and **every generated heading** stay English: they're
   machine-read keys, path components and directory names, and translating one breaks the handoff,
   the `.specs/features/<name>/` directories, or a cross-file lookup.
+
+## Asking whether your roadmap is sound
+
+You can ask this on its own, with no generating involved — *"check my roadmap"*, *"is my roadmap
+sound"*. Nothing is written: the skill reads what it produced and tells you what it found.
+
+It is the same list Phase 2 runs when it closes a roadmap, so this is for asking **later** — months
+in, after several waves, when you want to know whether the file still hangs together. It checks that
+no feature depends on one listed after it, that no name is used twice, that no feature is over the
+eight-task budget, that every open question in a feature also appears in the roll-up *and the other
+way round*, that the coverage table closes with nothing uncovered, that the build-order `.txt` still
+matches the roadmap, and that no feature name collides with another roadmap or a directory under
+`.specs/`. It also flags the reverse: a feature you already built that no roadmap names any more,
+which is what a rename looks like after the fact.
+
+Two things worth knowing. **A failure is a question, not a verdict** — you own the roadmap, and the
+output is meant to be read before anything is changed. And it says when it *could not* judge
+something rather than guessing, because a false alarm on a real backlog costs more than a missed one.
+
+What it cannot check is the part that needs a human: whether an open question is phrased well enough
+to answer, whether a feature is genuinely a vertical slice, and whether a coverage disposition is
+honest. Those stay a read.
 
 ## What it deliberately does *not* do
 
