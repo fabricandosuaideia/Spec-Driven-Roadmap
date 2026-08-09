@@ -196,6 +196,43 @@ main() {
         printf '  updated  %s  (%s, line %s)\n' "${FILES[$i]}" "${FIELDS[$i]}" "${LINES[$i]}"
     done
     printf '\n%s\n' "Review with 'git diff', then commit the bump with the release."
+
+    release_gate
+}
+
+# ---------------------------------------------------------------------------
+# The release gate.
+#
+# check-consistency.py shipped in 3.6.1 with ZERO callers: not in the
+# installers' REQUIRED_SCRIPTS, not named in SKILL.md or any reference, and
+# there is no CI in this repository to run it. It only ever ran because someone
+# remembered to -- and unaided memory missing a drifted fact is the exact
+# failure it exists to catch. A checker nobody invokes is worse than no checker,
+# because it produces the belief in a net without the net.
+#
+# This is the one place a release cannot route around: you cannot cut one
+# without bumping. It is deliberately NOT shipped to users -- it audits this
+# repository's own internal agreement, which is a maintainer's concern and not
+# a roadmap author's.
+# ---------------------------------------------------------------------------
+release_gate() {
+    local checker="$REPO_ROOT/scripts/check-consistency.py"
+    if [[ ! -f "$checker" ]]; then
+        printf '\n! %s\n' "$checker is missing — nothing audited this release." >&2
+        return 0
+    fi
+    if ! command -v python3 >/dev/null 2>&1; then
+        printf '\n! %s\n' "python3 not found — consistency check skipped, and a release that skips it is a release nothing audited." >&2
+        return 0
+    fi
+    printf '\n%s\n' "Running the consistency check before you release..."
+    if python3 "$checker" --root "$REPO_ROOT"; then
+        return 0
+    fi
+    printf '\n%s\n' "✗ The version was bumped, but the consistency check failed." >&2
+    printf '%s\n' "  Do not tag on top of this. Fix what it reported, or satisfy yourself" >&2
+    printf '%s\n' "  that the failure is acceptable and say why in the release notes." >&2
+    return 1
 }
 
 main "$@"

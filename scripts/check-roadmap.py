@@ -31,8 +31,6 @@ RUBRIC_THEMES = 9
 MAX_TASKS = 8
 WARN_TOKENS, ACT_TOKENS = 2000, 3000
 DISCHARGE = "discharge: no code — answered open question or context.md"
-DIMENSIONS = ["persistence", "state", "external call", "auth", "payment",
-              "concurrency", "state transition"]
 
 RESULTS = []
 

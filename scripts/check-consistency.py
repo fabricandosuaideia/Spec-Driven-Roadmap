@@ -17,15 +17,27 @@ Exit codes: 0 all checks passed, 1 at least one failed, 2 usage error.
 """
 
 import argparse
+import glob
 import json
 import os
 import re
 import sys
 
-REFERENCES = ["scope-phase.md", "index-phase.md", "decompose-phase.md", "handoff-seed.md",
-              "handover-prompt.md"]
-GUIDES = ["HOW-IT-WORKS.md", "HOW-IT-WORKS.pt-BR.md", "HOW-IT-WORKS.es.md"]
-READMES = ["README.md", "README.pt-BR.md", "README.es.md"]
+def _sorted_basenames(root, pattern):
+    return sorted(os.path.basename(p) for p in glob.glob(os.path.join(root, pattern)))
+
+
+def scope(root):
+    """Derived from disk, never a typed list. A typed list is a fact with one
+    reader that nobody updates -- the exact shape this file exists to catch. It
+    also silently excluded guide/ and the READMEs, 38% of the prose corpus and
+    the only place in this repository's history where drift was actually
+    recorded (c33f658, "correct the guide it drifted from")."""
+    return {
+        "references": _sorted_basenames(root, "references/*.md"),
+        "guides": _sorted_basenames(root, "guide/*.md"),
+        "readmes": _sorted_basenames(root, "README*.md"),
+    }
 
 # Block names the skill writes into GENERATED files. In this repo's own prose they
 # are always cited inline; a line that starts with one is a real heading, which is
@@ -36,13 +48,6 @@ GENERATED_BLOCKS = [
     "## Open Questions", "## Expected Gray Areas", "## Coverage",
 ]
 
-# Counts asserted in prose that must match reality. Each one drifted at least once.
-COUNTED_FACTS = [
-    ("non-negotiable rules", 13),
-    ("ledger states", 4),          # decision / N/A because / not decided / deferred to feature
-    ("coverage dispositions", 4),  # feature / covered by reference / deferred / pre-existing
-    ("handoff fields", 8),         # tlc-spec-driven v3.x's schema
-]
 NUMBER_WORDS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
     "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
@@ -117,7 +122,7 @@ def check_versions(root):
 def check_section_pointers(root):
     """Every quoted section name cited in prose must resolve to a real heading."""
     canonical, texts = set(), {}
-    for name in ["SKILL.md"] + [os.path.join("references", r) for r in REFERENCES]:
+    for name in ["SKILL.md"] + [os.path.join("references", r) for r in scope(root)["references"]]:
         text = read(root, name)
         if text is None:
             continue
@@ -146,7 +151,7 @@ def check_section_pointers(root):
 
 def check_generated_blocks_never_start_a_line(root):
     bad = []
-    for r in REFERENCES:
+    for r in scope(root)["references"]:
         text = read(root, "references", r)
         if text is None:
             continue
@@ -164,7 +169,7 @@ def check_rule_count(root):
     check("SKILL.md carries exactly 13 non-negotiable rules", n == 13, "found %d" % n)
 
     wrong = []
-    for name in ["SKILL.md"] + [os.path.join("references", r) for r in REFERENCES]:
+    for name in ["SKILL.md"] + [os.path.join("references", r) for r in scope(root)["references"]]:
         text = read(root, name) or ""
         for mm in re.finditer(r"\b(\w+)\s+(?:non-negotiable\s+)?rules\b", text, re.I):
             word = mm.group(1).lower()
@@ -185,7 +190,7 @@ def check_counted_facts(root):
     }
     wrong = []
     for label, (pattern, expected) in nouns.items():
-        for r in REFERENCES:
+        for r in scope(root)["references"]:
             text = read(root, "references", r) or ""
             for mm in re.finditer(pattern, text, re.I):
                 word = mm.group(1).lower()
@@ -216,7 +221,7 @@ def check_installer_payload(root):
     check("both installers require the same runtime scripts",
           sh_scr == ps_scr, "sh=%s ps1=%s" % (sorted(sh_scr), sorted(ps_scr)))
 
-    on_disk = set(os.listdir(os.path.join(root, "references")))
+    on_disk = set(scope(root)["references"])
     check("every references/ file is required by the installers",
           on_disk == sh_refs,
           "on disk but not required: %s" % sorted(on_disk - sh_refs))
@@ -224,7 +229,7 @@ def check_installer_payload(root):
     # The prose that claims what reaches a user's disk. It said "SKILL.md and
     # references/" for a whole release after scripts/ started shipping.
     stale = []
-    for name in ["SKILL.md"] + [os.path.join("references", r) for r in REFERENCES]:
+    for name in ["SKILL.md"] + [os.path.join("references", r) for r in scope(root)["references"]]:
         text = read(root, name) or ""
         for mm in re.finditer(r"copy only `?SKILL\.md`?[^.\n]*", text):
             if "scripts" not in mm.group(0):
@@ -257,22 +262,110 @@ def check_trilingual_parity(root, folder, names, label):
                % (base, only_base[:6], n, only_n[:6])) if (only_base or only_n) else "")
 
 
+def seed_files(root):
+    """The seed's file pair, derived from its own forwarding stub rather than
+    typed. handoff-seed.md carries a `## Steps N-M — ...` heading whose body
+    links the file the rest moved to; following that link is how the pair stays
+    correct if it is ever split differently."""
+    pair = ["handoff-seed.md"]
+    text = strip_fences(read(root, "references", "handoff-seed.md") or "")
+    # Plural AND a range: `Steps?` with an optional s also matches `## Step 1`,
+    # which silently captured the wrong section's body.
+    m = re.search(r"^## Steps \d+\s*[-–]\s*\d+ [^\n]*\n(.*?)(?=^#{1,6} |\Z)",
+                  text, re.M | re.S)
+    if m:
+        for link in re.findall(r"\(([\w.-]+\.md)\)", m.group(1)):
+            if link not in pair:
+                pair.append(link)
+    return pair
+
+
 def check_step_numbering(root):
     """The seed is one procedure across two files. Overlapping or missing step
     numbers is what a split gets wrong, and every bare `Step N` inside either
-    file resolves by that numbering."""
-    import re as _re
+    file resolves by that numbering. Scoped to the seed's own pair — the other
+    references have their own independent Step 1..N and must not be mixed in."""
+    pair = seed_files(root)
+    if len(pair) < 2:
+        check("the seed's steps exist exactly once across its files", False,
+              "handoff-seed.md has no `## Steps N-M` stub naming where the rest live")
+        return
     got = {}
-    for name in ("handoff-seed.md", "handover-prompt.md"):
+    for name in pair:
         text = read(root, "references", name) or ""
-        for m in _re.finditer(r"^## Step (\d+) — ", strip_fences(text), _re.M):
+        for m in re.finditer(r"^## Step (\d+) — ", strip_fences(text), re.M):
             got.setdefault(int(m.group(1)), []).append(name)
     dupes = ["Step %d in %s" % (k, " and ".join(v)) for k, v in sorted(got.items()) if len(v) > 1]
-    missing = [n for n in range(1, 11) if n not in got]
-    check("the seed's steps 1-10 exist exactly once across its two files",
-          not dupes and not missing,
+    top = max(got) if got else 0
+    missing = [n for n in range(1, top + 1) if n not in got]
+    check("the seed's steps 1-%d exist exactly once across %s" % (top, " + ".join(pair)),
+          bool(got) and not dupes and not missing,
           ("duplicated: %s\n" % "; ".join(dupes) if dupes else "")
           + ("missing: %s" % ", ".join(map(str, missing)) if missing else ""))
+
+
+def check_step_pointers(root):
+    """A citation of the form `<file>.md ... Step N` must land in a file that
+    defines Step N.
+
+    Each reference numbers its own steps from 1, so the namespaces are per-file
+    — a naive global map reports `decompose-phase.md Step 8` as wrong merely
+    because another file also has a Step 8. The one exception is the seed, whose
+    numbering runs continuously across its pair (see `seed_files`), so a pointer
+    into either half resolves against both.
+
+    This is the class no registry covers: nobody has to have written the fact
+    down beforehand. It is what a moved definition leaves behind, and it appeared
+    for real when Steps 8-10 left handoff-seed.md."""
+    files = ["SKILL.md"] + [os.path.join("references", r) for r in scope(root)["references"]]
+    defines = {}
+    for f in files:
+        base = os.path.basename(f)
+        text = strip_fences(read(root, f) if f == "SKILL.md" else read(root, "references", base) or "")
+        defines[base] = {int(m.group(1))
+                         for m in re.finditer(r"^#{2,4} Step (\d+)\b", text or "", re.M)}
+    pair = seed_files(root)
+    shared = set().union(*(defines.get(b, set()) for b in pair)) if len(pair) > 1 else set()
+    for b in pair:
+        if b in defines:
+            defines[b] = defines[b] | shared
+
+    bad = []
+    for f in files:
+        base = os.path.basename(f)
+        raw = read(root, f) if f == "SKILL.md" else read(root, "references", base)
+        joined = re.sub(r"\s*\n\s*", " ", strip_fences(raw or ""))
+        # Tight on purpose: only a deliberate pointer, not any prose that happens
+        # to name a file and a step in the same clause. "`SKILL.md`'s frontmatter,
+        # resolved as Step 5" names this file's own Step 5, not one in SKILL.md.
+        for m in re.finditer(r"([\w.-]+\.md)`?(?:'s)?[\s,)]{1,3}Step (\d+)\b", joined):
+            target, n = m.group(1), int(m.group(2))
+            if target in defines and n not in defines[target]:
+                where = [k for k, v in defines.items() if n in v and k != target]
+                bad.append("%s cites `%s Step %d`, which it does not define%s"
+                           % (base, target, n,
+                              " (it is in %s)" % ", ".join(sorted(where)) if where else ""))
+    check("every `<file> Step N` pointer lands", not bad, "\n".join(sorted(set(bad))))
+
+
+def check_no_orphan_constants(root):
+    """Every module-level constant must be read somewhere in its own file.
+
+    This is the only check here aimed at the disease rather than a symptom. Two
+    declarative tables shipped in this repository with zero readers: this file's
+    own COUNTED_FACTS, and check-roadmap.py's DIMENSIONS — which also listed
+    seven entries where SKILL.md rule 7 names six, so a wrong fact sat in the
+    tree inside a table nobody consulted. A constant with no reader is a fact
+    that cannot be wrong loudly, and it is exactly how a registry rots."""
+    orphans = []
+    for path in sorted(glob.glob(os.path.join(root, "scripts", "*.py"))):
+        text = read(root, "scripts", os.path.basename(path)) or ""
+        for m in re.finditer(r"^([A-Z][A-Z0-9_]{2,})\s*=", text, re.M):
+            name = m.group(1)
+            if len(re.findall(r"\b%s\b" % re.escape(name), text)) < 2:
+                orphans.append("%s: %s is declared and never read"
+                               % (os.path.basename(path), name))
+    check("no script declares a constant nothing reads", not orphans, "\n".join(orphans))
 
 
 def check_changelog(root):
@@ -302,9 +395,9 @@ def main():
     print("counted facts"); check_rule_count(root); check_counted_facts(root)
     print("installers"); check_installer_payload(root)
     print("trilingual parity")
-    check_trilingual_parity(root, "guide", GUIDES, "guide")
-    check_trilingual_parity(root, "", READMES, "README")
-    print("procedure"); check_step_numbering(root)
+    check_trilingual_parity(root, "guide", scope(root)["guides"], "guide")
+    check_trilingual_parity(root, "", scope(root)["readmes"], "README")
+    print("procedure"); check_step_numbering(root); check_step_pointers(root); check_no_orphan_constants(root)
     print("changelog"); check_changelog(root)
 
     print("\n%d checks, %d failed" % (checks_run, len(failures)))

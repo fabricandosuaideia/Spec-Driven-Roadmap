@@ -9,6 +9,47 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.9.0 — 2026-08-08
+
+**The fourth net had no callers.** An analysis of the one remaining gap — two statements that must
+agree and do not — measured the corpus first and then found something more embarrassing than the gap
+itself: `check-consistency.py` shipped in 3.6.1 and was never wired to anything. Not in the
+installers, not named in `SKILL.md` or any reference, and there is no CI here. It ran only because
+someone remembered to, and unaided memory missing a drifted fact is precisely what it exists to
+catch. A checker nobody invokes is worse than none: it produces the belief in a net without the net.
+
+Worse, two declarative tables shipped with **zero readers** — this repository's own version of the
+disease. `COUNTED_FACTS` in `check-consistency.py` and `DIMENSIONS` in `check-roadmap.py` were each
+declared once and consulted never, and `DIMENSIONS` listed seven entries where rule 7 names six. A
+wrong fact, sitting in the tree, inside a table nobody read.
+
+- **`bump-version.sh` is now the release gate.** It runs the consistency check after bumping and
+  exits non-zero when it fails. This is the one place a release cannot route around — you cannot cut
+  one without bumping. The checker stays out of the installers deliberately: it audits this
+  repository's internal agreement, which is a maintainer's concern, not a roadmap author's. It caught
+  a case on its first run that nobody had thought to check: a version bumped with no `CHANGELOG`
+  entry for it.
+- **Both dead tables deleted, and a meta-check added so a third cannot appear**: every module-level
+  constant must be read somewhere in its own file. It is the only check here aimed at the disease
+  rather than a symptom, and it reproduces on demand — reintroduce either table and it fails.
+- **`<file> Step N` pointers are now resolved.** The class a registry cannot cover, because nobody
+  has to have written the fact down first: it is what a moved definition leaves behind. Namespaces
+  are per-file — each reference numbers its own steps from 1 — with the seed's pair sharing one,
+  derived from its forwarding stub rather than hardcoded. Remove that stub and two checks fail
+  instead of none.
+- **Scope is derived from disk, never a typed list.** The old `REFERENCES`/`GUIDES`/`READMES`
+  constants silently excluded 38% of the prose corpus, including `guide/`, the one place in this
+  repository's history where drift was actually recorded (`c33f658`, *"correct the guide it drifted
+  from"*).
+
+Twenty-three checks now. **What this does not close:** four of the seven known contradiction cases
+stay uncovered, and the analysis says so with the reasons. Two never reached git at all — adversarial
+review caught them before commit. One lives in a repository we do not control and cannot be checked
+from inside, so it stays documented in prose. One is a composition of two individually-true
+statements, which comparing copies cannot reason about. And roughly 198 normative sentences that
+name something defined elsewhere remain unsupervised: the eighth case will arrive from outside any
+registry, because nobody enumerates what they have not yet thought of.
+
 ## 3.8.1 — 2026-08-08
 
 **The human guide never learned that you can ask it to check a roadmap.** 3.7.0 shipped the linter
