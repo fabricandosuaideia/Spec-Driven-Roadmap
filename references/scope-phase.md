@@ -20,8 +20,10 @@ run before reaching.
 first question: the version of this skill — the `metadata.version` value in `SKILL.md`'s
 frontmatter, the only version stamp the installers put on disk — where to check the latest
 published one (decided by the path you resolve that `SKILL.md` from: under a plugins directory →
-`/plugin update`; under `.claude/skills/spec-driven-roadmap/`, project or home → the comparison
-command the README documents; anywhere else, such as a repository checkout or a path the user
+`/plugin update`; under `.claude/skills/spec-driven-roadmap/`, project or home → re-running the
+installer, which prints `installing <latest> (replacing <yours>)` before it touches anything and so
+reports the comparison whether or not they go through with it — never the README, which the
+installers do not copy; anywhere else, such as a repository checkout or a path the user
 named → say where it is running from and that neither update route applies, so the comparison is
 against the repository), and that a roadmap run is best done on the strongest available model at
 the highest effort, which the user sets with `/model` and `/effort` **before** starting (SKILL.md,

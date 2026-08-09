@@ -9,6 +9,74 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.18.1 — 2026-08-09
+
+**The end-to-end benchmark had not been run since 3.13.0.** Running it on 3.18.0 found six defects,
+and none of them was in the skill's own logic: three were gates reddening on correct work, two were
+parsers in the shipped linter, and one was an instruction that could not be reached in time to obey.
+Two independent runs scored **7/7** with the linter clean.
+
+### Three gates that called correct work a regression
+
+A false red costs what an empty green costs. It teaches whoever opens `RESULTS.md` to discount the
+number, and it invites someone to "repair" behaviour that was already right.
+
+- **`check-roadmap.py` failed five correct section roadmaps at once.** In multi-section mode the
+  cross-cutting ledger lives in the index while the question a `not decided` row points at lives in
+  whichever section roadmap owns the affected features. The check looked for both in the same file,
+  so every section that was not the owner failed — on a project whose index row literally read *"see
+  the Notification channel entry in `docs/ROADMAP-notif.md`"*. It now searches the sibling roadmaps
+  when the ledger came from the index.
+- **The scorer graded a lazily decomposed run as a miss.** Multi-section decomposition is lazy by
+  design; a correct run may cover one section and leave the rest `NOT YET DECOMPOSED`. Ambiguities in
+  sections nobody reached cannot have been placed. `score` now reports `PARTIAL`, names the pending
+  sections, refuses to write the run to `RESULTS.md`, and does not count it as a regression.
+- **Ambiguity #7 was scored by grepping for English.** A correct run wrote *"Nada é apagado de
+  verdade: item retirado por C6 ou removido por A5 fica com marca de retirado"* — the right answer at
+  the right destination, in the language of the source document — and matched no pattern, scoring
+  6/7. It is now scored by the state of the `Data lifecycle / expiry` ledger row: present and not
+  `N/A`. The rubric theme name is a machine-read key and stays English in every language, which is
+  what makes the test survive translation. Eight cases verified, including that `N/A`, an empty cell
+  and a missing row all still fail.
+
+### Two parsers, one root cause
+
+A markdown list item is a marker followed by **whitespace**. Testing only the character made
+`**Resposta: …`, a continuation line written in bold, parse as a new bullet — which broke two checks
+in opposite directions on the same file: a roll-up gained a phantom entry naming no feature, and a
+gray-area justification that wrapped became invisible and was reported as *"no stated place where the
+answer already lives"*. All four bullet groupers in `check-roadmap.py` now share one helper.
+
+### An instruction nobody could reach in time
+
+Step 8's size re-raise said *"before the Write"* while living in `Sanity checks`, at the end of
+`decompose-phase.md`, two hundred lines past the step that writes. Both runs read the steps in order,
+wrote every file, and met the instruction afterwards; one then reversed the mode and rewrote
+everything. The trigger now opens Step 8, where it applies.
+
+**And only one of its two answers had a home.** The recording format was
+`size re-raised (…): single-section confirmed — <reason>`, to sit under `docs/ROADMAP.md`'s H1 — but
+in the outcome that actually changes anything, that file never exists. The multi-section answer now
+has its own wording and its own destination, the index's H1.
+
+Re-executed after the fix, by an agent told nothing about it: the re-raise fired **before any file
+was written**, the record landed on the index, and `rewroteAnything` came back false.
+
+### And a pointer to a file the user does not have
+
+The version announcement sent people to *"the comparison command the README documents"*. The
+installers copy `SKILL.md`, `references/` and `scripts/` — not the README. Two runs hit it. Both
+places now say what to do instead: re-run the installer, which prints
+`installing <latest> (replacing <yours>)` before it touches anything.
+
+### Recorded rather than fixed
+
+`benchmark/expected.md` now says what the `0a-single` scenario really does — the PRD decomposes to
+about twenty features, so a correct run answers *single* and then reverses, and a run that stays
+single-section is the regression. `benchmark/state-scenarios.md` gained the build order for the three
+untested scenarios, the reasoning behind each position, and the split that matters when building
+them: **generate the artifact interiors, author the drift by hand.**
+
 ## 3.18.0 — 2026-08-09
 
 **Step 2 could report failed work as done, and the clause that forbade it was the clause that did

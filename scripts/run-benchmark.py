@@ -68,8 +68,40 @@ PLANTED = [
     ("4 votes after edit", r"(voto|vote).{0,60}(edi|alterad)|(edi|edit).{0,60}(voto|vote)"),
     ("5 notification channel", r"canal|channel|e-?mail|smtp|push|in-?app"),
     ("6 public API auth", r"(api).{0,50}(auth|token|chave|key)|(auth|token|chave|key).{0,50}(api)"),
-    ("7 retention / deletion", r"reten[cç]|retention|exclus|delete|soft.?delete|purg"),
+    # 7 is not a word grep, and cannot be. The run writes prose in the source
+    # document's language, so a correct Portuguese answer — "Nada é apagado de
+    # verdade: item retirado fica com marca de retirado" — matched no English or
+    # cognate pattern and scored as a miss on a roadmap that had done everything
+    # right. A false red on the headline metric is as damaging as an empty green:
+    # it teaches people to stop reading the number, and invites someone to
+    # "repair" correct behaviour. Anchor on what never translates instead — the
+    # rubric theme name is a machine-read key and stays English in every language.
+    ("7 retention / deletion", None),
 ]
+
+# The theme #7 must land on, and the row state that means the run never looked.
+# Step 7a lets a genuinely inapplicable theme be dismissed with `N/A because`;
+# for this PRD it applies — accounts close, C6 withdraws an item, A5 removes a
+# person — so `N/A` is the run reading the document instead of enumerating the
+# entities it implies, which is exactly what this ambiguity was planted to catch.
+LIFECYCLE_THEME = r"data lifecycle"
+
+
+def lifecycle_row_decided(roadmaps):
+    """True when the `Data lifecycle` ledger row exists and is not dismissed."""
+    for path in roadmaps:
+        for line in read(path).splitlines():
+            if not line.strip().startswith("|"):
+                continue
+            if not re.search(LIFECYCLE_THEME, line, re.I):
+                continue
+            body = "|".join(line.split("|")[2:])
+            if re.search(r"\bN/?A\b", body, re.I):
+                return False
+            # Strip the dashes a placeholder cell uses, not just spaces and
+            # pipes: `| Data lifecycle | | — |` otherwise read as a decision.
+            return bool(body.strip(" |-\u2014\u2013\t"))
+    return False
 
 
 def die(msg, code=2):
@@ -151,11 +183,13 @@ BASELINES = RUNROOT + "-baselines"
 
 def pre_existing_hits(proj):
     """Which planted ambiguities the input already contains, before the run."""
-    corpus = "\n".join(read(p) for p in find_roadmaps(proj)).lower()
+    roadmaps = find_roadmaps(proj)
+    corpus = "\n".join(read(p) for p in roadmaps).lower()
     if not corpus.strip():
         return []
     return [name for name, pattern in PLANTED
-            if re.search(pattern, corpus, re.I | re.S)]
+            if (lifecycle_row_decided(roadmaps) if pattern is None
+                else re.search(pattern, corpus, re.I | re.S))]
 
 
 def save_baseline(stamp, scenario, hits):
@@ -228,7 +262,8 @@ def cmd_score(args):
 
     found, missing = [], []
     for name, pattern in scored:
-        hit = re.search(pattern, body, re.I | re.S) is not None
+        hit = (lifecycle_row_decided(roadmaps) if pattern is None
+               else re.search(pattern, body, re.I | re.S) is not None)
         (found if hit else missing).append(name)
         print("  %s %s" % ("✓" if hit else "✗", name))
     for name in pre:
@@ -248,6 +283,23 @@ def cmd_score(args):
     lastline = [l for l in lint.stdout.strip().splitlines() if "passed" in l]
     print("  check-roadmap: %s" % (lastline[-1] if lastline else "did not report"))
 
+    # Multi-section decomposition is lazy by design: a correct run may cover one
+    # section and leave the rest `NOT YET DECOMPOSED`. Its planted ambiguities
+    # then live in sections nobody has reached, and grading that as a miss calls
+    # correct behaviour a regression — the empty green pointed the other way, and
+    # just as good at teaching people to stop reading the number.
+    pending = []
+    idx = os.path.join(proj, "docs", "ROADMAP-INDEX.md")
+    for line in read(idx).splitlines():
+        if "NOT YET DECOMPOSED" in line.upper() and line.strip().startswith("-"):
+            pending.append(line.strip().lstrip("- ").split("—")[0].strip())
+    if pending:
+        print("\n  PARTIAL — %d section(s) not yet decomposed:" % len(pending))
+        for p in pending:
+            print("    %s" % p)
+        print("  Ambiguities belonging to those sections cannot have been placed yet,")
+        print("  so this score is not comparable with a fully decomposed run.")
+
     score = "%d/%d" % (len(found), len(scored))
     print("\n  planted ambiguities captured: %s" % score)
     if missing:
@@ -255,10 +307,14 @@ def cmd_score(args):
         print("\n  A miss is a regression against benchmark/expected.md. Read that file")
         print("  before changing anything — the destination may have moved with a rule.")
 
-    if args.record:
+    if args.record and pending:
+        # A partial run on the scoreboard reads as a regression forever after.
+        print("\n  NOT recorded: a partially decomposed run does not belong on the")
+        print("  scoreboard. Decompose the remaining sections and score again.")
+    elif args.record:
         record(args.version or skill_version(), args.dir, score, lastline, missing)
         print("\n  appended to benchmark/RESULTS.md")
-    return 1 if missing else 0
+    return 1 if (missing and not pending) else 0
 
 
 def skill_version():

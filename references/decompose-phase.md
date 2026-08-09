@@ -452,6 +452,28 @@ backlog has stopped being a sweep.
 
 ## Step 8 — Close the roadmap
 
+**Before writing anything, count the features you are about to write.** From about **9**, re-raise
+Phase 0's single-vs-multi question and wait for the answer. An oversized roadmap is evidence the mode
+choice was wrong, and asked here the question does not collide with rule 9's exception, because no
+`docs/ROADMAP.md` exists yet to have fixed the mode.
+
+This paragraph used to live in `Sanity checks`, at the end of this file, while saying *"before the
+Write"*. Two independent runs read the steps in order, wrote both files, and met the instruction
+afterwards — one of them then reversed the mode and rewrote everything, which is exactly the expense
+the timing was meant to avoid. The trigger belongs in the step it governs.
+
+**Record the answer, and both answers have a home:**
+
+- **single-section confirmed** — one plain line immediately under `docs/ROADMAP.md`'s H1, above
+  `## Status`: `size re-raised (as of <YYYY-MM-DD>): single-section confirmed — <reason>`.
+- **switched to multi-section** — the same line under `docs/ROADMAP-INDEX.md`'s H1:
+  `size re-raised (as of <YYYY-MM-DD>): switched to multi-section — <reason>`. Then run Phase 1 to
+  build the index and decompose per section; there is no `docs/ROADMAP.md` in this outcome, which is
+  why the single-section wording has nowhere to go and a run that only had that wording invented one.
+
+Anywhere else the line is lost or misread: inside `## Status` the next seed replaces the body and it
+is gone, inside `## Open Questions` it reads as an entry belonging to no feature.
+
 - **Coverage table:** one row per scope-unit → its disposition. Four dispositions are valid:
   - `<feature-name>` — built by that feature in this roadmap.
   - `covered by reference to <roadmap>/<feature>` — owned by another section (Step 4).
@@ -521,7 +543,7 @@ backlog has stopped being a sweep.
 
 `docs/ROADMAP.md` (single-section) or `docs/ROADMAP-<slug>.md` (multi-section):
 
-1. H1 title. When the size question below was re-raised and answered, its one-line record sits here
+1. H1 title. When the size question at the head of Step 8 was re-raised and answered, its record sits here
    too — plain text between the H1 and `## Status`, never inside either (the size bullet under
    `Sanity checks` gives the wording and says why nowhere else works).
 2. `## Status` — **single-section mode only.** Written and refreshed by the Handoff seed; leave the
@@ -641,14 +663,9 @@ the script is not on disk — an install predating it — do the whole list by h
   before a split is needed, instead of only reacting once the limit is crossed.
   **On a first decomposition, do that arithmetic on Step 1's inventory before writing anything.** The
   file goes from empty to final size in a single Write, so neither mark is ever crossed while
-  writing and the script can only report them afterwards — too late to change the mode cheaply. From
-  about 9 features, re-raise Phase 0's single-vs-multi question **before** the Write: an oversized
-  roadmap is evidence the mode choice was wrong, and asked at that moment the question does not
-  collide with rule 9's exception, because no `docs/ROADMAP.md` exists yet to have fixed the mode.
-  **Record the answer either way** — one plain line immediately under the H1, above `## Status`:
-  `size re-raised (as of <YYYY-MM-DD>): single-section confirmed — <reason>`. Anywhere else it is
-  lost or misread: inside `## Status` the next seed replaces the body and it is gone, inside
-  `## Open Questions` it reads as an entry belonging to no feature.
+  writing and the script can only report them afterwards — too late to change the mode cheaply.
+  **Step 8 opens with the re-raise itself**, including where each of the two answers is recorded;
+  this bullet is the arithmetic behind it, not a second copy of the instruction.
   `scripts/check-roadmap.py` reads that line and, past the 3,000 mark, reports the size as
   acknowledged instead of warning, so a mode that was re-raised and confirmed stops being
   indistinguishable from one that was never asked. The 2,000 mark still reports: it is the one that

@@ -87,6 +87,68 @@ different points in time. Nothing new to invent, no second answer key, and the d
    move to the index; a mandatory re-seed; and with work in flight, the documented exit taken rather
    than a silent skip.
 
+## Build them in this order, and generate the interiors
+
+Worked out by reading the three scenarios against the code that executes them. Recorded because the
+reasoning is expensive to redo and none of it is visible from the files themselves.
+
+**1. Re-run.** It builds the shared skeleton the other two consume, and both route through the same
+upstream fork — `scope-phase.md`'s extend-versus-own-section question, answered *extend* here and
+*own section* for the conversion, off the same disk state and the same wave-2 source. Its scoring
+needs only snapshot-and-diff, no git semantics. Derive the wave-2 source from the four capabilities
+`fixture/PRD.md` already defers: a source's own out-of-scope statements are never scope-units, so
+promoting two or three of them into a `docs/PRD-v2.md` is realistic and needs no second answer key.
+
+**2. Work in flight.** Cheapest marginal cost — a `.specs/STATE.md` variant on the tree scenario 1
+built, plus one feature directory with `spec.md` and no `validation.md`. It cannot come first: the
+seed never self-triggers, so it needs a Phase 2 run above it. Its central claim is also the most
+mechanically decidable in the set, `git diff --exit-code -- .specs/STATE.md`.
+
+**3. Conversion.** Last because it needs the most new machinery, not because it is hardest to
+justify — it would execute more never-run code than the other two combined: the `git mv` path, the
+`--rollback` unstage against real history, the `**In-progress** (file:line):` parenthetical parser,
+and the whole work-in-flight exit procedure. Built third, it composes two already-scored states.
+
+### Generate the artifact interiors; author the drift by hand
+
+Do **not** hand-write the `.specs/` artifacts wholesale, and do not try to generate them wholesale
+either. The two failure modes are different and the split is clean.
+
+Hand-writing fails on **interiors** — things that are byproducts of a process, not of a template, and
+that a fixture author would invent and then test their own invention against:
+
+- the task-completion marking convention, which the downstream gate keys on and **no document
+  defines**;
+- a genuine FAIL report that still carries `| ✅ PASS |` rows, which is the trap the completion test
+  opens by naming;
+- two `Result:` lines with real, colliding counts;
+- `file:line` citations that resolve to lines that exist.
+
+Generation cannot produce what only **time** produces, so author these deliberately: the six title
+forms above, the ~3:1 orphan ratio, the `.md`/`.txt` divergence, the `SUPERSEDED` entry. One
+generation is one model, on one day, under one downstream version — a real `.specs/` is layered
+across several.
+
+**Two cautions.** Run one feature as a spike before committing to the full build; it answers what
+completion marking the model actually writes, whether the loop prompt survives the approval gates,
+and how much persistence the stub routers need. And keep the generation run and the scored runs
+**separate and labelled** — generating a fixture by running the skill that the fixture then scores
+is the benchmark grading its own output.
+
+### What the runner still needs
+
+- Scenario keys for the three, each fixture tree owning its own `docs/PRD.md` (`cmd_setup` copies
+  with `copytree` and no `dirs_exist_ok`).
+- `git init` plus one commit at the end of `cmd_setup`, which is what makes the central assertions
+  mechanical.
+- A pre-run snapshot at setup — heading order, the `.txt`, the orphan list, the ledger rows — so
+  scoring is a diff rather than a grep.
+- **Their own scorer.** `cmd_score`'s seven-ambiguity grep is meaningless on a pre-populated tree;
+  the baseline subtraction added in 3.18.0 keeps it honest but a state scenario needs different
+  assertions, not a discounted version of these.
+- The expected **non-zero** `check-roadmap.py` baseline recorded by failing-check name, because the
+  prescribed `.md`/`.txt` divergence is deliberate and will otherwise read as a regression.
+
 ## Why this is not a separate repository
 
 Same reason the current benchmark is not: **the answer key changes when a rule changes**, and a

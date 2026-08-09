@@ -83,6 +83,34 @@ def strip_fences(text):
     return "\n".join(out)
 
 
+# A markdown list item is a marker followed by whitespace. Testing only the
+# character made `**Resposta: …` — a wrapped continuation written in bold — parse
+# as a brand-new bullet, which broke two checks in opposite directions on the same
+# file: a roll-up gained a phantom entry with no feature name, and a gray-area
+# justification that wrapped became invisible and was reported as "no stated place
+# where the answer already lives". Both were false failures on correct roadmaps,
+# found by executing the skill rather than by reading this file.
+BULLET_RE = re.compile(r"^\s*[-*+]\s")
+
+
+def bullets(text):
+    """Bullet items with their wrapped continuation lines folded in."""
+    items, cur = [], ""
+    for ln in (text or "").splitlines():
+        if BULLET_RE.match(ln):
+            if cur:
+                items.append(cur)
+            cur = ln.strip()
+        elif cur and ln.strip():
+            cur += " " + ln.strip()
+        elif cur:
+            items.append(cur)
+            cur = ""
+    if cur:
+        items.append(cur)
+    return items
+
+
 def block(text, heading):
     """Body of a '## Heading', to the next heading of any level. Fence-aware."""
     lines = strip_fences(text).splitlines()
@@ -285,18 +313,8 @@ def check_open_questions(rm, feats, text):
     # does not care and the reference never asked for one line each -- but reading
     # line by line split a wrapped entry into a fragment holding `status: open`
     # and a fragment holding the feature name, and then failed on the half that
-    # named nothing. A line starting with `-`/`*` opens an entry; anything after
-    # it that is not a bullet belongs to it.
-    entries, cur = [], None
-    for line in rollup.splitlines():
-        if line.strip().startswith(("-", "*")):
-            if cur is not None:
-                entries.append(cur)
-            cur = line.strip()
-        elif cur is not None and line.strip():
-            cur += " " + line.strip()
-    if cur is not None:
-        entries.append(cur)
+    # named nothing.
+    entries = bullets(rollup)
     orphan_status = []
     for entry in entries:
         if re.search(r"status\s*:\s*(open|answered)", entry, re.I):
@@ -383,22 +401,30 @@ def check_ledger(rm, text, root=None, path=None):
 
     unresolved = []
     rollup = block(text, "## Open Questions") or ""
+
+    # When the ledger came from the index, the question it points at lives in
+    # whichever SECTION roadmap owns the affected features — one file, not this
+    # one. Searching only `text` failed five section roadmaps of a correct
+    # multi-section project on one defect that was not theirs: the index row
+    # even said "see the ... entry in docs/ROADMAP-notif.md". A gate that reddens
+    # on correct output teaches people to stop reading it, which is the same
+    # damage as an empty green pointed the other way.
+    if source != rm and path:
+        for sib in sorted(glob.glob(os.path.join(os.path.dirname(path), "ROADMAP*.md"))):
+            if os.path.abspath(sib) == os.path.abspath(path):
+                continue
+            try:
+                with open(sib, encoding="utf-8") as fh:
+                    rollup += "\n" + (block(fh.read(), "## Open Questions") or "")
+            except OSError:
+                continue
     for r in paired:
         if "not decided" in r.lower() and "deferred to feature" not in r.lower():
             theme = r.strip("| ").split("|")[0].strip()
             # Same bullet-grouping the roll-up check uses. Splitting on physical
             # lines here made a wrapped entry invisible to one check and visible
             # to the other, on the same file.
-            entries, cur = [], ""
-            for ln in rollup.splitlines():
-                if ln.strip().startswith(("-", "*")):
-                    if cur:
-                        entries.append(cur)
-                    cur = ln.strip()
-                elif cur and ln.strip():
-                    cur += " " + ln.strip()
-            if cur:
-                entries.append(cur)
+            entries = bullets(rollup)
             hit = [e for e in entries
                    if theme and theme.lower() in e.lower() and "cross-cutting" in e.lower()]
             if not hit:
@@ -416,7 +442,7 @@ def check_disjoint(rm, text, feats):
     if gray is None or rollup is None:
         skip(rm, "gray areas and open questions are disjoint", "one of the two blocks is absent")
         return
-    gl = [l.strip(" -*") for l in gray.splitlines() if l.strip().startswith(("-", "*"))]
+    gl = [l.strip(" -*") for l in bullets(gray)]
     overlap = []
     for line in gl:
         key = re.sub(r"[^a-z ]", " ", line.lower())
@@ -456,7 +482,7 @@ def check_gray_area_reasons(rm, text):
     if gray is None:
         skip(rm, "gray-area lines say where the answer already lives", "no such block")
         return
-    lines = [l.strip() for l in gray.splitlines() if l.strip().startswith(("-", "*"))]
+    lines = bullets(gray)
     if not lines:
         skip(rm, "gray-area lines say where the answer already lives", "block present but empty")
         return

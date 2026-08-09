@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.18.0"
+  version: "3.18.1"
 ---
 
 # Spec-Driven Roadmap
@@ -50,8 +50,10 @@ so it may not be in context alongside this body, and a wrong number asserts a fa
 the whole run. If it cannot be read, announce `unknown` rather than dropping the line. State too
 where to check the latest published one, decided by the path this file resolved from: under a
 plugins directory → `/plugin update`; under
-`.claude/skills/spec-driven-roadmap/`, project or home → the comparison command the README
-documents; anywhere else, such as a repository checkout → say where it is running from and that
+`.claude/skills/spec-driven-roadmap/`, project or home → **re-running the installer is the check**:
+it prints `installing <latest> (replacing <yours>)` before it touches anything, so it reports the
+comparison whether or not they go through with it. Never send them to the README — the installers
+copy `SKILL.md`, `references/` and `scripts/`, and two runs pointed a user at a file they lacked; anywhere else, such as a repository checkout → say where it is running from and that
 neither update route applies. One line, delivered as an announcement — never as a question, so it
 costs no turn (scope-phase.md, preamble).
 
