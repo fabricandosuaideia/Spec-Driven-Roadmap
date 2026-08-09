@@ -158,6 +158,11 @@ dependency and a 40-task feature came out with `0 failed`, exit 0.
 silence. An empty green is the worst result a gate can give, because it switches off the attention of
 whoever reads it.
 
+**And test the failure path on every platform, not just the happy one.** The same linter printed `✓`
+fine on Windows and died on the first `✗` — the console encoding has no such character. It therefore
+worked on a clean roadmap and crashed on a defective one, which is the only case anybody runs a
+linter for. A gate is exercised by its failures; a green run proves almost nothing about it.
+
 ## 7. Measure before proposing; never invent a number
 
 Two numbers were published here without measuring — "300 lines" and "29 findings" — and both were
