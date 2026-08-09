@@ -109,8 +109,17 @@ precisely the disease it exists to catch.
 > A checker nobody invokes is **worse** than none: it produces the belief in a net without the net.
 
 **So:** when you create a check, decide in the same commit **where it is invoked**, and pick a point
-the process cannot route around. Here that was the version-bump script — you cannot cut a release
-without bumping.
+the process cannot route around.
+
+**And check that the point is frequent enough**, which is the half this lesson learned late. The
+first one chosen here was `bump-version.sh` — you cannot cut a release without bumping, so it is
+genuinely unavoidable. It is also *rare*: between two releases somebody can commit twenty times with
+nothing looking at the invariants, and a fact edited in one file and left stale in another is a
+per-commit failure. The check now runs at both — `scripts/hooks/pre-commit` on every commit that
+touches an invariant, and the release gate as the backstop for anything bypassed with `--no-verify`.
+
+A hook that fires on *every* commit is a hook people learn to bypass, so it stays out of the way of
+commits that touch nothing it reads.
 
 ## 4. A declared constant with no reader rots
 

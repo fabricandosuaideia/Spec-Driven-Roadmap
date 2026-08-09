@@ -9,6 +9,25 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.17.1 — 2026-08-09
+
+**The lesson about wiring a check had gone stale on the commit that fixed it.** `CLAUDE.md`'s third
+lesson closed with *"Here that was the version-bump script — you cannot cut a release without
+bumping"*, written when the release gate was the only caller. 3.17.0 added a pre-commit hook and did
+not revisit the paragraph explaining where checks are invoked.
+
+The lesson now carries the half it learned late: an invocation point must be **unavoidable and
+frequent enough**. The release gate is genuinely unavoidable and genuinely rare, so twenty commits
+could pass under it untouched — and the failure it guards against is per-commit. The check runs at
+both points now, and the paragraph says why a hook that fires on *every* commit is one people learn
+to bypass.
+
+Nothing else went stale. Swept and still true: there is no CI here; `install.ps1` has never been
+executed; the three state scenarios have no fixture; `RESULTS.md` holds two data points.
+
+Found by being asked whether the docs had been updated — which is the honest answer to how this class
+of drift gets caught when no check covers it.
+
 ## 3.17.0 — 2026-08-09
 
 **The net was installed but not switched on between releases.** `bump-version.sh` refuses to cut a
