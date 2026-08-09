@@ -171,6 +171,12 @@ roadmap unattended. It is always offered; what it needs first is a roadmap with 
 questions, which the skill closes with you before handing the prompt over — the guide explains
 what it trades away.
 
+## Working on the skill itself
+
+[`CONTRIBUTING.md`](CONTRIBUTING.md) — environment setup, and the two directories a clone does not
+get. [`CLAUDE.md`](CLAUDE.md) — the operating rules an agent follows here. [`benchmark/`](benchmark/)
+— a frozen fixture with seven planted ambiguities, an answer key, and a scoreboard per version.
+
 ## How it fits with tlc-spec-driven
 
 The two skills own different files and never collide:

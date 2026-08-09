@@ -9,6 +9,33 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.15.0 — 2026-08-09
+
+**A clone was not enough to work from.** `CLAUDE.md` taught *how to think* and mentioned the scripts
+exactly once, in passing. It never said what to run, when, or that a benchmark exists — and three
+directories are gitignored, one of which breaks a run rather than merely inconveniencing it.
+
+- **`CLAUDE.md` gained an operational section**, before the lessons: what each of the seven scripts
+  is for, the six-step loop for any change, what is never hand-edited (`RESULTS.md`, the three
+  version declarations), what is never changed without saying so (the 13 rules, the Step 10
+  templates, the eight-field Handoff schema), and that committing, tagging and pushing are asked
+  before, never assumed.
+- **`CONTRIBUTING.md`** — environment setup for a human. It exists because a fresh clone has no
+  `.claude/skills/tlc-spec-driven`, and `handoff-seed.md` *requires* reading that skill's real schema
+  from disk rather than from memory. Without it an agent takes the "no downstream skill installed"
+  branch and skips the entire seed — a run this repository has on record. It also records that
+  `install.ps1` has never been executed here: three static reviews, zero runs, for want of a Windows
+  machine.
+- **The three READMEs point at both**, so a contributor arriving at the front page finds them.
+
+`CONTRIBUTING.md` deliberately **restates no rule**. It points at `CLAUDE.md` and stops — a second
+copy of a rule is a second thing to keep in sync, which is the failure with the longest record here.
+
+Worth recording, because it is the point of the whole apparatus: adding those pointers broke
+trilingual parity, and `check-consistency.py` reported it on the very next run — a heading added to
+two READMEs and not the third, caught in seconds by a check that exists because this exact class of
+drift went unnoticed for two releases.
+
 ## 3.14.0 — 2026-08-09
 
 **The benchmark is standardised, and it lives here rather than in a repository of its own.** Testing

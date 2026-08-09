@@ -175,6 +175,13 @@ el roadmap entero sin supervisión. Siempre se ofrece; lo que exige antes es un 
 abiertas, y la skill las cierra contigo antes de entregarte el prompt — la guía explica qué cede a
 cambio.
 
+## Trabajar en la propia skill
+
+[`CONTRIBUTING.md`](CONTRIBUTING.md) — preparación del entorno, y los dos directorios que un clon no
+recibe. [`CLAUDE.md`](CLAUDE.md) — las reglas de trabajo que un agente sigue aquí.
+[`benchmark/`](benchmark/) — un fixture congelado con siete ambigüedades plantadas, una clave de
+respuestas, y un marcador por versión.
+
 ## Cómo encaja con tlc-spec-driven
 
 Las dos skills son dueñas de archivos distintos y nunca chocan:

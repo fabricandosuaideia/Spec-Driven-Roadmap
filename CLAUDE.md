@@ -23,6 +23,49 @@ Origin: the release sequence from v3.4.0 to v3.13.0. The lessons generalise; the
 
 ---
 
+## Working here: what to run, and when
+
+Before the lessons, the mechanics. Everything below is a command; none of it is optional.
+
+| | |
+|---|---|
+| `scripts/check-consistency.py` | 23 checks over the invariants that keep this repo's duplicated facts in step. **Run after any edit to `SKILL.md`, `references/` or `scripts/`.** |
+| `scripts/check-roadmap.py` | Lints a roadmap the skill produced. Shipped to users; Phase 2 runs it. |
+| `scripts/run-benchmark.py` | Sets up an isolated run and scores it. See [`benchmark/`](benchmark/). |
+| `scripts/convert-to-multi.py` | Shipped to users. The single→multi conversion. |
+| `scripts/bump-version.sh` | Writes all three version declarations **and runs the consistency check**, refusing the release when it fails. |
+
+**The loop for any change:**
+
+1. Read the reference you are about to edit **completely**. `SKILL.md` says so and it is not
+   ceremony — the contradictions found here lived 300 lines from the edit, or in another file.
+2. Make the change.
+3. `python3 scripts/check-consistency.py` — must report `0 failed`.
+4. **If the change alters what a correct run produces, run the benchmark** ([`benchmark/README.md`](benchmark/README.md))
+   and update [`benchmark/expected.md`](benchmark/expected.md) **in the same commit**. A rule and its
+   answer key drifting apart is the failure this repository has committed most often.
+5. Add the `CHANGELOG.md` entry **before** bumping — the gate checks the entry exists for the new
+   version.
+6. `bash scripts/bump-version.sh <version>` — it runs the gate and exits non-zero if anything fails.
+
+**Ask before committing, tagging or pushing.** Every release here is a public artifact with a tag;
+none of it is yours to decide unprompted.
+
+**Never edit by hand:** `benchmark/RESULTS.md` (the runner appends it), and the three version
+declarations (`bump-version.sh` writes them together, and refuses when they already disagree).
+
+**What is never touched without saying so:** the 13 non-negotiable rules in `SKILL.md`, the three
+prompt templates in `references/handover-prompt.md` Step 10, and the eight-field Handoff schema in
+`handoff-seed.md` Step 6. Two rule changes have happened in this repository's history; both are named
+in the `CHANGELOG.md` entry that made them.
+
+**Reading the downstream skill.** `references/handoff-seed.md` requires reading `tlc-spec-driven`'s
+real schema from disk, never from memory. It is vendored under `.claude/skills/` and **gitignored**,
+so a fresh clone does not have it — see [`CONTRIBUTING.md`](CONTRIBUTING.md) before concluding that
+no downstream skill is installed.
+
+---
+
 ## 1. A prose change is worth nothing until it has been executed
 
 **The most expensive lesson here.** Nine consecutive releases of prose review — adversarial reading,

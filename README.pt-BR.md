@@ -175,6 +175,13 @@ inteiro sem supervisão. Ela é sempre oferecida; o que ela exige antes é um ro
 em aberto, e a skill fecha essas perguntas com você antes de entregar o prompt — o guia explica o
 que ela troca.
 
+## Trabalhando na própria skill
+
+[`CONTRIBUTING.md`](CONTRIBUTING.md) — preparação do ambiente, e os dois diretórios que um clone não
+recebe. [`CLAUDE.md`](CLAUDE.md) — as regras de trabalho que um agente segue aqui.
+[`benchmark/`](benchmark/) — uma fixture congelada com sete ambiguidades plantadas, um gabarito, e um
+placar por versão.
+
 ## Como se encaixa com o tlc-spec-driven
 
 As duas skills são donas de arquivos diferentes e nunca colidem:
