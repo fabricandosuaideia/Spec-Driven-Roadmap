@@ -215,23 +215,142 @@ Exit `0` from it is therefore **necessary but not sufficient**; where these line
 decides. Say so in the Step 7 report when the two disagree, and never record a PASS the report
 contradicts.
 
-Collect the lines that are a heading (1-4 `#`) whose text **contains** `Validation`, `Validação`,
-`Validación` or `Verifier` anywhere in it, or that contain
-`Result:`, `Overall:` or `Status:` (with or without the `**`) — that selection is
-case-**in**sensitive — then judge the joined text **case-sensitively**, on the whole words `PASS` and
-`FAIL`, plus this rule first:
+Collect three kinds of line. The selection is case-**in**sensitive:
 
-- a `❌` or a `⚠️` on an `Overall:` or `Status:` line → **not done**, whatever any `PASS` says
-  elsewhere. Those are the consolidated verdicts; the sensor's `Result:` is scoped to mutants.
+1. a **heading** (1-4 `#`) whose text contains `Validation`, `Validação`, `Validación`, `Verifier`,
+   `Verificação`, `Verificación` or `Verificador` anywhere in it;
+2. a line containing `Result:`, `Overall:` or `Status:`, with or without the `**`;
+3. a line shaped **`**<anything>**:` immediately followed by a `✅`, `❌` or `⚠️`** — the mark is the
+   first non-space character after the colon, not merely somewhere on the line.
 
-- both `PASS` and `FAIL` present → unfilled template → **not done**
-- `FAIL` only → **not done**
-- `PASS` only, with no `path.ext:NN` citation anywhere in the file → **not done**
-- `PASS` only, with at least one such citation → **done**
-- no line matched either pattern → judge the **whole file's** text by these same rules; that is the
-  script's own fallback, and skipping it disagrees with the gate on exactly the reports that do not
-  follow the template
-- no `validation.md` at all, or no `PASS`/`FAIL` anywhere → **not done**
+**Rule 3 is the one that does not depend on spelling, and it exists because rules 1 and 2 do.** The
+downstream skill's own guidance contemplates writing the artifact in Portuguese
+(`references/coding-principles.md`), and the two consolidated verdicts in its template are
+`**Status**: ✅ All ACs covered / ❌ Gaps present` and `**Overall**: ✅ Ready | ⚠️ Issues | ❌ Not
+Ready` — a label, a colon, then the mark. Translate the label and rule 2 stops matching; the mark
+survives translation, so rule 3 still selects the line.
+
+**Why "immediately after the colon" and not "anywhere on the line".** The looser form selects prose
+asides — `**Note**: the suite is ⚠️ slow` would fail a finished feature. The template puts the mark
+first, so the tight form keeps every real verdict and drops the commentary. It also leaves the
+acceptance-criteria rows out on its own: `| AC-1 | … | ✅ PASS |` is a table row, not a bold label,
+and those rows are exactly what this step opened by refusing to match.
+
+**Before applying the selection, extend its lists — this is a step, not a permission.** Read
+the report's own bold labels and headings first, and add to rules 1 and 2 every one that is plainly
+one of these words in the report's language. The literals printed above are **observed, never
+complete**: they are the spellings somebody has seen, and the next project writes one nobody wrote
+down.
+
+The test for adding one is narrow — it must be *that word* translated, not a different word sitting
+nearby. `Situação:`, `Estado:`, `Geral:`, `General:` and `Resultado:` qualify; `Relatório:` is
+*Report* and `Comprobación:` is *Check*, so neither does. The same test governs rule 1's headings.
+Name every spelling you added when you report, and treat skipping this step as skipping the test:
+`**Geral**: Não Pronto ❌` beside `**Situação**: ✅ Critérios cobertos` reads as a finished feature
+until `Geral:` is on the list. What you may not do is
+stop at the list and conclude the report carries no verdict — the list is a floor, not a quota.
+
+**On a selected line, a mark counts as the verdict word it stands for:** `✅` reads as `PASS`, `❌`
+and `⚠️` read as `FAIL`. Without this the test only half works in translation — `❌ Não Pronto`
+would be caught while `✅ Pronto` would not, and a **finished** feature written in Portuguese would
+come back as unfinished for having no English `PASS` in it.
+
+A mark counts **wherever it sits on a scoring line**, not only right after the colon — and a
+heading is never a scoring line, so a `✅` in a title scores nothing. That is the loose reading and it
+is deliberate: `**Status**: ✅ All ACs covered — ⚠️ flaky suite` comes out as a
+failure. Scoring marks by position would be more precise and would cost more than it buys — an
+incidental mark then stops vetoing, and the verdict it stops vetoing is one that says something is
+wrong. Errs toward `not done`, which is the error this test is built to prefer.
+
+**Selection is positional; scoring is not, and the two are different jobs.** Rule 3 is tight because
+it has to decide *whether a line is a verdict at all* using nothing but its shape. Once a line is in,
+its label has already been recognised, so there is no longer anything to protect against.
+
+**A heading selects the report; it never carries a verdict.** Rule 1 finds the file's subject, and a
+heading matches on one word appearing anywhere in it — which also pulls in interior section headings
+like `## Verificação de Portão`. Score no mark and no verdict word found in a heading. Otherwise
+`# pauta-item-create Validation ✅` plus any citation reads as **done** with no consolidated verdict
+anywhere in the file, which is the wrong direction.
+
+**When you recognise a verdict label, select its whole line under rule 2, wherever its mark sits.**
+Rule 3's positional test is a net for labels you could not recognise, so it drops a real verdict
+whose mark drifted — `**Geral**: Não Pronto ❌`, `**Geral**: **❌ Não Pronto**`. The permission above
+to add a spelling is what catches those: once `Geral:` is on rule 2's list, the line comes in whole
+and its mark counts. The Verifier writes prose and prose varies, and a mark that is not first is
+exactly the variation to expect.
+
+**A `path.ext:NN` citation** is a filename carrying an extension, then a colon, then a line number —
+`api/app/routers/items.py:42`. It counts anywhere in the file, including inside an evidence column,
+because that column is where the Verifier is told to put it.
+
+**What follows scores only the selected lines that can carry a verdict, which never includes a
+heading.** A heading was selected to identify the report; it contributes no word and no mark to any
+bullet below. Read the bullets without that sentence and a title such as
+`# pauta-item-archive Validation ✅` satisfies them on its own.
+
+Then judge **case-sensitively**, on the whole words `PASS` and `FAIL` and on the marks that stand for
+them, taking the first of these that matches. Two definitions the bullets use and cannot be applied
+without:
+
+- **A scoring line** is a selected line that is **not a heading**. Headings were selected to identify
+  the report and contribute no word and no mark to any bullet — otherwise a title reading
+  `# pauta-item-archive Validation ✅` satisfies the `done` bullet by itself, on a report carrying no
+  verdict anywhere.
+- **The lists are already extended.** If you have not yet added the report's own translated verdict
+  labels to rules 1 and 2, stop and do that before reading further; half these bullets score lines
+  that only exist once you have. The test is narrow — the word must be *that word* translated, not a
+  different word sitting near it. `Situação:`, `Estado:`, `Geral:`, `General:` and `Resultado:`
+  qualify; `Relatório:` is *Report* and `Comprobación:` is *Check*, so neither does.
+
+- a scoring line offering **two or more verdicts as choices** — separated by `|`, or wrapped in
+  `[ ]`, as in `[PASS | FAIL]` and `✅ Ready | ⚠️ Issues | ❌ Not Ready` — is the template with
+  nobody's answer in it → **not done**. **The separator is the test**, not the count of verdict
+  tokens: `PASS ✅` is one verdict said twice and `**Overall**: ✅ Ready | 0 blockers` offers one, so
+  neither is an unfilled template.
+- a `FAIL`, a `❌` or a `⚠️` on any scoring line → **not done**, whatever any `PASS` says
+  elsewhere. `FAIL` is the whole word in capitals, so the `0 failed` of a Gate Check count is not
+  one — that line reports how many tests failed, not a verdict.
+- **at least one** `PASS` or `✅` on a scoring line and no `FAIL` or mark against it, with no
+  `path.ext:NN` citation anywhere in the file → **not done**
+- a `PASS` or a `✅`, and the **only** scoring line is the Discrimination Sensor's `Result:` — the
+  one reporting a mutant count in the shape `N/N killed`, whatever the section around it is called
+  → **not done**. That line reports whether mutants died, not whether the feature is done, so it can
+  refuse a feature and never pass one. Without this bullet the next one answers `done` on exactly the
+  report this step opened by condemning: every mutant killed, an acceptance criterion with no
+  evidence, and a green result. A sibling `**Status**: ✅` or `**Overall**: ✅` is also a scoring line,
+  so this bullet does not fire merely because the sensor's is the only line spelling `PASS` in letters.
+- **at least one** `PASS` or `✅` on a scoring line and no `FAIL` or mark against it, with at least
+  one such citation → **done**
+- no scoring line carried a verdict word or a mark at all → **not done**, and take the reason to
+  record from the fallback below. This bullet is why the two above say *at least one*: read them as
+  satisfiable by the absence of any verdict and they swallow this case, and a report with no verdict
+  and an incidental citation comes out `done`.
+
+**The sensor's line is the `Result:` one reporting a mutant count** — `3/3 killed`. A `FAIL ❌`
+there is decisive: a suite that cannot tell a mutated implementation from the real one has verified
+nothing. That is why the bullet above it exists, and why it sits *inside* the ordered list — an
+exception written after a list whose first line says "the first of these that matches" is an
+exception most readers never reach.
+
+**Every tie in this test breaks toward `not done`, on purpose.** The two errors are not symmetric.
+Reading a finished feature as unfinished re-targets the seed at built work — visible in the Step 7
+report, and a person catches it in one glance. Reading a failed feature as finished makes the seed
+skip past it, and the loop builds on top of work that never passed; nothing downstream ever revisits
+it. Prefer the recoverable error, and say which one you took.
+
+**When nothing selected carried a verdict — the fallback, and its one restriction.** That is the
+case whether the selection matched no line at all, or matched only a heading — which selects the
+report and scores nothing. Keying this on *matching* rather than on *scoring* is what made an earlier
+draft claim two different conditions were one. Read the whole
+file's text by the same rules, but the whole-file read may conclude **`not done`, never `done`**.
+Concretely: where that read would have answered `done`, answer **`not done — no locatable verdict`**
+instead. It is a real verdict with a stated reason, not a refusal to answer, and the reason is what
+tells a reader afterwards that the rule never found what it was looking for.
+This step opened by forbidding a whole-file `PASS` match, because a genuine FAIL report normally
+carries per-criterion `| ✅ PASS |` rows; a fallback allowed to answer `done` would do exactly what
+that sentence forbids, on precisely the reports too irregular to select from. Name the feature that
+fell back, and why, in the Step 7 report — a degraded path that decides silently is indistinguishable
+from one that worked.
 
 Two traps in that file, both verified against `tlc-spec-driven` v3.x's `references/validate.md`. Its
 persisted report is titled `# <feature> Validation` — the word comes *last*, so it fails a naive
@@ -241,9 +360,16 @@ disk carried six distinct title forms across its reports — `# <feature> Valida
 `# Validation: <feature>`, `# Validação — <feature>` — because the Verifier writes prose and prose
 varies. Four of the six fail a starts-with test, and the Portuguese one contains no `Validation` at
 all, which is why the selection above matches the word **anywhere** in the heading and accepts the
-translated and `Verifier` spellings. A run that lands on the whole-file fallback still reaches the
-right verdict most of the time, but the fallback is the degraded path and this rule promises the
-selection *is* the test; `## Validation: <feature> — PASS/FAIL` is the Verifier's **chat** summary and is never
+translated and `Verifier` spellings.
+
+**Six is the count somebody wrote down, not the count that exists.** Those six came from reading one
+project for one afternoon; the seventh is already predictable, because that same list translates
+`Validation` into three languages while leaving `Verifier` in English only. A Portuguese project
+writing `# <feature> — Verificação` was never covered, and the same asymmetry ran through the verdict
+lines: `Result:`, `Overall:` and `Status:` are English, so a translated verdict fell through to the
+fallback — where per-criterion `| ✅ PASS |` rows plus one citation made a **failed** feature read as
+done. That is why rule 3 keys on the mark rather than the word, and why the fallback may no longer
+answer `done`. `## Validation: <feature> — PASS/FAIL` is the Verifier's **chat** summary and is never
 written to disk. And the report carries two `Result:` lines, the Discrimination Sensor's verdict and
 Gate Check's `[X] passed, [Y] failed` counts. Judge them together — lower-case `failed` in a count is
 not a `FAIL` verdict.

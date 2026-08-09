@@ -234,6 +234,15 @@ feature's own discussion generates more on top of it. Nor is this a workaround: 
 gray area into the spec with the agent's default and rationale is `tlc-spec-driven`'s own
 documented fallback.
 
+**Two things the loop will not do, and one place it stops.** It never edits, weakens, skips or
+deletes a test to reach a `PASS`, and it never records a feature as done while its suite is red — the
+verified `PASS` is the only evidence the run produces, and a test bent to produce it destroys the
+evidence instead of the defect. It also approves its own specs, designs and task lists, because
+nobody is there to; each one is noted as self-approved in that feature's spec, so you can find them
+afterwards. And if the same feature comes out of verification without a `PASS` twice, the run stops
+and tells you rather than trying again or moving on — a feature that cannot pass is the one thing the
+loop cannot settle by itself.
+
 **One loop covers one roadmap.** If you split your product into section roadmaps, the loop builds the
 section you're on — not the whole product. That's deliberate: what one section hands another stays
 provisional until that section is actually built, so the gap between two sections is where the plan

@@ -246,6 +246,15 @@ planificación, mientras que la discusión propia de cada feature genera más en
 truco: enrutar una zona gris declinada hacia el spec con el default del agente y su justificación es
 el fallback documentado por el propio `tlc-spec-driven`.
 
+**Dos cosas que el loop no hace, y un lugar donde se detiene.** Nunca edita, debilita, omite ni
+borra una prueba para llegar a un `PASS`, y nunca registra una feature como hecha con la suite en
+rojo — el `PASS` verificado es la única evidencia que produce la ejecución, y una prueba amañada para
+producirlo destruye la evidencia en vez del defecto. También aprueba sus propios specs, diseños y
+listas de tareas, porque no hay nadie allí para hacerlo; cada uno queda anotado como auto-aprobado en
+el spec de esa feature, para que puedas encontrarlos después. Y si la misma feature sale de la
+verificación sin un `PASS` dos veces, la ejecución se detiene y te avisa en vez de intentarlo otra
+vez o seguir adelante — una feature que no puede pasar es lo único que el loop no resuelve solo.
+
 **Un loop cubre un roadmap.** Si dividiste el producto en roadmaps por sección, el loop construye la
 sección en la que estás — no el producto entero. Es deliberado: lo que una sección le entrega a otra
 sigue siendo provisional hasta que esa sección se construya de verdad, así que el límite entre dos

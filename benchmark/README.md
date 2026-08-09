@@ -29,7 +29,16 @@ it would be worth having; as the benchmark, no.
 | `fixture/PRD.md` | 26 numbered scope units across six sections, and **seven planted ambiguities** |
 | `fixture/brownfield/` | a working FastAPI + React project with no scope document, for the 0c path |
 | [`expected.md`](expected.md) | the answer key — where each planted ambiguity must land, and why |
+| [`reports/`](reports/) | thirteen `validation.md` reports, for the Step 2 completion test |
 | `RESULTS.md` | the scoreboard, **appended by the runner**, never edited by hand |
+
+**`reports/` is a different kind of test and runs differently.** The scenarios above execute the
+whole skill and score the roadmap it produces; that one hands an agent a single rule and thirteen files
+and asks what the rule yields. It exists because Step 2 decides which features are done, the seed
+skips every feature it calls done, and a wrong `done` means the loop builds on top of work that never
+passed. Run it the way a rule change should always be checked — two variants, agents that have seen
+neither, no hint that a second variant exists — and read
+[`reports-EXPECTED.md`](reports-EXPECTED.md) for what each file is there to catch.
 
 ## Running it
 

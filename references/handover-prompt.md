@@ -411,20 +411,55 @@ are already discharged and must be skipped, never built: <DISCHARGED-LIST>.
 Before each feature's gray-area discussion, read <STATUS-PATH> `## Cross-Cutting Decisions` and
 treat every entry as settled — do not re-decide it, and keep every feature consistent with it.
 
-No user is available for this run. When a gray area is not settled there, treat it as declined:
-choose the default, record it with its rationale in that feature's spec under Assumptions & Open
-Questions, and continue. Never stop to ask, and never leave one silently unrecorded.
+No user is available for this run. Dispose of every stop as follows and never wait for an answer,
+but never leave one silently unrecorded either:
+
+- A gray area not settled in `## Cross-Cutting Decisions` — treat it as declined: choose the
+  default and record it with its rationale in that feature's spec under Assumptions & Open Questions.
+- A request to approve this run's own spec, context, design or task list — approve and continue,
+  then note in that same section which artifacts were self-approved. Nobody reviewed them, and that
+  line is what lets somebody review them later.
+- A choice about how to execute — sub-agents, batching, ordering inside a feature — pick one, say
+  which, continue.
+- A project-level fact the run cannot invent, such as which test framework to use — take it from
+  `## Cross-Cutting Decisions`; if it is not there, record it as an open question and choose the most
+  conservative option that exists in the repository already. Never invent a credential and never
+  reach a network service to resolve one.
+- A failing test — never edit, weaken, skip or delete a test to reach a PASS, and never record a
+  feature as done while its suite is red. If a test is genuinely wrong, leave it failing and write
+  down why. This is the one stop where continuing costs more than halting: a verified PASS is the
+  only evidence this run produces, and a test bent to produce it destroys the evidence rather than
+  the defect.
+
+If the same feature comes out of verification without a PASS twice, stop the whole run and report it.
+Do not try a third time and do not move on to the next feature — a feature that cannot pass is the
+one thing this loop cannot settle by itself, and continuing past it builds on top of it.
 
 Backlog position is at <STATUS-PATH> `## Status`. Stop when every name in <BUILD-ORDER-TXT> from
 `<target>` onward has a verified PASS or is on the discharged list above; report and stop there
 rather than continuing into another roadmap.
 ```
 
-Three clauses in that template are load-bearing and easy to "tidy" into breakage. The
+Five clauses in that template are load-bearing and easy to "tidy" into breakage. The
 `<current-feature>` resume rule replaces a literal `Start at <target>`, because `/loop` re-reads the
 whole prompt every iteration and a fixed start restarts at the same feature forever. The stop
 condition says *"or is on the discharged list"* because a question-only feature can never earn a PASS
-— without that clause the run either spins on it or fabricates a verdict. And the scope sentence
+— without that clause the run either spins on it or fabricates a verdict.
+
+**The two-strikes rule is the loop's only termination guarantee**, and it is easy to read as
+pessimism and cut. The template forbids starting the next feature before this one has a verified
+PASS, and stops only when every name has one; a feature that cannot pass therefore satisfies neither
+condition and the loop re-enters it for as long as it is allowed to run. Nothing else in the prompt
+bounds that.
+
+**The failing-test clause is the one place where "never stop to ask" would be actively harmful.** The
+downstream skill halts and asks when a test looks wrong (`tlc-spec-driven`'s `references/implement.md`
+does exactly this); telling an unattended run never to stop, without saying what to do instead,
+leaves rewriting the test as the available improvisation — and the loop's whole notion of *done* is
+the verdict that test feeds. Every other disposition in that list can be audited afterwards from the
+artifacts on disk. This one cannot, because it destroys the artifact that would have shown it.
+
+And the scope sentence
 matters most in multi-section mode, where `<STATUS-PATH>` **is** `docs/ROADMAP-INDEX.md`, the file
 listing every other roadmap: without it a diligent run finds the rest of the backlog and keeps going.
 In single-section mode that clause is vacuously true and costs one line — keep it rather than

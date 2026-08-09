@@ -381,6 +381,71 @@ def check_no_orphan_constants(root):
     check("no script declares a constant nothing reads", not orphans, "\n".join(orphans))
 
 
+def check_benchmark(root):
+    """The benchmark is a body of duplicated facts, and it had no reader here.
+
+    Until this check existed, this file contained no reference to `benchmark` at
+    all: a scenario key could be added to run-benchmark.py and documented nowhere,
+    or a report fixture could be deleted while its answer key kept asserting it.
+    That is lessons 3 and 4 of CLAUDE.md at once — a checker with no caller, and a
+    declared constant with no reader — and it is how this repository's two
+    declarative tables rotted within weeks."""
+    runner = read(root, "scripts", "run-benchmark.py") or ""
+    keys = set(re.findall(r"""^\s{4}["']([\w-]+)["']:\s*\(""", runner, re.M))
+    # Read zero keys and every key is trivially documented. This check would then
+    # be committing, inside itself, the failure it was written to prevent:
+    # deleting run-benchmark.py outright still printed a tick. CLAUDE.md lesson 6
+    # — if the unit you were meant to judge could not be read, that is a failure.
+    if not keys:
+        check("every benchmark scenario key is documented", False,
+              "read no scenario keys from scripts/run-benchmark.py — the file is missing, "
+              "or SCENARIOS no longer matches `    \"key\": (`. Judging nothing is a "
+              "failure here, not a pass.")
+    else:
+        readme = read(root, "benchmark", "README.md") or ""
+        expected = read(root, "benchmark", "expected.md") or ""
+        undocumented = sorted(k for k in keys if k not in readme and k not in expected)
+        check("every benchmark scenario key is documented", not undocumented,
+              "in run-benchmark.py but in neither benchmark/README.md nor expected.md: "
+              + ", ".join(undocumented))
+
+    # The report fixtures and their answer key, in both directions.
+    rdir = os.path.join(root, "benchmark", "reports")
+    key = read(root, "benchmark", "reports-EXPECTED.md") or ""
+    on_disk = {os.path.basename(p) for p in glob.glob(os.path.join(rdir, "*.md"))}
+    # Table rows only. The prose around them names artifacts the skill
+    # reads (`validation.md`, `spec.md`), which are not fixtures here. The
+    # filename pattern allows dots: a fixture named `pt.fail.extra.md` was
+    # otherwise reported as undocumented and could not be documented.
+    rows = "\n".join(l for l in key.splitlines() if l.lstrip().startswith("|"))
+    listed = set(re.findall(r"`([\w.-]+\.md)`", rows))
+    if not on_disk and not listed:
+        # Guarding this on `isdir` made the whole check *disappear* rather than
+        # fail when the corpus was absent: 24 checks, 0 failed, no mention of it.
+        check("report fixtures and their answer key agree", False,
+              "no fixtures at benchmark/reports/ and no rows in "
+              "benchmark/reports-EXPECTED.md — there is nothing here to judge.")
+    else:
+        drift = (["%s is on disk and not in reports-EXPECTED.md" % f
+                  for f in sorted(on_disk - listed)]
+                 + ["reports-EXPECTED.md names %s, which is not on disk" % f
+                    for f in sorted(listed - on_disk)])
+        check("report fixtures and their answer key agree", not drift, "\n".join(drift))
+
+    # What these files say the corpus *size* is. Three fixtures were added and
+    # every prose count stayed on ten, in both the README and the answer key.
+    stale = []
+    for name in ("README.md", "reports-EXPECTED.md"):
+        text = read(root, "benchmark", name) or ""
+        for m in re.finditer(r"\b(%s)\b(?:[^.\n\[\]]{0,40}?)\b(?:reports|files)\b"
+                             % "|".join(NUMBER_WORDS), text, re.I):
+            if NUMBER_WORDS[m.group(1).lower()] != len(on_disk):
+                stale.append("benchmark/%s: %r, but %d fixtures are on disk"
+                             % (name, m.group(0).strip(), len(on_disk)))
+    check("the report corpus is counted correctly where it is described",
+          not stale, "\n".join(sorted(set(stale))))
+
+
 def check_changelog(root):
     text = read(root, "CHANGELOG.md") or ""
     skill = read(root, "SKILL.md") or ""
@@ -411,6 +476,7 @@ def main():
     check_trilingual_parity(root, "guide", scope(root)["guides"], "guide")
     check_trilingual_parity(root, "", scope(root)["readmes"], "README")
     print("procedure"); check_step_numbering(root); check_step_pointers(root); check_no_orphan_constants(root)
+    print("benchmark"); check_benchmark(root)
     print("changelog"); check_changelog(root)
 
     print("\n%d checks, %d failed" % (checks_run, len(failures)))

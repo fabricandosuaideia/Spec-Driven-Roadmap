@@ -46,7 +46,7 @@ that never says hard or soft. A run that misses only #7 is a run that read inste
 
 ## Per-scenario expectations
 
-### 0a single-section — the primary run
+### `0a-single` — single-section, the primary run
 
 - All seven ambiguities at their destination above.
 - `## Expected Gray Areas`: **every line states where the answer already lives** (code, config, an
@@ -58,7 +58,7 @@ that never says hard or soft. A run that misses only #7 is a run that read inste
 - Coverage closes `uncovered: none` and accounts for all 26 units `A1`–`F3`.
 - `check-roadmap.py` passes with zero failures.
 
-### 0a multi-section
+### `0a-multi` — multi-section
 
 - `docs/ROADMAP-INDEX.md` carries `## Status` and `## Cross-Cutting Decisions`; the section roadmaps
   reference and never restate them.
@@ -66,20 +66,20 @@ that never says hard or soft. A run that misses only #7 is a run that read inste
   is the design, not an omission.
 - The seed does **not** fire for a section that has no `.txt`.
 
-### 0b interview, no downstream skill installed
+### `0b-interview` — interview, no downstream skill installed
 
 - `docs/PROJECT.md` written from the interview, and the roadmap generated anyway.
 - **Nothing created under `.specs/`** — not `STATE.md`, not a placeholder.
 - The `**Handoff**` line records `pending — no downstream spec-driven skill installed`.
 - No implementation prompt is handed over: there is no confirmed trigger phrase to build one from.
 
-### 0c brownfield
+### `0c-brownfield` — working code, no scope document
 
 - Two lists confirmed **in chat before** `docs/CODEBASE-SUMMARY.md` is written.
 - Capabilities already built appear as `pre-existing` in the coverage table, never as features.
 - `## Gaps / Likely Next Work` comes from the user's answer, never inferred from the code.
 
-### Option B — the loop path
+### `loop` — option B, the loop path
 
 - Step 9 runs: every open question closed by interview, one at a time.
 - Afterwards the roadmap holds **zero** `status: open` and **zero** `not decided`.

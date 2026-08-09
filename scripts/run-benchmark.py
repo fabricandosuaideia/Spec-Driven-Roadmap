@@ -21,6 +21,7 @@ Exit codes: 0 scored clean, 1 a planted ambiguity is missing, 2 usage error.
 
 import argparse
 import datetime
+import json
 import os
 import re
 import shutil
@@ -117,13 +118,68 @@ def cmd_setup(args):
                 d = os.path.join(proj, item)
                 shutil.copytree(s, d) if os.path.isdir(s) else shutil.copyfile(s, d)
 
+    # What the INPUT already answers, before any agent touches it.
+    #
+    # cmd_score greps the finished roadmaps for the seven planted ambiguities. On
+    # the five input-only scenarios nothing is pre-populated, so every hit is the
+    # run's work. A scenario that ships a roadmap already written — which every
+    # state scenario in benchmark/state-scenarios.md must — hands cmd_score the
+    # answers at setup, and it would print 7/7 and exit 0 whatever the run did.
+    # That is the empty green: a gate switching off the attention of whoever
+    # reads it. Record the baseline here so the score can subtract it.
+    pre = pre_existing_hits(proj)
+    save_baseline(stamp, args.scenario, pre)
+
     print("scenario : %s — %s" % (args.scenario, label))
     print("project  : %s" % proj)
     print("parent   : %s  (contains only this run)" % parent)
+    if pre:
+        print("baseline : %d of 7 already present in the input — excluded from the"
+              % len(pre))
+        print("           score: %s" % ", ".join(pre))
     print("\nGive the agent that path and nothing else. benchmark/README.md has the")
     print("launch rules — fresh agent, follow literally, friction is the output,")
     print("never say what changed.")
     return 0
+
+
+# A sibling of RUNROOT, never a child: cmd_list enumerates RUNROOT verbatim, so a
+# child appeared in the list as though it were a run — and `setup --label .baselines`
+# would then have rmtree'd the whole baseline store on its way to creating it.
+BASELINES = RUNROOT + "-baselines"
+
+
+def pre_existing_hits(proj):
+    """Which planted ambiguities the input already contains, before the run."""
+    corpus = "\n".join(read(p) for p in find_roadmaps(proj)).lower()
+    if not corpus.strip():
+        return []
+    return [name for name, pattern in PLANTED
+            if re.search(pattern, corpus, re.I | re.S)]
+
+
+def save_baseline(stamp, scenario, hits):
+    os.makedirs(BASELINES, exist_ok=True)
+    # Outside the run's parent on purpose. The parent holds one run and nothing
+    # else so that `ls ..` from inside reveals no answers — and a file naming
+    # which ambiguities are already present is exactly such an answer.
+    with open(os.path.join(BASELINES, stamp + ".json"), "w", encoding="utf-8") as fh:
+        json.dump({"scenario": scenario, "pre_existing": hits}, fh, indent=2)
+
+
+def load_baseline(rundir):
+    """Baseline for a run directory, or None when setup never recorded one."""
+    d = os.path.abspath(rundir).rstrip(os.sep)
+    if os.path.basename(d) == "project":
+        d = os.path.dirname(d)
+    path = os.path.join(BASELINES, os.path.basename(d) + ".json")
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
 
 
 def find_roadmaps(proj):
@@ -154,11 +210,29 @@ def cmd_score(args):
     print("scoring %s" % proj)
     print("  files: %s\n" % ", ".join(os.path.basename(p) for p in roadmaps))
 
+    base = load_baseline(args.dir)
+    if base is None:
+        print("  ! no setup baseline recorded for this run — every hit below is")
+        print("    being credited to the run. That is right only if the scenario")
+        print("    started from input with no roadmap in it.\n")
+        pre = []
+    else:
+        pre = base.get("pre_existing") or []
+
+    # A pattern the input already carried proves nothing about the run.
+    scored = [(n, p) for n, p in PLANTED if n not in pre]
+    if not scored:
+        die("all seven planted ambiguities were already present in this scenario's "
+            "input, so this score would measure nothing. Give the state scenarios "
+            "their own scorer rather than reusing the seven-ambiguity grep.", 2)
+
     found, missing = [], []
-    for name, pattern in PLANTED:
+    for name, pattern in scored:
         hit = re.search(pattern, body, re.I | re.S) is not None
         (found if hit else missing).append(name)
         print("  %s %s" % ("✓" if hit else "✗", name))
+    for name in pre:
+        print("  · %s (present in the input — not scored)" % name)
 
     # A planted ambiguity present as prose but at no destination is not captured.
     # Destinations are: a feature's `open questions`, the roll-up, or a ledger row.
@@ -174,7 +248,7 @@ def cmd_score(args):
     lastline = [l for l in lint.stdout.strip().splitlines() if "passed" in l]
     print("  check-roadmap: %s" % (lastline[-1] if lastline else "did not report"))
 
-    score = "%d/7" % len(found)
+    score = "%d/%d" % (len(found), len(scored))
     print("\n  planted ambiguities captured: %s" % score)
     if missing:
         print("  missing: " + ", ".join(missing))

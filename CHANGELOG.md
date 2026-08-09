@@ -9,6 +9,122 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.18.0 — 2026-08-09
+
+**Step 2 could report failed work as done, and the clause that forbade it was the clause that did
+it.** Step 2 opens by saying *"never substring-match `PASS` across the whole file — that reports
+failed work as done"*, and its own last bullet sent any report it could not select from to a
+whole-file read allowed to answer `done`. The two sentences lived eighty-nine lines apart — measured, because the last distance published
+here was not.
+
+The contradiction fired on any report whose consolidated verdict was not in English. The selection
+matched verdict lines by the literals `Result:`, `Overall:` and `Status:`, and titles by `Validation`,
+`Validação`, `Validación` or `Verifier` — three languages for one word, one language for the other. A
+Portuguese report saying `**Geral**: ❌ Não Pronto` matched nothing, fell back, and the whole-file read
+found `✅ PASS` rows from the acceptance-criteria table, a `file:line` citation and no occurrence of
+`FAIL`: **done**. The seed skips that feature and the loop builds on top of it.
+
+### What the executions found
+
+The rule was executed six times against a frozen corpus of validation reports, by agents that had
+never seen it and were not told a second variant existed. Every revision was unanimous — three of
+three agents, identical verdicts — so each score is a property of the text, not of agent variance.
+
+```
+as shipped        5/10   failed every translated report, and the fallback
+1st revision     10/10   no regressions, 6 defects found by reading it back
+2nd revision     10/10   5 of 6 closed, 3 new, 2 of them able to change a verdict
+3rd revision     12/12   2 fixtures added for wrong-`done` paths reasoned to but never planted
+4th revision     13/13   1 fixture added for the branch the 3rd revision never executed
+5th, whole rule  13/13   unanimous
+5th, bullets only 12/13  a reader who does not hunt back through the prose gets one wrong
+6th, bullets only 13/13  unanimous, 4-0 on every file
+```
+
+The last two rounds are the ones that mattered, and they exist because the metric changed. At the
+fourth revision the score was perfect and **every** remaining friction pointed at a wrong `done` —
+unfinished work reported as finished. Counting said ship; direction said the opposite. So the last
+rounds asked a different question: does the ordered bullet list decide correctly for a reader who
+executes it and does **not** hunt back through the surrounding paragraphs? It did not, at first —
+which located three facts that were governing bullets from twenty lines away. Moving them inside the
+list is what closed it.
+
+**No revision ever regressed a verdict, and every one of them introduced a defect the next execution
+found.** That is the fourth time this repository has recorded that shape, and the first time it was
+measured across a single change rather than across releases.
+
+Two of the five wrong answers in the shipped rule were the expensive direction — `pt-fail-translated`
+and `es-fail-translated` came back **done**, unanimously, all three agents via the fallback. One was
+the mirror nobody had predicted: `pt-pass-translated`, a **finished** feature read as unfinished,
+because its title matched (which switches the fallback off) leaving a one-line selection that can
+never carry a verdict word.
+
+### The rule now
+
+- **A third selection rule that does not depend on spelling** — a line shaped `**<label>**:` with a
+  `✅`, `❌` or `⚠️` immediately after the colon. The downstream skill's template puts the mark first
+  on both consolidated verdicts, and a mark survives translation where a label does not. The
+  positional form is deliberate: the loose one selects prose asides like `**Note**: the suite is ⚠️
+  slow`, and it leaves the `| AC-1 | … | ✅ PASS |` rows out on its own.
+- **A mark counts as the verdict word it stands for.** Without this the fix worked one way only:
+  `❌ Não Pronto` would be caught while `✅ Pronto` would not. Found by building the test case, not by
+  re-reading the text.
+- **The whole-file fallback may conclude `not done`, never `done`**, and it now names the verdict to
+  emit — `not done — no locatable verdict`. That closes the contradiction at its source, and the step
+  says outright that every tie breaks toward `not done`, with the reason: reading finished work as
+  unfinished is visible in the Step 7 report and a person catches it, while reading failed work as
+  finished is invisible and nothing downstream revisits it.
+- **The Discrimination Sensor's line can refuse a feature but never pass one.** A green sensor beside
+  a criterion with no evidence and no consolidated verdict used to read `done` — reproducing exactly
+  the gate-script failure the step opens by condemning.
+- **A heading selects the report and never carries a verdict.** Otherwise
+  `# pauta-item-archive Validation ✅` plus any citation is a `done` with no verdict anywhere in the
+  file.
+- **A recognised verdict label brings its whole line in under rule 2, wherever its mark sits** — the
+  positional test is a net for labels you could not recognise, and it drops `**Geral**: Não Pronto ❌`.
+- `Verificação`, `Verificación` and `Verificador` joined the title list, and the literals are now
+  declared **observed, never complete**, with permission to add a translated spelling and a test for
+  refusing one. Six title forms were what one afternoon of reading a real project produced; the
+  seventh was predictable from the asymmetry alone.
+
+### The loop prompt
+
+**It told an unattended run to never stop, without saying what to do instead.** Its disposition
+covered gray areas only, while the downstream skill halts for spec, context, design and task
+approval, for a missing test framework, for an execution-strategy choice, and — the dangerous one —
+when a test looks wrong. Told never to stop and given no disposition, the available improvisation is
+to rewrite the test until it passes, and a verified PASS is the only evidence the whole loop
+produces. The template now disposes of each class explicitly, forbids editing, weakening, skipping or
+deleting a test to reach a PASS, and requires self-approved artifacts to be recorded as such.
+
+**And it had no termination guarantee.** It forbids starting the next feature before this one has a
+verified PASS and stops only when every name has one, so a feature that cannot pass satisfies neither
+condition and the loop re-enters it for as long as it is allowed to run. Two failed verification
+cycles on the same feature now stop the run and report. This is a change to one of the three prompt
+templates, named here because `CLAUDE.md` requires it.
+
+### The benchmark
+
+**The scorer would have printed a green it did not measure.** `cmd_score` greps the finished roadmaps
+for the seven planted ambiguities; every state scenario in `benchmark/state-scenarios.md` must ship a
+roadmap already written, which hands the scorer its answers at setup — `7/7`, exit 0, whatever the run
+did. `setup` now records what the input already contains, `score` subtracts it and reports the honest
+denominator, and it **refuses to score at all** when nothing is left to measure.
+
+**New: `benchmark/reports/`** — thirteen `validation.md` reports and an answer key, the executable
+test for the rule above. Five are cases the shipped rule got wrong; three more were added later
+for wrong-`done` paths it was never measured against, found by reasoning rather than by a score. The key lives at
+`benchmark/reports-EXPECTED.md`, one level up, because an executor grepped the fixture directory and
+printed the answers into its own context — this repository's isolation lesson reappearing at file
+granularity instead of directory granularity. It also records, in plain words, the four ways the rule
+can still answer `done` about unfinished work, none of which has a fixture yet.
+
+`check-consistency.py` gained a `benchmark` group tying the runner's scenario keys to the
+documentation and the report fixtures to their key. It found one real drift on its first run — three of
+five scenario keys documented in prose but not by the key anyone types, which
+`benchmark/expected.md` now carries in its headings. Its other complaint was a false positive in
+the check itself.
+
 ## 3.17.2 — 2026-08-09
 
 **The shipped scripts crashed on Windows, at exactly the moment they had something to report.**

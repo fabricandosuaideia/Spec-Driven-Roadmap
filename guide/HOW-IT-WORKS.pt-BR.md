@@ -250,6 +250,15 @@ discussão de cada feature gera mais em cima disso. E isso não é gambiarra: ma
 recusada para a spec com o default e a justificativa do agente é o fallback documentado da própria
 `tlc-spec-driven`.
 
+**Duas coisas que o loop não faz, e um lugar onde ele para.** Ele nunca edita, enfraquece, pula ou
+apaga um teste para chegar a um `PASS`, e nunca registra uma feature como pronta com a suíte
+vermelha — o `PASS` verificado é a única evidência que a execução produz, e um teste distorcido para
+produzi-lo destrói a evidência em vez do defeito. Ele também aprova os próprios specs, designs e
+listas de tarefas, porque não há ninguém ali para isso; cada um fica anotado como auto-aprovado no
+spec daquela feature, para você encontrá-los depois. E se a mesma feature sair da verificação sem um
+`PASS` duas vezes, a execução para e te avisa em vez de tentar de novo ou seguir adiante — uma
+feature que não consegue passar é a única coisa que o loop não resolve sozinho.
+
 **Um loop cobre um roadmap.** Se você dividiu o produto em roadmaps por seção, o loop constrói a
 seção em que você está — não o produto inteiro. Isso é de propósito: o que uma seção entrega para
 outra fica provisório até aquela seção ser realmente construída, então a fronteira entre duas seções

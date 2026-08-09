@@ -29,7 +29,7 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 
 | | |
 |---|---|
-| `scripts/check-consistency.py` | 23 checks over the invariants that keep this repo's duplicated facts in step. **Run after any edit to `SKILL.md`, `references/` or `scripts/`.** |
+| `scripts/check-consistency.py` | 26 checks over the invariants that keep this repo's duplicated facts in step. **Run after any edit to `SKILL.md`, `references/` or `scripts/`.** |
 | `scripts/check-roadmap.py` | Lints a roadmap the skill produced. Shipped to users; Phase 2 runs it. |
 | `scripts/run-benchmark.py` | Sets up an isolated run and scores it. See [`benchmark/`](benchmark/). |
 | `scripts/convert-to-multi.py` | Shipped to users. The single→multi conversion. |
@@ -85,6 +85,32 @@ it. Including in fixes made to fix defects:
 **So:** when editing a procedure, a specification, a prompt — anything another person or agent will
 *execute* — plan the execution alongside the edit. "I re-read it and it is correct" is not
 verification; it is exactly what preceded each of the cases above.
+
+**3.18.0 measured the same shape inside one change**, by executing one rule six times against a
+frozen corpus, three or four blind agents per round:
+
+```
+shipped            5/10   ->  6 defects found by reading the fix back
+1st fix           10/10   ->  3 more, 2 of them able to change a verdict
+2nd fix           10/10   ->  1 more, plus 2 wrong answers reasoned to with no fixture for them
+3rd fix           12/12   ->  the branch the fix was written for had never been executed
+4th fix           13/13   ->  every remaining friction pointed at a wrong `done`
+5th, whole rule   13/13
+5th, bullets only 12/13   ->  three facts were governing bullets from twenty lines away
+6th, bullets only 13/13   ->  unanimous, 4-0 on every file
+```
+
+Every round was unanimous except the one that mattered most. No round ever regressed an answer, and
+every round introduced something the next one found. **Six executions to converge on a rule that
+looked finished after the first** — and the fourth, at a perfect score, was the one it would have
+been most tempting to ship.
+
+**What made it converge was scoring the *direction* of each error, not the count.** This test decides
+whether a feature is done; reading finished work as unfinished re-targets the seed at built work and
+a person sees it, while reading failed work as finished makes a loop build on top of it and nothing
+ever revisits it. Once the two were separated, several proposed fixes were refused outright — one of
+them was correct in the abstract and would have converted a recoverable error into an unrecoverable
+one. **Ask which way a rule fails before asking how often.**
 
 ## 2. When a rule can become a script, make it one
 
