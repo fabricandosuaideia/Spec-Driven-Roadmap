@@ -1,0 +1,4 @@
+[project]
+name = "pauta-api"
+version = "0.2.0"
+dependencies = ["fastapi>=0.110", "sqlalchemy>=2.0", "pydantic>=2.6", "alembic>=1.13"]

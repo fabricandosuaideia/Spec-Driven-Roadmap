@@ -147,6 +147,11 @@ of every number.
 
 ## 10. Plant known defects so quality becomes a score
 
+> Standardised as [`benchmark/`](benchmark/): frozen fixture, answer key, and a runner that isolates
+> the run and scores it. Read [`benchmark/README.md`](benchmark/README.md) before testing a change —
+> especially the four rules for launching the agent, which are what make a result mean anything.
+
+
 The test PRD carried **seven deliberately planted ambiguities**. That turned "does the never-decide-an-
 ambiguity rule work?" from an impression into a score: **5 of 7 → 7 of 7**.
 

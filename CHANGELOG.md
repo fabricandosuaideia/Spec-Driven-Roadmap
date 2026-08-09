@@ -9,6 +9,44 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.14.0 — 2026-08-09
+
+**The benchmark is standardised, and it lives here rather than in a repository of its own.** Testing
+a change had been ad-hoc: a fixture built by hand each time, seven finished runs sharing one parent
+directory where any of them could read another's answers to the same PRD, and a score that existed
+only in whoever ran it.
+
+- **`benchmark/fixture/`** — the frozen input: a 26-unit PRD across six sections with **seven
+  deliberately planted ambiguities**, plus a working FastAPI + React project with no scope document
+  for the brownfield path.
+- **[`benchmark/expected.md`](benchmark/expected.md)** — the answer key. Where each planted ambiguity
+  must land and why, per-scenario expectations, and the regression signals.
+- **`scripts/run-benchmark.py`** — `setup` creates a project under a parent containing nothing else;
+  `score` checks the seven reached a destination, runs the linter, and with `--record` appends to
+  `benchmark/RESULTS.md`. Exit 1 when one is missing.
+- **`benchmark/RESULTS.md`** — the scoreboard, appended by the runner and never hand-edited.
+
+**Why not a separate repository, which was the obvious answer.** The benchmark's asset is not the
+fixture, it is the answer key — and **the answer key changes when a rule changes**. v3.12.0 moved the
+correct destination for the vote tie-break from `## Expected Gray Areas` to the ledger, because test
+1 became a gate. An answer key in another repository would still assert the old destination: green,
+and wrong. That is two things that must agree, in two places, with nothing keeping them in step —
+the failure `CLAUDE.md` names as the pattern behind 15 of 37 findings in a full review. So the input
+is frozen and the answer key versions with the rules it tests.
+
+**Why not a well-known third-party repository as the fixture.** You cannot plant a defect in someone
+else's PRD, and without planted defects there is no score — only "it ran", which is what prose review
+already gave while finding nothing. Worth having later as a secondary check against real-world input;
+not as the benchmark.
+
+The script does not execute the skill — an agent does. What a script can do is the two things around
+it that went wrong when done by hand: isolate the run, and score it afterwards.
+`benchmark/README.md` carries the part no script can: the four rules for launching the agent — fresh
+and uninformed about what changed, follow the text literally, friction is the output, and have it
+declare which answers it decided on its own.
+
+Seeded with the two runs already on record: v3.13.0 at 7/7, v3.10.0 at 6/7.
+
 ## 3.13.0 — 2026-08-09
 
 **The loop path ran for the first time, in a sanitised environment, and the gate change was validated

@@ -1,0 +1,121 @@
+# Answer key — what a correct run does with the fixture
+
+This file is the benchmark's real asset. The fixture is just input; **this is what makes a result a
+score instead of an impression.**
+
+It lives in this repository, beside the rules it tests, for one reason: **the expected answer changes
+when a rule changes.** In v3.12.0 the correct destination for the vote tie-break moved from
+`## Expected Gray Areas` to the ledger, because test 1 became a gate. Had this file lived in a
+separate repository it would still be asserting the old answer, green and wrong — the exact drift
+`CLAUDE.md` spends a section on. **Update this file in the same commit as any rule that changes what
+a correct run produces.**
+
+---
+
+## The seven planted ambiguities
+
+The fixture's `PRD.md` is deliberately silent on seven points. Rule 1 forbids deciding any of them in
+silence, so each must reach one of three destinations. Anything reaching a fourth destination — or
+none — is a failure.
+
+| # | Ambiguity | Where it hides | Test 1 | Correct destination |
+|---|---|---|---|---|
+| 1 | Password rule | `A1` says "e-mail and password", never what is valid | passes | feature `open questions` (+ roll-up) |
+| 2 | Exact role permissions | `A5` names roles, defines only two verbs | passes | ledger — `Auth boundaries & rate limits` |
+| 3 | Tie-break on equal votes | `C3` gives the sort key, never the tie | passes | ledger — `Concurrency / ordering` |
+| 4 | Votes after an item is edited | `C5` allows editing, `C2` owns votes; neither meets | passes | ledger — `project-specific` |
+| 5 | Notification channel | `E1`–`E3` name triggers, never the channel | passes | ledger — `project-specific` |
+| 6 | Public API auth scheme | `F1` says "authenticated", names no scheme | passes | ledger — `Auth boundaries & rate limits` |
+| 7 | Retention / deletion | **absent** — zero occurrences in the PRD | passes | ledger — `Data lifecycle / expiry` |
+
+**Why the destinations differ.** 2, 3, 6 and 7 map onto a rubric theme and reach several features, so
+they are ledger rows. 4 and 5 also reach several features but map onto no rubric theme, so they take
+the `project-specific` row Step 7a allows. 1 reaches one feature only, so it stays in that feature's
+own `open questions` — and that is the case v3.12.0 exists for: before it, being small was a reason
+to file it where nothing sweeps.
+
+**A ledger row may be *decided* rather than open.** Answering it is a legitimate outcome — the run
+asks, and a user who answers has decided. What is never legitimate is the answer appearing with
+nobody asked. The scorer therefore checks *presence at the right destination*, not `status: open`.
+
+**#7 is the sharpest of the seven.** It cannot be found by reading the PRD, only by sweeping the
+entities the PRD implies — a person removed from a team, an account closed, `C6`'s "withdraw item"
+that never says hard or soft. A run that misses only #7 is a run that read instead of enumerating.
+
+---
+
+## Per-scenario expectations
+
+### 0a single-section — the primary run
+
+- All seven ambiguities at their destination above.
+- `## Expected Gray Areas`: **every line states where the answer already lives** (code, config, an
+  existing convention). None may cite `feature-local` or `cheap to reverse` — those are routing
+  tests, not filing reasons (Step 7b).
+- In a greenfield fixture this block is **nearly empty and that is correct**: with no code and no
+  conventions on disk, almost nothing can honestly fail test 1. A long block here means citations
+  were fabricated to get through the gate.
+- Coverage closes `uncovered: none` and accounts for all 26 units `A1`–`F3`.
+- `check-roadmap.py` passes with zero failures.
+
+### 0a multi-section
+
+- `docs/ROADMAP-INDEX.md` carries `## Status` and `## Cross-Cutting Decisions`; the section roadmaps
+  reference and never restate them.
+- Only the requested section is decomposed. The others read `NOT YET DECOMPOSED` — lazy decomposition
+  is the design, not an omission.
+- The seed does **not** fire for a section that has no `.txt`.
+
+### 0b interview, no downstream skill installed
+
+- `docs/PROJECT.md` written from the interview, and the roadmap generated anyway.
+- **Nothing created under `.specs/`** — not `STATE.md`, not a placeholder.
+- The `**Handoff**` line records `pending — no downstream spec-driven skill installed`.
+- No implementation prompt is handed over: there is no confirmed trigger phrase to build one from.
+
+### 0c brownfield
+
+- Two lists confirmed **in chat before** `docs/CODEBASE-SUMMARY.md` is written.
+- Capabilities already built appear as `pre-existing` in the coverage table, never as features.
+- `## Gaps / Likely Next Work` comes from the user's answer, never inferred from the code.
+
+### Option B — the loop path
+
+- Step 9 runs: every open question closed by interview, one at a time.
+- Afterwards the roadmap holds **zero** `status: open` and **zero** `not decided`.
+- The propagation pass runs and reports its five categories; converging inside the 3-pass cap.
+- The emitted prompt is word-for-word the Step 10 template, with **`<current-feature>` still
+  literal** — substituting it pins every iteration to feature one and the loop never terminates.
+- `<DISCHARGED-LIST>` resolved (`none` when there are no question-only features).
+- The new-session warning is given.
+
+---
+
+## Friction: the second number
+
+Agent-reported, not scriptable, and worth recording anyway. Classify each point as `travou`,
+`improvisou`, `contradicao`, `leitura-nao-mandada`, `impossivel` or `quase-errei`.
+
+The one that matters is the share of **`improvisou`** — an agent deciding something the procedure
+should have decided. It is the only friction type that measures the procedure rather than the agent.
+
+Baselines measured on this fixture:
+
+```
+v3.10.0   63 points across 4 scenarios   improvisou 56%
+v3.11.0   ~7.5 per scenario              improvisou 33%
+```
+
+**Regression:** `improvisou` rising above its previous release, or any planted ambiguity losing its
+destination. Both are hard signals. A rising total friction count with `improvisou` flat is usually a
+more honest reporter, not a worse skill — read before reacting.
+
+---
+
+## Changing this file
+
+Only alongside the rule that changed what a correct run produces, in the same commit, with the reason
+in the message. A benchmark whose answer key moves for convenience measures nothing.
+
+Planting an eighth ambiguity is welcome — the fixture is deliberately under-specified in more places
+than seven. Add it to the table, say where it hides, and say why its destination is what it is.
