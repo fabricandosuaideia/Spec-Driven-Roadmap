@@ -25,6 +25,19 @@ import os
 import re
 import sys
 
+# Windows consoles default to cp1252, which has no ✓ ✗ ! · or em-dash: printing
+# a failure marker raised UnicodeEncodeError and killed the run at exactly the
+# moment it had something to report. Reconfiguring is enough — a terminal that
+# cannot render a glyph now shows a replacement instead of taking the process
+# down with it. Found by the first execution of this project on Windows.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):  # pragma: no cover - pre-3.7 or a pipe
+        pass
+
+
+
 # tlc-spec-driven v3.x's rubric, from its references/specify.md. A different
 # downstream skill has its own; the count is reported, never enforced blindly.
 RUBRIC_THEMES = 9

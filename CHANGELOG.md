@@ -9,6 +9,34 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.17.2 — 2026-08-09
+
+**The shipped scripts crashed on Windows, at exactly the moment they had something to report.**
+`install.ps1` had never been executed in this project's history — three static reviews, zero runs.
+The first execution passed every path it was written for, and then found a bug in something else.
+
+```
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2717'
+```
+
+Windows consoles default to cp1252, which has no `✓`, `✗`, `!`, `·` or em-dash. `check-roadmap.py`
+printed `✓` fine and **died on the first `✗`** — so it worked on a clean roadmap and crashed on a
+defective one, which is the only case anybody runs it for. `convert-to-multi.py` rendered its
+em-dashes as `?`. All four scripts now reconfigure `stdout`/`stderr` to UTF-8 with `errors="replace"`,
+so a terminal that cannot render a glyph shows a replacement instead of taking the process down.
+
+Verified on Windows PowerShell 5.1 against a deliberately defective roadmap — forward dependency,
+40-task feature, `uncovered: 2` — which now prints its failures and exits 1.
+
+`install.ps1` itself passed everything: fresh install, reinstall (`already at 3.17.1 - reinstalling`),
+a forged old install (`installing 3.17.1 (replacing 3.1.0)`), a `SKILL.md` with no frontmatter
+(`replacing unknown`), the non-interactive overwrite guard (exit 1 with the `-Force` instruction), and
+`-Global`. The payload is the same eight files the shell installer delivers.
+
+Also confirmed on that machine: `python3.exe` is the Microsoft Store stub, printing *"Python was not
+found; run without arguments to install from the Microsoft Store"*. The READMEs already warn about
+exactly this, and now it is something observed rather than repeated.
+
 ## 3.17.1 — 2026-08-09
 
 **The lesson about wiring a check had gone stale on the commit that fixed it.** `CLAUDE.md`'s third

@@ -64,9 +64,12 @@ it.
 build. The scripts are standard library only, which is deliberate — a benchmark that needs a
 dependency is a benchmark that stops running.
 
-`pwsh` if you intend to touch `install.ps1`. **It has never been executed in this project's history**
-— three static reviews, zero runs, because no Windows machine was available. If you have one, that is
-the single most valuable hour anyone can spend here.
+PowerShell if you intend to touch `install.ps1`. It was executed for the first time in v3.17.2, on
+Windows PowerShell 5.1 — fresh install, reinstall, `-Force`, `-Global`, the non-interactive overwrite
+guard, and version reporting including the `unknown` degradation. All passed. **The run found a
+different bug**: the shipped Python scripts crashed on Windows the moment they printed a failure
+marker, because the console encoding has no `✗`. From WSL2 you can drive the host directly —
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File <path>` — which is how that was found.
 
 ## Layout
 
