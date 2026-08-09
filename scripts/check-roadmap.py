@@ -132,6 +132,27 @@ def field(fields, *names):
     return None
 
 
+# Step 6's field labels, in the spellings `field()` looks up. `name` is
+# deliberately not here: the `### ` heading already carries it and no check below
+# reads a `- name` line, so an entry whose one English label was that would still
+# leave every per-feature check with nothing to read.
+KNOWN_FIELDS = ("objective", "scope-unit", "depends", "external contract", "size",
+                "task estimate", "tasks", "implicit dimension", "open question",
+                "needs pre-written context", "needs context", "discharge")
+
+
+def has_known_field(fields):
+    """True when an entry produced at least one label Step 6 names.
+
+    Accepting only the colon used to make the documented `field — value` form
+    parse to zero fields. Accepting both separators fixed that half and left the
+    other: an entry whose labels are translated parses to a full dict of keys no
+    check knows, every `field()` lookup returns None, and the per-feature checks
+    then skip or pass on nothing at all. Both halves are the same parse failure,
+    and the gate in main() treats them as one."""
+    return any(k.startswith(n) for k in fields for n in KNOWN_FIELDS)
+
+
 def txt_names(path):
     if not os.path.isfile(path):
         return None
@@ -199,11 +220,29 @@ def check_discharge(rm, feats, text):
            % (" (%d question-only)" % len(carriers) if carriers else ""))
 
 
+def reads_as_none(v):
+    """Whether an `open questions` value means "nothing pending here".
+
+    Exact equality with "none" made `none — <reason>` a failure, and that is a
+    shape Step 6 itself prints one field above ("none — originated from `<X>`"),
+    so the linter was failing a roadmap for obeying the reference. A `status:`
+    marker anywhere on the line means a real question is on it whatever the line
+    opens with — which is how check_context_flag already reads this same field,
+    and the disagreement between two checks of one field was the bug's shape.
+    `\\bnone` and not `startswith`: "None of the roles are named" is a question."""
+    v = (v or "").strip()
+    if v in ("", "—", "-"):
+        return True
+    if re.search(r"status\s*:", v, re.I):
+        return False
+    return re.match(r"none\b", v, re.I) is not None
+
+
 def check_open_questions(rm, feats, text):
     rollup = block(text, "## Open Questions")
     if rollup is None:
         infield = [n for n, f, _ in feats
-                   if (field(f, "open question") or "none").lower() not in ("none", "—", "-", "")]
+                   if not reads_as_none(field(f, "open question"))]
         if infield:
             fail(rm, "open questions roll-up exists",
                  "features carry open questions but there is no `## Open Questions` section: "
@@ -215,17 +254,33 @@ def check_open_questions(rm, feats, text):
     missing = []
     for name, fields, _ in feats:
         v = field(fields, "open question")
-        if not v or v.lower() in ("none", "—", "-"):
+        if reads_as_none(v):
             continue
         if name not in rollup:
             missing.append(name)
-    orphan_status = []
+    # Group by bullet, not by physical line. An entry is free to wrap -- markdown
+    # does not care and the reference never asked for one line each -- but reading
+    # line by line split a wrapped entry into a fragment holding `status: open`
+    # and a fragment holding the feature name, and then failed on the half that
+    # named nothing. A line starting with `-`/`*` opens an entry; anything after
+    # it that is not a bullet belongs to it.
+    entries, cur = [], None
     for line in rollup.splitlines():
-        if re.search(r"status\s*:\s*open", line, re.I) or re.search(r"status\s*:\s*answered", line, re.I):
-            if not re.search(r"cross-cutting", line, re.I):
-                named = [n for n, _, _ in feats if n in line]
+        if line.strip().startswith(("-", "*")):
+            if cur is not None:
+                entries.append(cur)
+            cur = line.strip()
+        elif cur is not None and line.strip():
+            cur += " " + line.strip()
+    if cur is not None:
+        entries.append(cur)
+    orphan_status = []
+    for entry in entries:
+        if re.search(r"status\s*:\s*(open|answered)", entry, re.I):
+            if not re.search(r"cross-cutting", entry, re.I):
+                named = [n for n, _, _ in feats if n in entry]
                 if not named:
-                    orphan_status.append(line.strip()[:90])
+                    orphan_status.append(entry[:90])
     detail = []
     if missing:
         detail.append("carried by a feature but absent from the roll-up: " + ", ".join(missing))
@@ -238,6 +293,7 @@ def check_open_questions(rm, feats, text):
 def check_ledger(rm, text, root=None, path=None):
     led = block(text, "## Cross-Cutting Decisions")
     source = rm
+    looked_in = None
     if led is None and path:
         # Multi-section keeps the ledger in the index — exactly one per project.
         # Skipping here meant the ledger was never checked at all in that mode,
@@ -245,11 +301,22 @@ def check_ledger(rm, text, root=None, path=None):
         # to it, so an unanswered theme reaches every one of them.
         idx = os.path.join(os.path.dirname(path), "ROADMAP-INDEX.md")
         if os.path.isfile(idx):
+            looked_in = os.path.relpath(idx, root or os.path.dirname(path))
             with open(idx, encoding="utf-8") as fh:
                 led = block(fh.read(), "## Cross-Cutting Decisions")
-            source = os.path.relpath(idx, root or os.path.dirname(path))
+            source = looked_in
     if led is None:
-        skip(rm, "cross-cutting ledger", "no block here and no index beside it")
+        if looked_in:
+            # The index is right there and was read. Saying "no index beside it"
+            # was simply false, and this is not a file that could not be parsed:
+            # it is a mandatory block that exists nowhere, which is what
+            # check_coverage warns about in the same situation.
+            warn(rm, "cross-cutting ledger",
+                 "no `## Cross-Cutting Decisions` here, and none in %s either — "
+                 "multi-section keeps exactly one per project, in the index, and "
+                 "every section roadmap defers to it" % looked_in)
+        else:
+            skip(rm, "cross-cutting ledger", "no block here and no index beside it")
         return
     if source != rm:
         record("ok", rm, "cross-cutting ledger read from %s" % source)
@@ -261,6 +328,10 @@ def check_ledger(rm, text, root=None, path=None):
     # is not one of the nine, so counting it against them reports a false surplus.
     extra = [r for r in rows if re.search(r"project-specific", r, re.I)]
     rows = [r for r in rows if r not in extra]
+    # `extra` leaves the theme count but NOT the pairing guard below: a
+    # project-specific row left `not decided` still needs its `cross-cutting`
+    # entry, or the decision the sweep surfaced has no question anywhere.
+    paired = rows + extra
     states = {"decided": 0, "n/a": 0, "not decided": 0, "deferred": 0}
     for r in rows:
         low = r.lower()
@@ -289,11 +360,24 @@ def check_ledger(rm, text, root=None, path=None):
 
     unresolved = []
     rollup = block(text, "## Open Questions") or ""
-    for r in rows:
+    for r in paired:
         if "not decided" in r.lower() and "deferred to feature" not in r.lower():
             theme = r.strip("| ").split("|")[0].strip()
-            hit = [l for l in rollup.splitlines()
-                   if theme and theme.lower() in l.lower() and "cross-cutting" in l.lower()]
+            # Same bullet-grouping the roll-up check uses. Splitting on physical
+            # lines here made a wrapped entry invisible to one check and visible
+            # to the other, on the same file.
+            entries, cur = [], ""
+            for ln in rollup.splitlines():
+                if ln.strip().startswith(("-", "*")):
+                    if cur:
+                        entries.append(cur)
+                    cur = ln.strip()
+                elif cur and ln.strip():
+                    cur += " " + ln.strip()
+            if cur:
+                entries.append(cur)
+            hit = [e for e in entries
+                   if theme and theme.lower() in e.lower() and "cross-cutting" in e.lower()]
             if not hit:
                 unresolved.append("%r has a `not decided` row with no `cross-cutting` entry "
                                   "naming it in `## Open Questions`" % theme)
@@ -322,15 +406,26 @@ def check_disjoint(rm, text, feats):
 
 
 def check_coverage(rm, text):
-    body = block(text, "## Coverage") or text
-    m = re.search(r"uncovered:\s*(\w+)", body, re.I)
+    # Falling back to the whole file when there is no `## Coverage` heading used
+    # to be silent, and silence here reads as a pass: any sentence of prose
+    # saying "uncovered: none" satisfied the check, while the real table said
+    # otherwise. Where this script cannot scope a read it says so instead --
+    # decompose-phase.md promises exactly that.
+    body = block(text, "## Coverage")
+    scoped = body is not None
+    m = re.search(r"uncovered:\s*(\w+)", body if scoped else text, re.I)
     if not m:
         warn(rm, "coverage closes with `uncovered: none`",
              "no `uncovered:` line found — decompose-phase Step 8 requires one")
-        return
-    (ok if m.group(1).lower() == "none" else fail)(
-        rm, "coverage closes with `uncovered: none`",
-        "" if m.group(1).lower() == "none" else "reads `uncovered: %s`" % m.group(1))
+    elif m.group(1).lower() != "none":
+        fail(rm, "coverage closes with `uncovered: none`", "reads `uncovered: %s`" % m.group(1))
+    elif scoped:
+        ok(rm, "coverage closes with `uncovered: none`")
+    else:
+        warn(rm, "coverage closes with `uncovered: none`",
+             "no `## Coverage` heading — the `uncovered:` line was matched anywhere in the file, so "
+             "this pass is not scoped to the coverage table. decompose-phase Step 8's output shape "
+             "names that heading.")
 
 
 def check_context_flag(rm, feats):
@@ -373,15 +468,32 @@ def check_txt_agreement(rm, feats, txt, txt_path):
     (ok if not detail else fail)(rm, "build-order .txt agrees with the roadmap", "\n".join(detail))
 
 
+# decompose-phase.md's size bullet: the answer to a re-raised single-vs-multi
+# question is recorded on a plain line between the H1 and `## Status`, the one
+# spot no other reader rewrites. Without it "asked the user and they confirmed"
+# and "never asked" produce the same warning forever.
+SIZE_ACK = re.compile(r"^size re-raised\b", re.M | re.I)
+
+# Roughly 230 tokens per feature over roughly 900 of fixed overhead, regressed
+# against real roadmaps; decompose-phase.md's size bullet states the same two
+# numbers and must move with this one.
+TOKENS_PER_FEATURE = 230
+
+
 def check_size(rm, text):
-    tokens = int(len(text.split()) * 1.3)
-    if tokens >= ACT_TOKENS:
+    # len/4, not words*1.3. Measured against tiktoken on four generated roadmaps,
+    # words*1.3 ran ~31% low and put a 2,484-token file in the clear; len/4
+    # classified all four correctly.
+    tokens = len(text) // 4
+    if tokens >= ACT_TOKENS and SIZE_ACK.search(text):
+        ok(rm, "roadmap size (~%d tokens — oversize acknowledged)" % tokens)
+    elif tokens >= ACT_TOKENS:
         warn(rm, "roadmap size", "~%d tokens — past the %d mark where decompose-phase re-raises "
              "the single-vs-multi question. The `/loop` prompt names this file as spec source for "
              "every feature it builds." % (tokens, ACT_TOKENS))
     elif tokens >= WARN_TOKENS:
         warn(rm, "roadmap size", "~%d tokens — approaching the %d mark (roughly %d more features)"
-             % (tokens, ACT_TOKENS, max(1, (ACT_TOKENS - tokens) // 220)))
+             % (tokens, ACT_TOKENS, max(1, (ACT_TOKENS - tokens) // TOKENS_PER_FEATURE)))
     else:
         ok(rm, "roadmap size (~%d tokens)" % tokens)
 
@@ -452,20 +564,44 @@ def main():
                  + "\nEvery per-feature check below is vacuous for them, so a green "
                    "result here would mean nothing. Check the separator: the fields "
                    "are `- **objective** — value` or `- Objective: value`.")
+        unlabelled = [n for n, f, _ in feats if f and not has_known_field(f)]
+        if unlabelled:
+            fail(rm, "feature fields carry their documented English labels",
+                 "these entries parse into fields, but not one of them is a label "
+                 "decompose-phase.md Step 6 names: " + ", ".join(unlabelled[:8])
+                 + "\nThe per-feature checks below look those up by exact name, so "
+                   "translated or renamed labels make them tick green or skip "
+                   "without reading anything. Field labels stay English whatever "
+                   "language the roadmap's prose is in (scope-phase.md's carve-out); "
+                   "only the value after the label is translated.")
         base = os.path.basename(path)
         tp = os.path.join(os.path.dirname(path),
                           "roadmap.txt" if base == "ROADMAP.md"
                           else "roadmap-%s.txt" % base[len("ROADMAP-"):-3])
         txt = txt_names(tp)
-        check_forward_deps(rm, feats)
+        # Failing the two gates above is not enough on its own: the four checks
+        # that look a field up by name would still run, read None everywhere, and
+        # print `✓ no forward dependencies` and `✓ open questions agree in both
+        # directions` under the failure that just said they mean nothing. A green
+        # is a claim, so they are held back and one line says so instead.
+        legible = any(has_known_field(f) for _, f, _ in feats)
+        if not legible:
+            skip(rm, "the checks that read Step 6's fields by name",
+                 "held back — no entry yields a label they know, so each would report "
+                 "green having read nothing. The failure above names the entries.")
+        if legible:
+            check_forward_deps(rm, feats)
         check_duplicate_names(rm, feats, txt)
-        check_task_estimate(rm, feats)
+        if legible:
+            check_task_estimate(rm, feats)
         check_discharge(rm, feats, text)
-        check_open_questions(rm, feats, text)
+        if legible:
+            check_open_questions(rm, feats, text)
         check_ledger(rm, text, root, path)
         check_disjoint(rm, text, feats)
         check_coverage(rm, text)
-        check_context_flag(rm, feats)
+        if legible:
+            check_context_flag(rm, feats)
         check_txt_agreement(rm, feats, txt, os.path.relpath(tp, root))
         check_size(rm, text)
     check_global_names(root, all_feats)

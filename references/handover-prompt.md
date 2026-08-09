@@ -483,15 +483,15 @@ language:
 > Handoff is for. Building here risks the agent working from remembered conversation instead of the
 > written artifacts, and it starts the build with the context budget already spent.
 
-Then stop. Do not wait, do not poll `validation.md`, do not check back in — including under option B,
-where the loop is the user's CLI running the downstream skill, not this skill continuing. If asked to
-seed again later, this procedure simply re-runs from Step 1, and Step 1's evidence test is what keeps
-it from clobbering real progress.
-
 **Optional bridge, offered as text — never written automatically.** The downstream skill reaches
 `docs/` only through its Knowledge Verification Chain, which names the directory and no file — and
-the Handoff's own pointer is gone at the first `pause work`, since that section is overwritten. If
-the project has a `CLAUDE.md`, offer the user these lines to paste into it (their file, their call):
+the Handoff's own pointer is gone at the first `pause work`, since that section is overwritten. So
+offer these lines every time, and let what is on disk decide only where they go: if the project has
+a `CLAUDE.md`, offer them to paste into it; if it has none, name the file their agent auto-loads at
+project root — `CLAUDE.md` for Claude Code, the equivalent for whatever tool they use — and hand
+them the same lines to put there. A missing `CLAUDE.md` changes the destination, never whether the
+offer is made. Either way this is output and nothing else: create no file, edit no file, and leave
+the paste to them (their file, their call).
 
 ```markdown
 - `docs/ROADMAP-INDEX.md` `## Status` — current backlog position and the next feature to build.
@@ -505,3 +505,16 @@ the project has a `CLAUDE.md`, offer the user these lines to paste into it (thei
 In single-section mode both blocks are in `docs/ROADMAP.md`; adjust the paths accordingly. This
 bridge is the durable half of the delivery: the Handoff's **Next step** carries the pointer for the
 next feature only, while these lines make it reach every feature after it.
+
+**Say what declining costs, so the choice is an informed one.** Once the first `pause work`
+overwrites **Next step**, nothing left in the project points a hand-started session at
+the `## Cross-Cutting Decisions` block, so every later feature's Discuss begins blind to
+decisions already made with the user — and re-asks them, per feature, answered inconsistently.
+Under option B the loop prompt carries its own pointer to that block for as long as that loop
+runs; a session started by hand afterwards, or instead of it, carries none. Say this once, as the
+reason the lines are worth pasting, and then accept whatever they decide.
+
+Then stop. Do not wait, do not poll `validation.md`, do not check back in — including under option B,
+where the loop is the user's CLI running the downstream skill, not this skill continuing. If asked to
+seed again later, this procedure simply re-runs from Step 1, and Step 1's evidence test is what keeps
+it from clobbering real progress.

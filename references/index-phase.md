@@ -94,6 +94,16 @@ without re-deriving it:
 4. **Ask the user.** Never invent an edge that is not traceable to one of the above — a wrong edge
    silently corrupts every downstream roadmap's ordering.
 
+**A cross-reference proves the edge exists; it does not say which end is which.** Decide direction
+by mechanism, never by who does the naming: the section that cannot be built without the other's
+mechanism is the **consumer** — its row's `Depends on` names the other, and the DAG arrow runs
+producer → consumer, matching build order. A section describing what a role may do will name the
+objects that role acts on, and those objects live elsewhere — that is the producer naming its
+consumer, not a dependency on it. When the prose names the other section but leaves it unclear which
+side holds the mechanism, source (2) has resolved the edge's existence and not its direction:
+resolve the direction from (3) or (4), and say so in the citation. A direction guessed from
+who-names-whom is exactly the wrong edge (4) warns about, and it can invert the whole build order.
+
 State plainly if the source's own edges never cross section boundaries (common with auto-extracted
 diagrams, where arrows rarely leave their bounding box). When that is the case, say so up front and
 be explicit that the order comes from (2)/(3)/(4), not from any drawn edge.
@@ -174,16 +184,18 @@ they do not. Listing one here is not deciding it — this phase still never answ
    this phase carries an **already-populated** ledger into this file from the roadmap that used to
    hold it, rewriting the paths inside it on the way. It still answers nothing, adds no row, and
    changes no row's state.
-4. Table of roadmaps: section → roadmap file → build-order file → slug/prefix → depends-on, plus
-   excluded sections and why.
+4. `## Roadmaps` — the table: section → roadmap file → build-order file → slug/prefix → depends-on,
+   plus excluded sections and why. Keep that exact heading: it is the literal
+   `scripts/convert-to-multi.py` writes, so an index written by hand under any other name and an
+   index produced by a conversion diverge by construction.
 5. `## Ordering` — DAG + topological list, each edge citing its resolving source. Keep that exact
    heading; the seed locates the section by name (handoff-seed.md Steps 3 and 4). **The ordered list
    carries buildable sections only** — it is build order, and an excluded section has none. An
    excluded section appears in the DAG where a boundary contract cites it, marked
    `(excluded — pure foundation)` or `(excluded — pure decision log)`, and never in the ordered
    list.
-6. Boundary contracts, one subsection per edge.
-7. Project-level decision candidates, if any.
+6. `## Boundary Contracts` — one subsection per edge.
+7. `## Project-Level Decision Candidates` — if any.
 
 Cite these sections by **name**, never by position — inserting one renumbers every reference to the
 ones below it, silently, in another file.

@@ -19,13 +19,16 @@ run before reaching.
 **Open the run with the version and the model recommendation.** In one short message, before the
 first question: the version of this skill — the `metadata.version` value in `SKILL.md`'s
 frontmatter, the only version stamp the installers put on disk — where to check the latest
-published one (`/plugin update` for a plugin install, or the comparison command the README documents
-for a standalone install), and that a roadmap run is best done on the strongest available model at
+published one (decided by the path you resolve that `SKILL.md` from: under a plugins directory →
+`/plugin update`; under `.claude/skills/spec-driven-roadmap/`, project or home → the comparison
+command the README documents; anywhere else, such as a repository checkout or a path the user
+named → say where it is running from and that neither update route applies, so the comparison is
+against the repository), and that a roadmap run is best done on the strongest available model at
 the highest effort, which the user sets with `/model` and `/effort` **before** starting (SKILL.md,
-"Version and model"). **Resolve that version exactly as handoff-seed.md's Step 5 prescribes** —
-which `SKILL.md` to open, and the standing prohibition on filling the number from memory. That
-procedure is written once, there; do not restate it here. **If the version cannot be read, announce
-`unknown`** rather than dropping the line: the announcement exists to tell the user which release is
+"Version and model"). **Resolve that version exactly as that section prescribes** — it names the
+file to open and forbids filling the number from memory. Do not restate that procedure here; it is
+already in context, since `SKILL.md` is. **If the version cannot be read, announce `unknown`**
+rather than dropping the line: the announcement exists to tell the user which release is
 on disk, and a silent omission reads as if there were nothing to check. This is an **announcement,
 not a question**: it asks for nothing and expects no answer, so it neither batches nor consumes a
 turn, and the "One question at a time — never batch" cadence below is untouched. Do not wait for a
@@ -50,12 +53,18 @@ whole run.
 exists; otherwise the language the user is conversing in — this applies to prose and body text.
 
 **Carve-out, always English regardless:** feature names, prefixes, slugs, filenames, the downstream
-skill's Handoff field labels (`**Feature**`, `**Next step**`, …), **and every generated section
+skill's Handoff field labels (`**Feature**`, `**Next step**`, …), **every generated section
 heading** (`## MVP Scope`, `## Explicitly Out of Scope`, `## Capabilities Already Built`,
 `## Gaps / Likely Next Work`, `## Status`, `## Open Questions`, `## Cross-Cutting Decisions`,
-`## Expected Gray Areas`). Those are machine-read keys, path components, and literals that later
-phases locate by exact name — translating any of them breaks the handoff, the
-`.specs/features/<name>/` directories, or a cross-file lookup.
+`## Expected Gray Areas`, `## Coverage`, `## Execution Order`), **and every literal
+`scripts/check-roadmap.py` matches**: the per-feature field labels decompose-phase.md Step 6
+defines, the `discharge:` line, the `status: open` / `status: answered` tags, the `cross-cutting`
+tag and its `affects:` line, the ledger's `Theme` column header and the state words `not decided` /
+`n/a because` / `deferred to feature`, and the `uncovered:` line — together with the sentinel values
+those checks read (`none`, `yes`, `no`). Those are machine-read keys, path components, and literals
+that later phases locate by exact name — translating any of them breaks the handoff, the
+`.specs/features/<name>/` directories, or a cross-file lookup. Only the prose after the key is in
+the source language.
 
 **How to ask, in this phase.** One question at a time — never batch. Wait for each answer before
 asking the next. (Phase 2's Step 7a deliberately batches its cross-cutting themes and says why; the

@@ -165,7 +165,15 @@ had nowhere to look. Search these, first hit wins, and say which one answered:
 2. `~/.claude/skills/<name>/SKILL.md` — a global install.
 3. `~/.claude/plugins/**/<name>/**/SKILL.md` — a plugin install; take the highest version present,
    and ignore any directory carrying an `.orphaned_at` marker.
-4. The path the user gave, if they named one.
+4. `~/.cache/agent-skills/skills/<name>/SKILL.md` — where
+   `npx @tech-leads-club/agent-skills install` puts it, which is the command this project's own
+   README prescribes for installing `tlc-spec-driven`. Two independent runs had to abandon the
+   procedure and `find` for it because this line was missing.
+5. The path the user gave, if they named one.
+
+**If none of the five hits, search before concluding.** `find ~ -maxdepth 6 -name SKILL.md -path
+"*<name>*"` costs one command and is the difference between a seed and a skipped one. The list above
+is what is known to exist today, not a proof of what exists.
 
 **Absence is a finding, not a default.** Report which paths you looked in before concluding nothing
 is installed — Phase 0's "generate the roadmap anyway" branch and Step 6's skip both hang off that
@@ -456,7 +464,10 @@ Notes on the fields that carry real weight:
   git repo.
 - **Uncommitted files** — report what `git status --porcelain` actually shows, not a blind `none`.
   The downstream skill's resume reconciles this field against git, so a false `none` is a claim it
-  will catch and have to work around.
+  will catch and have to work around. Outside a git repo that command errors rather than returning
+  an empty list, so there is nothing to report: write exactly `none — not a git repository`. The
+  annotation is what keeps the field honest — a bare `none` there is indistinguishable from the
+  false one this bullet forbids.
 - **Blockers** — check three sources in this order and stop at the first that fires; put that exact
   question here instead of `none`, and set **Next step** to answering it rather than the specify
   trigger. Quote one question, not three sources' worth — the ~500-token budget is real.

@@ -9,6 +9,53 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.11.0 — 2026-08-09
+
+**Rule 1 went from 5-of-7 to 7-of-7, measured.** The PRD used for the execution test carries seven
+deliberately planted ambiguities, and the first run left two of them unrecorded anywhere — no
+feature field, no roll-up, no ledger. After this pass a fresh agent captured all seven, and two moved
+category: the password rule went from a bare objective line to a `status: open` question in three
+places, and data retention stopped being a silently decided ledger row and became `not decided`
+paired with a `cross-cutting` entry.
+
+**The honest discount, which the run itself volunteered:** three of the seven ended as *decided* rows
+whose "reasonable user" was the agent simulating one. By the metric that matters to rule 1 — did
+anyone fill a gap in silence — it is 7 of 7. By "a human actually decided", 4 of 7.
+
+Friction fell by roughly half per path, and the composition changed in the direction that matters:
+`improvisou` — an agent deciding what the procedure should have decided — dropped from 56% of
+friction to 33%. Grave friction fell least, about 25%, and the reason is a single defect that hit
+both re-runs independently.
+
+- **The `<skill-dir>` search order missed the path our own README prescribes.** 3.10.0 added the
+  discovery procedure and listed project, global and plugin installs. It did not list
+  `~/.cache/agent-skills/skills/`, which is where `npx @tech-leads-club/agent-skills install` puts
+  things — the exact command this repository's README gives as the prerequisite. Both re-runs had to
+  abandon the procedure and `find` for it. Added, along with the honest closer: the list is what is
+  known to exist today, not a proof of what exists, so search before concluding absence.
+- **`project-specific` ledger rows escaped the pairing guard**, a bug introduced by 3.10.0's own fix.
+  They were excluded from the theme count — correct — and from the check that a `not decided` row has
+  its `cross-cutting` question — wrong. The fix caught a real instance in freshly generated output on
+  its first run.
+- **The two roll-up parsers disagreed with each other.** `check_open_questions` had been taught to
+  group by bullet; `check_ledger` still split on physical lines, so a wrapped entry was visible to one
+  check and invisible to the other in the same file.
+- Plus seven procedure fixes from the pass: `## Coverage`, `## Execution Order`, `## Roadmaps`,
+  `## Boundary Contracts` and `## Project-Level Decision Candidates` are now named rather than left
+  for each agent to invent; the coverage check no longer silently falls back to scanning the whole
+  file; the size estimator moved from `words × 1.3` to `chars / 4`, which classified 4 of 4 testbed
+  roadmaps correctly against a real tokenizer where the old one classified 3 of 4.
+
+**Triage rejected the proposed remedy in five of seven cases before anything was written**, which is
+now the expected rate rather than a surprise. One was inverted outright: the fix for wrapped roll-up
+entries was to teach the parser, not to impose a one-physical-line rule the repository's own files
+violate.
+
+Six generated projects in the testbed, `check-consistency` at 23/23. **Still open and recorded:** the
+size arithmetic is calibrated in-sample and drifts outside it; the rule 1 / rule 8 boundary between
+an open question and an expected gray area has no written test, and both re-runs invented one
+independently.
+
 ## 3.10.0 — 2026-08-08
 
 **The skill was executed, for the first time since 3.4.0.** Nine releases of prose review had

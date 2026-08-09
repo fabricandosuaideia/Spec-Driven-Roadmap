@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.10.0"
+  version: "3.11.0"
 ---
 
 # Spec-Driven Roadmap
@@ -44,9 +44,16 @@ the runtime `scripts/`, so this frontmatter is the single version stamp that eve
 user's disk.
 
 **Announce that version before the first question of any run.** State the version read from this
-file's frontmatter, and where to check the latest published one: `/plugin update` for a plugin
-install, or the comparison command the README documents for a standalone install. One line,
-delivered as an announcement — never as a question, so it costs no turn (scope-phase.md, preamble).
+file's frontmatter — **open the file and read that frontmatter at run time; never fill the number
+from memory or inference**. The frontmatter is what the installers stamp and what discovery reads,
+so it may not be in context alongside this body, and a wrong number asserts a false provenance for
+the whole run. If it cannot be read, announce `unknown` rather than dropping the line. State too
+where to check the latest published one, decided by the path this file resolved from: under a
+plugins directory → `/plugin update`; under
+`.claude/skills/spec-driven-roadmap/`, project or home → the comparison command the README
+documents; anywhere else, such as a repository checkout → say where it is running from and that
+neither update route applies. One line, delivered as an announcement — never as a question, so it
+costs no turn (scope-phase.md, preamble).
 
 **Model and effort are a recommendation this skill states and never applies itself.** A run here
 freezes build order, scope boundaries and feature names into files the whole downstream build cycle
