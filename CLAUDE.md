@@ -33,6 +33,7 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 | `scripts/check-roadmap.py` | Lints a roadmap the skill produced. Shipped to users; Phase 2 runs it. |
 | `scripts/run-benchmark.py` | Sets up an isolated run and scores it. See [`benchmark/`](benchmark/). |
 | `scripts/convert-to-multi.py` | Shipped to users. The single→multi conversion. |
+| `scripts/hooks/pre-commit` | Runs the consistency check before a commit that touches an invariant. Install once: `bash scripts/hooks/install.sh`. |
 | `scripts/bump-version.sh` | Writes all three version declarations **and runs the consistency check**, refusing the release when it fails. |
 
 **The loop for any change:**
@@ -40,7 +41,8 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 1. Read the reference you are about to edit **completely**. `SKILL.md` says so and it is not
    ceremony — the contradictions found here lived 300 lines from the edit, or in another file.
 2. Make the change.
-3. `python3 scripts/check-consistency.py` — must report `0 failed`.
+3. `python3 scripts/check-consistency.py` — must report `0 failed`. The pre-commit hook runs
+   this for you once installed; running it yourself is faster than finding out at commit time.
 4. **If the change alters what a correct run produces, run the benchmark** ([`benchmark/README.md`](benchmark/README.md))
    and update [`benchmark/expected.md`](benchmark/expected.md) **in the same commit**. A rule and its
    answer key drifting apart is the failure this repository has committed most often.

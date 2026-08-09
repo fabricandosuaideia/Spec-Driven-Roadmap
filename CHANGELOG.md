@@ -9,6 +9,32 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.17.0 — 2026-08-09
+
+**The net was installed but not switched on between releases.** `bump-version.sh` refuses to cut a
+release when the consistency check fails, and that was the only place it ran — so between two
+releases somebody could commit twenty times with nothing looking at the invariants. A fact edited in
+one file and left stale in another is a per-commit failure, not a per-release one, and
+[`CLAUDE.md`](CLAUDE.md)'s third lesson is to pick a point the process cannot route around. The
+release gate was too rare a point.
+
+- **`scripts/hooks/pre-commit`**, enabled with `bash scripts/hooks/install.sh` — one `git config`
+  pointing at the tracked hooks directory, so a fix to the hook arrives with a pull rather than
+  needing every clone to re-copy it.
+- It runs **only when the commit touches an invariant**: `SKILL.md`, `references/`, `scripts/`,
+  `guide/`, the READMEs, `CLAUDE.md`, the installers, the plugin manifests. A commit touching nothing
+  but the CHANGELOG or the benchmark fixture is not delayed — a hook that fires on everything is a
+  hook people learn to bypass.
+- `--no-verify` bypasses it, and the file says when that is fair: a work-in-progress branch, not
+  `main`, where the release gate catches it later anyway — louder, and further from the cause.
+
+Verified in a clone across all three paths: a CHANGELOG-only commit passes without running the check;
+a commit breaking trilingual parity is refused and **not created**; `--no-verify` lets it through.
+
+Writing this up also caught a stale count in `CONTRIBUTING.md` — "four shipped to users, three
+maintainer-only" was true before the hook existed. Two are shipped. The kind of drift that has no
+check behind it, found by writing the sentence next to the thing it describes.
+
 ## 3.16.0 — 2026-08-09
 
 **Reading one real project found a defect no synthetic fixture could.** A private six-month codebase

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Run the consistency check before every commit.
+#
+# Why a hook and not just the release gate: bump-version.sh already refuses to
+# cut a release when the check fails, but a release is rare. Between two of them
+# somebody can commit twenty times with nothing looking at the invariants, and
+# the drift this repository has committed most often is a fact edited in one
+# file and left stale in another — which is a per-commit failure, not a
+# per-release one. CLAUDE.md's third lesson says to pick a point the process
+# cannot route around; the release gate was too rare a point.
+#
+# Install:  bash scripts/hooks/install.sh
+# Bypass:   git commit --no-verify
+#
+# Bypassing is legitimate for a work-in-progress commit on a branch. It is not
+# legitimate on main, and the release gate will catch it later anyway — louder,
+# and further from the change that caused it.
+
+set -uo pipefail
+
+repo="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+checker="$repo/scripts/check-consistency.py"
+
+[[ -f "$checker" ]] || exit 0
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "! pre-commit: python3 not found, consistency check skipped." >&2
+    exit 0
+fi
+
+# Only the files the check actually reads. A commit touching nothing but the
+# benchmark fixture or the CHANGELOG has no invariant to break, and a hook that
+# fires on every commit regardless is a hook people learn to bypass.
+if ! git diff --cached --name-only --diff-filter=ACMR \
+     | grep -qE '^(SKILL\.md|README.*\.md|CLAUDE\.md|references/|scripts/|guide/|install\.(sh|ps1)|\.claude-plugin/)'; then
+    exit 0
+fi
+
+output="$(python3 "$checker" --root "$repo" 2>&1)"
+status=$?
+
+if [[ $status -ne 0 ]]; then
+    echo "$output" >&2
+    cat >&2 <<'MSG'
+
+✗ pre-commit: the consistency check failed, so the commit was stopped.
+
+  These are the invariants that keep this repository's duplicated facts in step
+  — cross-file pointers, declared counts, installer payload, step numbering,
+  trilingual parity. A failure here is almost always one half of a change that
+  landed in one file and not the other.
+
+  Fix it, or `git commit --no-verify` if you know why this failure is acceptable
+  and are going to say so.
+MSG
+    exit 1
+fi
+
+exit 0

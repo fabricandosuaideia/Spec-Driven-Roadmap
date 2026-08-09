@@ -39,6 +39,25 @@ installers copy `SKILL.md`, `references/` and the runtime `scripts/`, and nothin
 > That installer needs a git repository, and silently writes nothing outside one while still printing
 > success. Verify with `ls .claude/skills/tlc-spec-driven` before moving on.
 
+## Turn the hook on
+
+```bash
+bash scripts/hooks/install.sh
+```
+
+One `git config` for this clone, pointing at the tracked `scripts/hooks/`. `pre-commit` then runs
+`check-consistency.py` whenever a commit touches `SKILL.md`, `references/`, `scripts/`, `guide/`, the
+READMEs, `CLAUDE.md`, the installers or the plugin manifests — and stays out of the way otherwise.
+
+It exists because the release gate was too rare a point. `bump-version.sh` already refuses to cut a
+release on a failing check, but between two releases somebody can commit twenty times with nothing
+looking at the invariants — and a fact edited in one file and left stale in another is a per-commit
+failure, not a per-release one.
+
+`git commit --no-verify` bypasses it. That is fair on a work-in-progress branch and not on `main`,
+where the release gate will catch it later anyway — louder, and further from the change that caused
+it.
+
 ## Requirements
 
 `python3` for the scripts, `bash` for the installer, `git`. No package to install, no virtualenv, no
@@ -55,7 +74,7 @@ the single most valuable hour anyone can spend here.
 |---|---|
 | `SKILL.md` | the map, and the 13 non-negotiable rules |
 | `references/` | the procedures — this is the skill; `SKILL.md` is a map to it |
-| `scripts/` | four shipped to users, three maintainer-only ([`CLAUDE.md`](CLAUDE.md) lists which) |
+| `scripts/` | two shipped to users (`convert-to-multi.py`, `check-roadmap.py`), the rest maintainer-only ([`CLAUDE.md`](CLAUDE.md) lists which) |
 | `benchmark/` | frozen fixture, answer key, scoreboard — see [`benchmark/README.md`](benchmark/README.md) |
 | `guide/` | the human guide, in three languages, kept at structural parity |
 | `install.sh` / `install.ps1` | must stay behaviourally identical; a check enforces the payload |
