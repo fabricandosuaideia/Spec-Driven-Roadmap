@@ -115,6 +115,16 @@ def parse_features(text):
         fields, last = {}, None
         for line in body:
             fm = FIELD_RE.match(line)
+            # A label Step 6 does not name is not a field — it is a sub-bullet of
+            # the field above. Accepting any letters made a question written as
+            # `- Qual regra de senha...? status: open` under `- **open questions**`
+            # parse as a NEW field, leaving `open questions` empty and the
+            # open-question check green on a roadmap full of them. The one real
+            # run that escaped did so only because its author happened to prefix
+            # every sub-bullet with `(A1)` — a convention no reference prescribes.
+            if fm and not any(fm.group(1).strip().lower().startswith(n)
+                              for n in KNOWN_FIELDS):
+                fm = None
             if fm:
                 last = fm.group(1).strip().lower()
                 fields[last] = fm.group(2).strip()
@@ -405,9 +415,20 @@ def check_disjoint(rm, text, feats):
                                   if overlap else "")
 
 
-MISFILED = re.compile(r"feature[- ]local|cheap to reverse|barato de reverter|local (?:a|à) (?:uma )?feature",
-                      re.I)
-LIVES_IN = re.compile(r"\bcode\b|\bconfig\b|convention|c[oó]digo|conven[cç]|discoverable|descobr", re.I)
+# The skill writes its output in the source document's language (scope-phase's
+# carve-out keeps only names and headings in English), so these have to read
+# more than English or the check silently passes every non-English roadmap.
+MISFILED = re.compile(
+    r"feature[- ]local|local (?:a|à|de) (?:uma )?feature|"
+    r"cheap to reverse|barato (?:de|para) reverter|f[aá]cil de reverter|"
+    r"barato de revertir|local a una feature|"
+    r"test 2|test 3|teste 2|teste 3|prueba 2|prueba 3", re.I)
+# Deliberately broad: a false accusation here costs more than a missed line,
+# because the fix it suggests is to move a question into the loop's sweep.
+LIVES_IN = re.compile(
+    r"\bcode\b|\bconfig|convention|default|documented|"
+    r"c[oó]digo|configura|conven[cç]|padr[aã]o|documenta|"
+    r"biblioteca|library|librer[ií]a|schema|migration", re.I)
 
 
 def check_gray_area_reasons(rm, text):

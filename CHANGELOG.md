@@ -9,6 +9,43 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.13.0 — 2026-08-09
+
+**The loop path ran for the first time, in a sanitised environment, and the gate change was validated
+blind.** Every execution before this one chose option A, so Step 9 — close every open question by
+interview, write each answer back in both places, promote the `not decided` rows, then run the
+five-category propagation pass — had never executed. It does now, and it held: 15 questions closed,
+the propagation pass found a real category-2 consequence and two category-4 edges, converged in 2 of
+its 3 allowed passes, and left `0 status: open` / `0 not decided` on disk against `31 status:
+answered`. The `/loop` prompt came out word-for-word identical to the Step 10 template, with
+`<current-feature>` surviving literal in all four places — substituting it pins every iteration to
+feature one and the run never terminates.
+
+The 3.12.0 gate was validated by an agent told nothing about what had changed: of the seven
+ambiguities planted in the test PRD, **zero** reached `## Expected Gray Areas`, against four
+mis-filed of six lines under the old rule on the same PRD.
+
+Three defects that validation found, all of them mine:
+
+- **3.12.0 never reached `handover-prompt.md`** — the file that implements the loop gate still
+  defined the gray-area block by the rule that had just been replaced. The same accretion failure the
+  general review had already diagnosed fifteen times, committed again while fixing something else.
+- **The `project-specific` valve existed in Step 7a and not in 7b**, so an ambiguity with no rubric
+  theme had nowhere legal to go in the residue block — and a run dropped *"what does the decision
+  search index?"* from the roadmap entirely rather than misfile it. Rule 1 broken by the fix to rule 1.
+- **The field parser accepted any label**, so a question written as a sub-bullet under
+  `- **open questions** —` parsed as a *new field*, leaving `open questions` empty and the both-ways
+  agreement check green on a feature carrying open questions. The one clean run escaped only because
+  its author prefixed every sub-bullet with `(A1)`, a convention no reference prescribes and which he
+  derived by reading the linter's source. Only labels Step 6 names are fields now; everything else is
+  continuation.
+
+Also: the two gray-area regexes read only English while the skill mandates output in the source
+document's language, so every non-English roadmap passed that check silently — now tested across
+three languages. And greenfield had an incentive to *fabricate* the "where the answer already lives"
+citation, since a project with no code, config or conventions can barely fail test 1 honestly: name
+the file or the setting that exists today, or the thing passes the gate and becomes a question.
+
 ## 3.12.0 — 2026-08-09
 
 **Rule 1 had an exception nobody meant to write, and two independent runs found it by inventing their

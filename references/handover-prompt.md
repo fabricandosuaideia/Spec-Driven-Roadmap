@@ -131,7 +131,8 @@ is not swept: its question is carried by a feature in the build order, so this s
 in that feature's own `open questions` field.
 
 **Do not sweep `## Expected Gray Areas`.** Those were deliberately left to the downstream skill's own
-Discuss (decompose-phase Step 7b) — they failed the three tests, meaning they are feature-local and
+Discuss (decompose-phase Step 7b) — they failed **test 1**, meaning the code, config or an existing
+convention already answers them and Discuss resolves them
 better answered with the code in front of them. Step 10's prompt is what tells the run how to handle
 them unattended; re-asking them here is the exact waste decompose-phase Step 7 exists to prevent.
 

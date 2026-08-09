@@ -215,6 +215,15 @@ better later. If it exists nowhere but in the user's head, it is recorded as a q
 small its blast radius; tests 2 and 3 then decide only *where* — the ledger and the roll-up when both
 pass, the carrying feature's own `open questions` field when either fails.
 
+**In a greenfield project this block is nearly empty, and that is correct.** Test 1 fails when the
+code, config or an existing convention answers — and in a project with none of those on disk, almost
+nothing can fail it. A run under this rule reached for *"the project's storage convention answers
+it"* in a repository that had no storage and no conventions, which is the citation being fabricated
+to get through the gate. So: **name the file, the setting or the convention, and if you cannot point
+at one that exists today, the thing passes test 1** and belongs in a question. A library's documented
+default is a legitimate answer; "the code will decide" is not — that is the silent default under
+another name.
+
 This does not widen the sweep. Rule 8's economy is test 1 itself: the thing that "the built code
 would have answered later" fails it and still goes to `## Expected Gray Areas`, exactly as before.
 What changes is that a user-only decision can no longer be filed there for being small.
@@ -391,6 +400,13 @@ roll-up: one line each, naming the feature that carries it, the rubric theme it 
 **where the answer already lives** — the code, the config, or an existing convention. That is the
 only legal reason for a line to be in this block, and stating it is what makes the line auditable;
 without it the block is indistinguishable from a list of things nobody got round to asking.
+
+**And this block takes `project-specific` too.** Step 7a has that valve and 7b did not, which cost a
+real ambiguity: a run hit *"what does the decision search actually index?"*, found no rubric theme
+for it, and — with nowhere legal to put it — dropped it from the roadmap altogether. An ambiguity
+with no home is rule 1 broken, and the block that was supposed to receive the residue was refusing
+it on a formality. Where a rubric theme does not fit, write `project-specific` in its place, same as
+7a.
 
 `feature-local` and `cheap to reverse` are **not** reasons to file something here. They are the
 routing tests, and a user-only decision that fails them belongs in its feature's `open questions`
