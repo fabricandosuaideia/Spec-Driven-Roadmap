@@ -9,6 +9,35 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.16.0 — 2026-08-09
+
+**Reading one real project found a defect no synthetic fixture could.** A private six-month codebase
+was read — structure only, nothing of its content here or ever — to learn what a fixture for the
+three untested state scenarios has to look like. It carried something better than a shape.
+
+Its verification reports had **six distinct title forms**: `# <feature> Validation`,
+`# <feature> — Validação`, `# <feature> — Verifier Report`, `# Validation Report — <feature>`,
+`# Validation: <feature>`, `# Validação — <feature>`. Step 2's selection matched headings whose text
+*starts with* `Validation`, so **four of the six failed**, and the Portuguese one contains no
+`Validation` at all. The rule had even documented the trap — *"the word comes last"* — for one form,
+without noticing there were six. The Verifier writes prose, and prose varies.
+
+The selection now matches the word **anywhere** in the heading and accepts the translated and
+`Verifier` spellings. Verified against all six, with `# Roadmap` still correctly excluded.
+
+The lesson outlives the bug: **wherever this skill reads an artifact another skill wrote, that
+skill's template is a sample, not a spec.** A fixture built from a template tests the happy path
+only, which is exactly what a hand-built one does — whoever writes it writes all six the same way.
+
+- **[`benchmark/state-scenarios.md`](benchmark/state-scenarios.md)** — what the three missing
+  fixtures must carry, with the measured shapes of a real project: 30 of 37 built features no longer
+  named by the roadmap, four wave prefixes, a `SUPERSEDED` entry absent from the `.txt`, a Handoff
+  mid-Execute. They will be built over the existing Pauta fixture at different points in time — same
+  domain, one answer key, nothing new to invent.
+
+**One repository, more scenarios — not more repositories.** For the reason that decided the
+benchmark's location: an answer key elsewhere keeps asserting the old expectation after a rule moves.
+
 ## 3.15.0 — 2026-08-09
 
 **A clone was not enough to work from.** `CLAUDE.md` taught *how to think* and mentioned the scripts

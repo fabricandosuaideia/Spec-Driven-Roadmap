@@ -215,7 +215,8 @@ Exit `0` from it is therefore **necessary but not sufficient**; where these line
 decides. Say so in the Step 7 report when the two disagree, and never record a PASS the report
 contradicts.
 
-Collect the lines that are a heading (1-4 `#`) whose text *starts with* `Validation`, or that contain
+Collect the lines that are a heading (1-4 `#`) whose text **contains** `Validation`, `Validação`,
+`Validación` or `Verifier` anywhere in it, or that contain
 `Result:`, `Overall:` or `Status:` (with or without the `**`) — that selection is
 case-**in**sensitive — then judge the joined text **case-sensitively**, on the whole words `PASS` and
 `FAIL`, plus this rule first:
@@ -234,7 +235,15 @@ case-**in**sensitive — then judge the joined text **case-sensitively**, on the
 
 Two traps in that file, both verified against `tlc-spec-driven` v3.x's `references/validate.md`. Its
 persisted report is titled `# <feature> Validation` — the word comes *last*, so it fails a naive
-heading test; `## Validation: <feature> — PASS/FAIL` is the Verifier's **chat** summary and is never
+starts-with test. **And the template is not what a real project contains.** One six-month project on
+disk carried six distinct title forms across its reports — `# <feature> Validation`,
+`# <feature> — Validação`, `# <feature> — Verifier Report`, `# Validation Report — <feature>`,
+`# Validation: <feature>`, `# Validação — <feature>` — because the Verifier writes prose and prose
+varies. Four of the six fail a starts-with test, and the Portuguese one contains no `Validation` at
+all, which is why the selection above matches the word **anywhere** in the heading and accepts the
+translated and `Verifier` spellings. A run that lands on the whole-file fallback still reaches the
+right verdict most of the time, but the fallback is the degraded path and this rule promises the
+selection *is* the test; `## Validation: <feature> — PASS/FAIL` is the Verifier's **chat** summary and is never
 written to disk. And the report carries two `Result:` lines, the Discrimination Sensor's verdict and
 Gate Check's `[X] passed, [Y] failed` counts. Judge them together — lower-case `failed` in a count is
 not a `FAIL` verdict.

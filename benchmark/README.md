@@ -84,6 +84,13 @@ the only friction type that measures the *procedure* rather than the agent, and 
 A rising total friction count with `improvisou` flat usually means a more honest reporter, not a
 worse skill. Read before reacting.
 
+## What is not covered yet
+
+The four entry paths and the loop all start from **input only**. Three scenarios need a project with
+a past — re-run over an existing roadmap, seed with work in flight, conversion over generated output —
+and none has ever been run. [`state-scenarios.md`](state-scenarios.md) records what a fixture for them
+must carry, measured against a real six-month project rather than imagined.
+
 ## Changing the fixture
 
 The input is frozen. Change it only to **plant an eighth ambiguity** — the PRD is under-specified in
