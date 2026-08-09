@@ -9,6 +9,44 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.10.0 — 2026-08-08
+
+**The skill was executed, for the first time since 3.4.0.** Nine releases of prose review had
+happened without anyone running the procedure. Four agents with no knowledge of this session executed
+it end to end against a real 26-unit PRD — single-section, multi-section, interview with no
+downstream skill, and brownfield over a working FastAPI + React codebase — instructed to follow the
+text literally and to record friction rather than paper over it. They reported 63 friction points, 8
+of them grave, and produced the finding that matters most.
+
+- **The roadmap linter was green by luck.** `check-roadmap.py` parsed only `- **objective**: value`
+  while `decompose-phase.md` Step 6 specifies the fields as `- **objective** — one sentence`. An
+  entry written in the documented form parsed to **zero fields**, every per-feature check then
+  skipped, and the roadmap came out green. Reproduced: a roadmap with a real forward dependency and a
+  40-task feature passed with `0 failed`, exit 0. All four runs happened to invent the colon form, so
+  the gate had never been exercised against the form its own reference documents. The parser now
+  accepts both, and — the deeper fix — **a `### ` entry that yields no parseable fields is now a
+  failure, not a silent skip**. "Skip rather than guess" was right for an unparseable file and wrong
+  for an unparseable feature: it turned a total parse failure into a pass.
+- **The ledger was never checked in multi-section mode.** It lives in `ROADMAP-INDEX.md` there, and
+  the linter looked only at the section roadmap, found nothing, and skipped — in the mode where the
+  ledger matters most, since every section defers to it. It now reads the index and says so.
+- **`<skill-dir>` had no discovery procedure.** A run declared "no downstream skill installed" and
+  skipped the entire seed while `tlc-spec-driven` sat on disk in two places. Both the seed and
+  Phase 0 now carry the search order — project install, global install, plugin, user-supplied — and
+  require reporting which path answered. Absence is a finding, not a default.
+- **A cross-cutting decision that matches no rubric theme had no legal home.** Two runs hit the same
+  wall independently, with the same workaround: rule 1 says every ambiguity has a home, Step 8 says a
+  `cross-cutting` entry names its rubric theme, and Step 7a caps the ledger at one row per theme — so
+  a question passing all three tests but matching none of the nine was unwritable. Both demoted it to
+  one feature, under-reporting its reach, which is precisely what `affects:` exists to prevent. Such
+  a decision now gets a `project-specific` row, obeying every other rule and not counted against the
+  rubric.
+
+The four generated roadmaps now pass the linter on their merits rather than by accident: 12, 14, 13
+and 13 checks, zero failures. **The remaining 4 grave and 25 medium friction points are recorded and
+not yet applied** — the dominant kind is `improvisou`, 35 of 63, meaning the procedure repeatedly
+leaves an agent to decide something it should have decided.
+
 ## 3.9.0 — 2026-08-08
 
 **The fourth net had no callers.** An analysis of the one remaining gap — two statements that must

@@ -13,7 +13,7 @@
       "name": "spec-driven-roadmap",
       "source": "./",
       "description": "Generates a dependency-ordered feature backlog from a PRD, architecture doc, interview, or existing codebase, then seeds the downstream spec-driven build skill.",
-      "version": "3.9.0",
+      "version": "3.10.0",
       "author": {
         "name": "Fabricando Sua Ideia",
         "url": "https://github.com/fabricandosuaideia"

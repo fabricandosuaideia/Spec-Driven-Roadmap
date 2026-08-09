@@ -157,6 +157,20 @@ conclude the whole backlog is finished and seed nothing.
 the confirmed downstream skill actually ships one, otherwise your own read of the report. Neither is
 a lesser version of the other.
 
+**How to find `<skill-dir>`, because nothing else says.** A real run reported "no downstream skill
+installed" and skipped the whole seed while `tlc-spec-driven` sat on disk in two places — the check
+had nowhere to look. Search these, first hit wins, and say which one answered:
+
+1. `<project-root>/.claude/skills/<name>/SKILL.md` — a project install, what Claude Code loads first.
+2. `~/.claude/skills/<name>/SKILL.md` — a global install.
+3. `~/.claude/plugins/**/<name>/**/SKILL.md` — a plugin install; take the highest version present,
+   and ignore any directory carrying an `.orphaned_at` marker.
+4. The path the user gave, if they named one.
+
+**Absence is a finding, not a default.** Report which paths you looked in before concluding nothing
+is installed — Phase 0's "generate the roadmap anyway" branch and Step 6's skip both hang off that
+conclusion, and reaching it without looking discards the entire handoff for a skill that was there.
+
 **Check the disk, never the documentation.** Resolve `<skill-dir>` — the directory containing the
 confirmed skill's own `SKILL.md`, not the project root — and list its `scripts/`. Use a script only
 if the file is there **and** that skill's own reference documents it as the completion gate. **Never

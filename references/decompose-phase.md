@@ -212,6 +212,24 @@ auth boundaries. **Map the gray area to a theme, never the feature's flag to a t
 | External-dependency failure | Timeouts, fallbacks, and whether the system degrades or fails when a third party is down |
 | State-transition integrity | The canonical state machines and their guards |
 
+**A gray area that passes all three tests but matches no rubric theme still gets a row.** The rubric
+is the downstream skill's list of what *its* Discuss will ask; it is not a claim that every
+project-wide decision falls inside it. Two independent runs of this phase hit the same wall — *"which
+channel do notifications go out on?"* and *"which e-mail provider?"* — both passing only-the-user-
+decides, spans-two-or-more-features and expensive-to-reverse, and neither mapping onto any of the
+nine. The literal reading leaves them unwritable: rule 1 says every ambiguity has a home, Step 8 says
+a `cross-cutting` entry names its rubric theme, and this step caps the ledger at one row per theme.
+Both runs demoted the question to a single feature, which under-reports its reach — the seed then
+never blocks the other features the answer governs, which is the one thing `affects:` exists to
+prevent.
+
+So: add a row named for the decision itself, marked `project-specific` where a theme name would go.
+It follows every other rule — one row, one of the four states, and an `## Open Questions` entry
+tagged `cross-cutting` with an `affects:` line when it is left unanswered. The sanity check below
+counts rubric themes; `project-specific` rows are additional and are not counted against it. Do not
+invent these to pad the ledger: a row here has to have passed all three tests, and the burden of
+showing that is on the row.
+
 **Only themes the roadmap actually touches get asked.** For each theme: either features in this
 roadmap touch it — then ask — or record it as `N/A because <reason> (as of <this-roadmap>)`. That
 escape is mandatory, and its reasoning is borrowed from the same skill's own dimensions sweep: it
@@ -490,7 +508,8 @@ the script is not on disk — an install predating it — do the whole list by h
 - The coverage table accounts for 100% of the enumerated scope-units, each exactly once, and closes
   with `uncovered: none`.
 - Every theme in the confirmed downstream skill's rubric (Step 7a — nine for `tlc-spec-driven` v3.x)
-  has exactly one row in `## Cross-Cutting Decisions`, in one of its four states. No theme absent,
+  has exactly one row in `## Cross-Cutting Decisions`, in one of its four states, plus any
+  `project-specific` rows the sweep added (see Step 7a). No rubric theme absent,
   no theme with two rows.
 - Every `not decided` row (a `deferred to feature` row is exempt) names an entry that exists in
   `## Open Questions` tagged `cross-cutting`, naming that same rubric theme, with an `affects:` line;

@@ -33,8 +33,11 @@ reply — continue straight into the first question.
 
 **Confirm the downstream spec-driven skill.** Default assumption is `tlc-spec-driven`, but the seed
 needs that skill's exact fresh-start trigger phrase and its exact `.specs/STATE.md` field schema, and
-0b/0c need to know whose project-init output to reuse (rule 13). Ask if it is not evident from the
-project.
+0b/0c need to know whose project-init output to reuse (rule 13). **Look for it on disk before
+asking**, in the search order handoff-seed.md's Step 2 prescribes — a project install, then a global
+one, then a plugin — and say which path answered. Concluding "none installed" without having looked
+is what sends a run down the no-downstream-skill branch while the skill is sitting there. Ask only
+when the search is genuinely empty, or when what you found is not evidently the project's choice.
 
 *If nothing is installed yet:* **generate the roadmap anyway.** Phases 1 and 2 write only to `docs/`
 and produce artifacts a human or any agent can use. The seed still runs — it just stops after its

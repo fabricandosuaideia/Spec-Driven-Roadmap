@@ -83,7 +83,13 @@ def block(text, heading):
     return "\n".join(lines[start + 1:]) if start is not None else None
 
 
-FIELD_RE = re.compile(r"^\s*[-*]\s*\*{0,2}([A-Za-z][A-Za-z .\-/]*?)\*{0,2}\s*:\s*(.*)$")
+# Both separators. decompose-phase.md Step 6 specifies the fields as
+# `- **objective** — one sentence.` while the guide's worked example renders them
+# as `- Objective: ...`. Accepting only the colon made an entry written in the
+# documented form parse to zero fields, and every field check then skipped —
+# a roadmap with a forward dependency and a 40-task feature came out green.
+FIELD_RE = re.compile(
+    r"^\s*[-*]\s*\*{0,2}([A-Za-z][A-Za-z .\-/]*?)\*{0,2}\s*(?::|—|–|\s-\s)\s*(.*)$")
 
 
 def parse_features(text):
@@ -229,14 +235,32 @@ def check_open_questions(rm, feats, text):
     (ok if not detail else fail)(rm, "open questions agree in both directions", "\n".join(detail))
 
 
-def check_ledger(rm, text):
+def check_ledger(rm, text, root=None, path=None):
     led = block(text, "## Cross-Cutting Decisions")
+    source = rm
+    if led is None and path:
+        # Multi-section keeps the ledger in the index — exactly one per project.
+        # Skipping here meant the ledger was never checked at all in that mode,
+        # which is the mode where it matters most: every section roadmap defers
+        # to it, so an unanswered theme reaches every one of them.
+        idx = os.path.join(os.path.dirname(path), "ROADMAP-INDEX.md")
+        if os.path.isfile(idx):
+            with open(idx, encoding="utf-8") as fh:
+                led = block(fh.read(), "## Cross-Cutting Decisions")
+            source = os.path.relpath(idx, root or os.path.dirname(path))
     if led is None:
-        skip(rm, "cross-cutting ledger", "no block here (multi-section keeps it in the index)")
+        skip(rm, "cross-cutting ledger", "no block here and no index beside it")
         return
+    if source != rm:
+        record("ok", rm, "cross-cutting ledger read from %s" % source)
     rows = [l for l in led.splitlines()
             if l.strip().startswith("|") and not re.match(r"^\s*\|[\s|:-]+\|\s*$", l)]
     rows = [r for r in rows if not re.search(r"\bTheme\b", r, re.I)]
+    # decompose-phase Step 7a: a decision that passes the three tests but matches
+    # no rubric theme gets a `project-specific` row. It obeys every other rule but
+    # is not one of the nine, so counting it against them reports a false surplus.
+    extra = [r for r in rows if re.search(r"project-specific", r, re.I)]
+    rows = [r for r in rows if r not in extra]
     states = {"decided": 0, "n/a": 0, "not decided": 0, "deferred": 0}
     for r in rows:
         low = r.lower()
@@ -252,8 +276,9 @@ def check_ledger(rm, text):
         warn(rm, "cross-cutting ledger has one row per theme",
              "the block is present but no table rows were found")
         return
-    summary = "%d rows: %d decided, %d N/A, %d not decided, %d deferred" % (
-        len(rows), states["decided"], states["n/a"], states["not decided"], states["deferred"])
+    summary = "%d rubric rows: %d decided, %d N/A, %d not decided, %d deferred%s" % (
+        len(rows), states["decided"], states["n/a"], states["not decided"], states["deferred"],
+        " (+%d project-specific)" % len(extra) if extra else "")
     if len(rows) != RUBRIC_THEMES:
         warn(rm, "cross-cutting ledger has one row per theme",
              summary + " — tlc-spec-driven v3.x's rubric has %d themes; a different downstream "
@@ -419,6 +444,14 @@ def main():
         if not feats:
             skip(rm, "parse", "no `### <feature-name>` entries found — is this a roadmap?")
             continue
+        fieldless = [n for n, f, _ in feats if not f]
+        if fieldless:
+            fail(rm, "every feature entry yields parseable fields",
+                 "these `### ` entries produced no recognisable `- <field>` lines: "
+                 + ", ".join(fieldless[:8])
+                 + "\nEvery per-feature check below is vacuous for them, so a green "
+                   "result here would mean nothing. Check the separator: the fields "
+                   "are `- **objective** — value` or `- Objective: value`.")
         base = os.path.basename(path)
         tp = os.path.join(os.path.dirname(path),
                           "roadmap.txt" if base == "ROADMAP.md"
@@ -429,7 +462,7 @@ def main():
         check_task_estimate(rm, feats)
         check_discharge(rm, feats, text)
         check_open_questions(rm, feats, text)
-        check_ledger(rm, text)
+        check_ledger(rm, text, root, path)
         check_disjoint(rm, text, feats)
         check_coverage(rm, text)
         check_context_flag(rm, feats)
