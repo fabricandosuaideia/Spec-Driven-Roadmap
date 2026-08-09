@@ -9,6 +9,43 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.12.0 — 2026-08-09
+
+**Rule 1 had an exception nobody meant to write, and two independent runs found it by inventing their
+way around it.** Step 7 splits a gray area by three tests and said a decision failing *any* of them
+goes to `## Expected Gray Areas`. Test 2 is "reaches beyond one feature". So a decision **only the
+user can make** — rule 1's exact subject — was legally filed in the one block the loop gate skips by
+design, where Discuss picks a default and nobody is asked. Rule 1 says *never guess, never pick a
+silent default*; rule 8 said, for anything feature-local, do precisely that.
+
+The re-execution caught it in the wild. `rerun-d` filed *"criterio de desempate entre itens
+empatados"* — the vote tie-break, one of the seven ambiguities planted in the test PRD, and a
+decision no code can answer because voting does not exist yet — under *"falha o teste 3: barato de
+reverter"*. Correct by the old text, and it means an unattended loop would have picked a tie-break
+rule on the user's behalf and moved on.
+
+**Test 1 is now a gate, not a peer.** Failing it — the code, config or an existing convention can
+answer — is the only route into `## Expected Gray Areas`, because that is a lookup and never was an
+ambiguity. Passing it means the question is recorded, always; tests 2 and 3 decide only *where*:
+the ledger plus a `cross-cutting` entry when both also pass, the carrying feature's own
+`open questions` field when either fails. A decision only the user can make never lands in the block
+nothing sweeps, whatever its blast radius.
+
+This does not widen the sweep, and the distinction is the whole point of rule 8's economy: the thing
+"the built code would have answered later" fails test 1 and still goes to `## Expected Gray Areas`,
+exactly as before. What changed is that being *small* stopped being a reason to skip asking.
+
+- Step 7b now requires each line to state **where the answer already lives** — code, config, or an
+  existing convention. `feature-local` and `cheap to reverse` are routing tests, not filing reasons,
+  and a line claiming either is misfiled.
+- `check-roadmap.py` enforces it. The boundary between the two blocks was previously described as
+  "strictly disjoint" with no test for deciding which side something falls on, which is why two runs
+  invented two different criteria — and the next would have invented a third.
+
+**Expect this to fail on roadmaps generated before today.** All six projects in the testbed flag it,
+correctly: they were written when `feature-local` was a legal reason. The fix is to move those lines
+into the carrying feature's `open questions`, which is where the loop gate will then find them.
+
 ## 3.11.0 — 2026-08-09
 
 **Rule 1 went from 5-of-7 to 7-of-7, measured.** The PRD used for the execution test carries seven

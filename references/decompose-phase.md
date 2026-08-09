@@ -203,7 +203,23 @@ to leave until then from the ones that are right to leave until then.
 3. **Reversing it later is expensive** — it gets embedded in several features, so changing it means
    reworking all of them.
 
-Test 2 is the load-bearing one, and not by accident. A decision that spans features is a decision
+**Test 1 is a gate; tests 2 and 3 are a router.** Read in the obvious way — "fails any of the three,
+so it is not asked" — the list sends a decision only the user can make into `## Expected Gray Areas`
+the moment it happens to be feature-local, and that block is swept by nothing: the loop gate skips it
+by design and Discuss picks a default. That is rule 1's silent default with a different label on it,
+and two independent runs of this phase invented their own tie-break rather than follow it.
+
+So: **failing test 1 is the only route to `## Expected Gray Areas`.** If the answer exists in code,
+config or an existing convention, it was never an ambiguity — it is a lookup, and Discuss resolves it
+better later. If it exists nowhere but in the user's head, it is recorded as a question no matter how
+small its blast radius; tests 2 and 3 then decide only *where* — the ledger and the roll-up when both
+pass, the carrying feature's own `open questions` field when either fails.
+
+This does not widen the sweep. Rule 8's economy is test 1 itself: the thing that "the built code
+would have answered later" fails it and still goes to `## Expected Gray Areas`, exactly as before.
+What changes is that a user-only decision can no longer be filed there for being small.
+
+Test 2 is the load-bearing one for *routing*, and not by accident. A decision that spans features is a decision
 whose effects propagate — and the downstream Discuss is scoped to one feature at a time, with an
 explicit guardrail against leaving that boundary. That whole class is invisible from inside any
 single feature's discussion. It is the one thing this phase can see and that phase structurally
@@ -370,11 +386,16 @@ passes the three tests becomes one of these rows.
 
 ### 7b — Everything else is recorded, not asked
 
-A gray area that fails any of the three tests is **not** asked here. It goes into an
-`## Expected Gray Areas` roll-up: one line each, naming the feature that carries it, the rubric theme
-it belongs to, and **which test it failed** (feature-local / cheap to reverse / discoverable from the
-code). The failed test is what makes the line auditable; without it the block is indistinguishable
-from a list of things nobody got round to asking.
+A gray area that fails **test 1** is not asked here. It goes into an `## Expected Gray Areas`
+roll-up: one line each, naming the feature that carries it, the rubric theme it belongs to, and
+**where the answer already lives** — the code, the config, or an existing convention. That is the
+only legal reason for a line to be in this block, and stating it is what makes the line auditable;
+without it the block is indistinguishable from a list of things nobody got round to asking.
+
+`feature-local` and `cheap to reverse` are **not** reasons to file something here. They are the
+routing tests, and a user-only decision that fails them belongs in its feature's `open questions`
+field (Step 7's gate). A line here whose stated reason is one of those two is misfiled, and the
+sanity check below catches it.
 
 **Record only what this sweep actually turned up.** This block is 7a's residue, not a forecast of
 Discuss's agenda. Discuss generates its own gray areas per feature with the code in front of it —
@@ -586,6 +607,10 @@ the script is not on disk — an install predating it — do the whole list by h
   present or one of its open questions reads `status: open`, and `no` otherwise. The field is
   derived (Step 6), so it is checkable — and the seed's Blocker gate reads the question, not this
   field, precisely so a wrong `no` cannot switch the gate off.
+- Every `## Expected Gray Areas` line states where the answer already lives — the code, the config,
+  or an existing convention. A line whose stated reason is `feature-local` or `cheap to reverse` is
+  misfiled: those are Step 7's routing tests, and a user-only decision that fails them belongs in its
+  feature's `open questions` field, not in the block nothing sweeps.
 - Nothing appears in both `## Expected Gray Areas` and `## Open Questions` (or any feature's own
   `open questions` field). That pair is the one that must be disjoint — the loop gate sweeps one and
   deliberately skips the other.

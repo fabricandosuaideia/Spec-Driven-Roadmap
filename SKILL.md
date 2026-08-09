@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.11.0"
+  version: "3.12.0"
 ---
 
 # Spec-Driven Roadmap
@@ -118,11 +118,16 @@ Phase 2 runs it too, as its own closing check — see decompose-phase.md, "Sanit
    fire; it says nothing about *what* it will demand. Phase 2's Step 7 closes that gap against the
    downstream skill's **rubric** — a different, longer list than rule 7's six triggers — and splits
    by a three-part test: only-the-user-decides, spans two or more features, expensive to reverse.
-   Three destinations, exactly one each: all three tests **and answered** → that theme's row in
-   `## Cross-Cutting Decisions`; all three but left **unanswered** → a `cross-cutting` question in
-   `## Open Questions` plus a `not decided` row in that same ledger, because silence never promotes
-   a proposed default into a decision; any test missing → `## Expected Gray Areas`, left to Discuss,
-   which answers it better with the code in front of it. Never sweep everything: a question asked
+   **Test 1 is a gate, not a peer.** Fail it — the code, config or conventions can answer — and it
+   was never a rule 1 ambiguity: it is a lookup, and it goes to `## Expected Gray Areas` for Discuss,
+   which answers it better with the code in front of it. Pass it and it is recorded as a question,
+   always; tests 2 and 3 decide only *where*. Three destinations, exactly one each: passes all three
+   **and answered** → that theme's row in `## Cross-Cutting Decisions`; passes all three but left
+   **unanswered** → a `cross-cutting` question in `## Open Questions` plus a `not decided` row in
+   that same ledger, because silence never promotes a proposed default into a decision; passes test 1
+   but fails 2 or 3 → the carrying feature's own `open questions` field. A decision only the user can
+   make never lands in `## Expected Gray Areas`, whatever its blast radius — that block is swept by
+   nothing, so putting one there is rule 1's silent default wearing rule 8's clothes. Never sweep everything: a question asked
    here that the built code would have answered later spends the user's attention twice.
 9. **Ask how the scope is shaped.** Single unified roadmap versus multiple section roadmaps is the
    user's call, made explicitly in Phase 0. Never infer it from how big the source looks. Exception:

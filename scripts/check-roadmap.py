@@ -405,6 +405,39 @@ def check_disjoint(rm, text, feats):
                                   if overlap else "")
 
 
+MISFILED = re.compile(r"feature[- ]local|cheap to reverse|barato de reverter|local (?:a|à) (?:uma )?feature",
+                      re.I)
+LIVES_IN = re.compile(r"\bcode\b|\bconfig\b|convention|c[oó]digo|conven[cç]|discoverable|descobr", re.I)
+
+
+def check_gray_area_reasons(rm, text):
+    """Step 7b: failing test 1 is the only route into this block.
+
+    `feature-local` and `cheap to reverse` are the routing tests, not reasons to
+    file something here — a decision only the user can make that happens to be
+    small belongs in its feature's `open questions`, which the loop gate sweeps.
+    This block is swept by nothing, so a user-only decision parked here gets a
+    default with no one asked, which is rule 1's silent default relabelled."""
+    gray = block(text, "## Expected Gray Areas")
+    if gray is None:
+        skip(rm, "gray-area lines say where the answer already lives", "no such block")
+        return
+    lines = [l.strip() for l in gray.splitlines() if l.strip().startswith(("-", "*"))]
+    if not lines:
+        skip(rm, "gray-area lines say where the answer already lives", "block present but empty")
+        return
+    misfiled = [l[:100] for l in lines if MISFILED.search(l)]
+    silent = [l[:100] for l in lines if not MISFILED.search(l) and not LIVES_IN.search(l)]
+    detail = []
+    if misfiled:
+        detail.append("reason is a routing test, not test 1 — these belong in the feature's "
+                      "`open questions`:\n  " + "\n  ".join(misfiled))
+    if silent:
+        detail.append("no stated place where the answer already lives:\n  " + "\n  ".join(silent))
+    (ok if not detail else fail)(rm, "gray-area lines say where the answer already lives",
+                                 "\n".join(detail))
+
+
 def check_coverage(rm, text):
     # Falling back to the whole file when there is no `## Coverage` heading used
     # to be silent, and silence here reads as a pass: any sentence of prose
@@ -599,6 +632,7 @@ def main():
             check_open_questions(rm, feats, text)
         check_ledger(rm, text, root, path)
         check_disjoint(rm, text, feats)
+        check_gray_area_reasons(rm, text)
         check_coverage(rm, text)
         if legible:
             check_context_flag(rm, feats)
