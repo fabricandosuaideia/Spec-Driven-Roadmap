@@ -1,173 +1,186 @@
-# CLAUDE.md — Contrato de método deste repositório
+# CLAUDE.md — how work is done in this repository
 
-> Este arquivo não diz **o que** a skill faz — isso está no [`README.md`](README.md), no
-> [`SKILL.md`](SKILL.md) e em [`references/`](references/). Ele guarda **como se trabalha aqui**:
-> técnicas que foram testadas neste repositório e que funcionaram, para não serem redescobertas a
-> cada sessão.
+> **Speak the user's language.** Reply in whatever language the person is writing to you in —
+> Portuguese, Spanish, English or anything else — without being asked and without switching back.
+> This repository is written in English and stays that way; that is a convention for the *files*,
+> never an instruction about the *conversation*.
 >
-> Cada lição vem com a evidência que a tornou crível. Os números são de execuções reais registradas
-> no [`CHANGELOG.md`](CHANGELOG.md), não de opinião — e vários deles são defeitos que o mantenedor
-> cometeu e mediu depois. Estão aqui porque o padrão é mais útil que o pudor.
->
-> Origem: a sequência de releases da v3.4.0 à v3.13.0. As lições generalizam para outros projetos;
-> a evidência é local.
+> Keep the two apart, because they have different rules. What the skill **generates** follows
+> `references/scope-phase.md`: the language of the source document, or of the conversation when
+> there is no source, with feature names, slugs, filenames and every generated section heading
+> staying in English because they are machine-read keys. What you **say** follows the person in
+> front of you.
+
+This file does not describe *what* the skill does — that is [`README.md`](README.md),
+[`SKILL.md`](SKILL.md) and [`references/`](references/). It records **how work is done here**:
+techniques tested in this repository that held up, so they are not rediscovered every session.
+
+Each lesson carries the evidence that made it credible. The numbers come from real runs recorded in
+[`CHANGELOG.md`](CHANGELOG.md), not from opinion — and several of them are defects the maintainer
+shipped and measured afterwards. They are here because the pattern is more useful than the modesty.
+
+Origin: the release sequence from v3.4.0 to v3.13.0. The lessons generalise; the evidence is local.
 
 ---
 
-## 1. Mudança em prosa não vale nada até ser executada
+## 1. A prose change is worth nothing until it has been executed
 
-**A lição mais cara da sessão.** Nove releases seguidas de revisão de prosa — leitura adversarial,
-verificação cruzada, contagens conferidas — não acharam nada do que **uma única execução** achou.
+**The most expensive lesson here.** Nine consecutive releases of prose review — adversarial reading,
+cross-checking, counts verified — found none of what **a single execution** found.
 
-Pior: toda vez que uma correção de prosa foi embarcada sem execução, a execução seguinte achou
-defeito nela. Inclusive nas correções feitas para consertar defeitos:
-
-```
-3.6.1  fechou 3 graves  →  criou 2
-3.10.0 fechou 4 graves  →  criou 1 (que o rerun pegou)
-3.12.0 fechou 1 grave   →  criou 2 (um deles quebrando a mesma regra que consertava)
-```
-
-**Portanto:** ao editar procedimento, especificação, prompt ou qualquer artefato que outra pessoa (ou
-agente) vai *executar*, planeje a execução junto com a edição. "Reli e está certo" não é verificação
-— foi exatamente o que precedeu cada um dos casos acima.
-
-## 2. Quando uma regra pode virar script, faça
-
-Quatro vezes neste repositório uma regra escrita virou código, sempre pelo mesmo motivo: **procedimento
-escrito não roda contra caso de teste.**
-
-O caso definitivo: um procedimento de migração destrutiva foi **reprovado três vezes seguidas** por
-revisão adversarial. Reescrito como script, a primeira execução expôs um quarto defeito que nenhuma
-das três revisões podia ver, e uma quarta rodada contra 54 fixtures achou mais cinco — incluindo dois
-que só apareciam rodando comandos `git` de verdade.
-
-**Sinais de que uma regra deveria ser script:** ela tem ordem de operações; ela tem caminho de
-rollback; ela deriva um valor de outro lugar; ela é verificável por comparação. Se você está
-escrevendo "nunca faça X antes de Y" em prosa, considere que uma função faz isso melhor.
-
-## 3. Verificador sem chamador é decoração
-
-Um script de consistência existiu por duas releases **sem nenhum chamador**: fora dos instaladores,
-não citado em documento nenhum, sem CI. Só rodava quando alguém lembrava — e memória falhando é
-exatamente a doença que ele existia para pegar.
-
-> Um verificador que ninguém invoca é **pior** que nenhum: produz a crença numa rede sem a rede.
-
-**Portanto:** ao criar uma checagem, decida no mesmo commit **onde ela é invocada** e escolha um
-ponto por onde o processo não passa ao largo. Aqui foi o script de bump de versão — não se corta um
-release sem bumpar.
-
-## 4. Constante declarada sem leitor apodrece
-
-Duas tabelas declarativas foram embarcadas com **zero leitores**. Uma delas guardava um fato
-**errado** (listava 7 itens onde o canônico eram 6) — parado no repositório, invisível, porque nada
-a consultava.
-
-Virou checagem automática: *toda constante de módulo precisa ser lida em algum lugar do próprio
-arquivo.* É a única verificação que ataca a doença em vez do sintoma.
-
-## 5. Verifique o remédio, não só o achado
-
-Taxa medida ao longo da sessão, em três lotes:
+Worse: every time a prose fix shipped without being executed, the next execution found a defect in
+it. Including in fixes made to fix defects:
 
 ```
-6 remédios refutados de N  →  26 de 31 precisaram de correção  →  5 de 7 rejeitados na triagem
+3.6.1   closed 3 grave defects  ->  created 2
+3.10.0  closed 4                ->  created 1, caught by the re-run
+3.12.0  closed 1                ->  created 2, one of them breaking the rule it was fixing
 ```
 
-Um remédio errado, aplicado, **introduz defeito enquanto parece progresso**. Exemplos reais pegos
-antes de escrever: um conserto que faria um laço de propagação girar para sempre; uma cláusula que
-recusaria semear uma seção em construção; um check que inventava um artefato inexistente.
+**So:** when editing a procedure, a specification, a prompt — anything another person or agent will
+*execute* — plan the execution alongside the edit. "I re-read it and it is correct" is not
+verification; it is exactly what preceded each of the cases above.
 
-**Portanto:** entre "achado confirmado" e "aplicar", insira uma fase que responda **duas** perguntas
-separadas — *(a) o defeito ainda existe hoje?* e *(b) o remédio proposto quebra alguma outra coisa?*
-— relendo o trecho inteiro que a correção altera. Descartar é resultado legítimo, e a lista de
-descartes costuma ser mais informativa que a de aplicados.
+## 2. When a rule can become a script, make it one
 
-## 6. Num portão, pular em silêncio é pior que falhar
+Four times in this repository a written rule became code, always for the same reason: **a written
+procedure cannot be run against a test case.**
 
-Um linter tinha o princípio "pular em vez de chutar", certo para arquivo ilegível e **errado** para
-item ilegível: transformava falha total de parse em aprovação. Um roadmap com dependência circular e
-uma feature de 40 tarefas passava com `0 failed`, exit 0.
+The decisive case: a destructive migration procedure was **rejected three rounds running** by
+adversarial review. Rewritten as a script, the first execution exposed a fourth defect none of the
+three reviews could see, and a fourth round against 54 fixtures found five more — two of which only
+appeared when real `git` commands ran.
 
-**Regra:** se a unidade que você deveria julgar não pôde ser lida, isso é **falha**, não silêncio.
-Verde vazio é a pior saída que um portão pode dar, porque desliga a atenção de quem lê.
+**Signs a rule should be a script:** it has an order of operations; it has a rollback path; it
+derives a value from somewhere else; it is verifiable by comparison. If you are writing "never do X
+before Y" in prose, a function does that better.
 
-## 7. Meça antes de propor; não invente número
+## 3. A checker with no caller is a decoration
 
-Dois números foram publicados sem medição — "300 linhas" e "29 achados" — e os dois estavam
-errados. O primeiro estava errado **em espécie**: a distância real não era dentro do arquivo, era
-entre arquivos, e uma ferramenta baseada em proximidade teria pego 1 caso de 7.
+A consistency script existed for two releases with **zero callers**: not in the installers, named in
+no document, and there is no CI here. It ran only when someone remembered — and memory failing is
+precisely the disease it exists to catch.
 
-A medição também mudou uma decisão de desenho: contar os fatos duplicados (64 candidatos, sem
-saturar) provou que um registro manual cobriria ~13% e viraria mais uma coisa a derivar. A conclusão
-correta foi **não construir** o mecanismo proposto.
+> A checker nobody invokes is **worse** than none: it produces the belief in a net without the net.
 
-**Portanto:** toda afirmação quantitativa vem de um comando que você rodou. Se não mediu, escreva
-"não medido" — é mais útil que uma estimativa que parece dado.
+**So:** when you create a check, decide in the same commit **where it is invoked**, and pick a point
+the process cannot route around. Here that was the version-bump script — you cannot cut a release
+without bumping.
 
-## 8. Para testar execução, use agentes sem histórico
+## 4. A declared constant with no reader rots
 
-Quem escreveu o procedimento é o **pior leitor possível** dele: sabe o que ele *deveria* dizer.
+Two declarative tables shipped with **zero readers**. One of them held a **wrong** fact — seven
+entries where the canonical number is six — sitting in the tree, invisible, because nothing consulted
+it.
 
-Instruções que fizeram a diferença nos testes daqui:
+It became an automated check: *every module-level constant must be read somewhere in its own file.*
+It is the only check here aimed at the disease rather than a symptom.
 
-- **"Siga literalmente."** Diante de ambiguidade, seguir a leitura mais literal e registrar — nunca
-  preencher a lacuna com bom senso. Um agente que conserta o procedimento enquanto executa esconde
-  exatamente o que se quer ver.
-- **"Atrito é o produto."** Declarar que travar, improvisar, achar contradição são o *resultado*, não
-  efeito colateral. Uma execução que reporta zero atrito é suspeita de não ter seguido o texto.
-- **Não contar o que mudou.** Para validar uma mudança, o executor não deve saber qual é. Se o texto
-  só funciona com alguém explicando, ele não funciona.
+## 5. Verify the remedy, not just the finding
 
-A métrica mais útil que saiu disso: a proporção de atrito do tipo **"improvisou"** — agente decidindo
-algo que o procedimento deveria ter decidido. Caiu de 56% para 33% e apontou exatamente o que
-consertar.
+Measured across three batches in this repository:
 
-## 9. Isole o ambiente de teste
+```
+6 remedies refuted  ->  26 of 31 needed correcting  ->  5 of 7 rejected in triage
+```
 
-Sete execuções concluídas ficaram lado a lado sob o mesmo diretório pai. Qualquer uma podia fazer
-`ls ..` e ver os resultados das outras para a mesma entrada.
+A wrong remedy, applied, **introduces a defect while looking like progress**. Real examples caught
+before anything was written: a fix that would have made a propagation pass loop forever; a clause
+that would have refused to seed a section under construction; a check that invented an artifact which
+does not exist.
 
-**Portanto:** o diretório pai do projeto de teste contém **só ele**. E arquive o estado anterior antes
-de limpar — ele é a base de comparação de tudo que foi medido, e apagá-lo custa o "antes" dos números.
+**So:** between "finding confirmed" and "apply", insert a phase answering **two separate** questions —
+*(a) does the defect still exist today?* and *(b) does the proposed remedy break something else?* —
+by re-reading the whole passage the fix touches. Discarding is a legitimate outcome, and the list of
+discards is usually more informative than the list of applications.
 
-## 10. Plante defeitos conhecidos para tornar qualidade mensurável
+## 6. In a gate, a silent skip is worse than a failure
 
-O PRD de teste levou **sete ambiguidades plantadas de propósito**. Isso transformou "a regra de nunca
-decidir ambiguidade funciona?" de impressão em placar: **5 de 7 → 7 de 7**.
+A linter carried the principle "skip rather than guess" — right for an unparseable file, **wrong**
+for an unparseable item: it turned a total parse failure into a pass. A roadmap with a circular
+dependency and a 40-task feature came out with `0 failed`, exit 0.
 
-Sem os defeitos plantados não há como saber se uma correção funcionou. Com eles, a resposta é um
-número, e regressão fica visível.
+**Rule:** if the unit you were supposed to judge could not be read, that is a **failure**, not
+silence. An empty green is the worst result a gate can give, because it switches off the attention of
+whoever reads it.
 
-**Complemento honesto que vale copiar:** peça ao executor que **declare quando decidiu em silêncio**,
-deixando claro que isso é o dado e não falha dele. Foi assim que apareceu o desconto que importa —
-7/7 pela métrica "ninguém preencheu lacuna em silêncio", mas 4/7 pela métrica "um humano decidiu de
-fato".
+## 7. Measure before proposing; never invent a number
+
+Two numbers were published here without measuring — "300 lines" and "29 findings" — and both were
+wrong. The first was wrong **in kind**: the real distance was not within a file but between files, so
+a proximity-based tool would have caught 1 case out of 7.
+
+Measuring also reversed a design decision. Counting the duplicated facts (64 candidates, and the
+enumeration had not saturated) proved a hand-maintained registry would cover ~13% and become one more
+thing that drifts. The correct conclusion was **not to build** the proposed mechanism.
+
+**So:** every quantitative claim comes from a command you ran. If you did not measure, write "not
+measured" — it is more useful than an estimate that looks like data.
+
+## 8. To test execution, use agents with no history
+
+Whoever wrote the procedure is its **worst possible reader**: they know what it was *meant* to say.
+
+Instructions that made the difference in the tests here:
+
+- **"Follow it literally."** Faced with ambiguity, take the most literal reading and record it — never
+  fill the gap with good sense. An agent that repairs the procedure while executing it hides exactly
+  what you are trying to see.
+- **"Friction is the output."** State that stalling, improvising and finding contradictions are the
+  *result*, not a side effect. A run reporting zero friction is suspected of not having followed the
+  text.
+- **Do not say what changed.** To validate a change, the executor must not know which one it is. If
+  the text only works with someone explaining it, it does not work.
+
+The most useful metric this produced: the share of friction of the kind **"improvised"** — an agent
+deciding something the procedure should have decided. It fell from 56% to 33% and pointed straight at
+what to fix.
+
+## 9. Isolate the test environment
+
+Seven completed runs sat side by side under one parent directory. Any of them could `ls ..` and see
+the others' results for the same input.
+
+**So:** the test project's parent directory contains **only it**. And archive the previous state
+before cleaning — it is the baseline for everything measured, and deleting it costs you the "before"
+of every number.
+
+## 10. Plant known defects so quality becomes a score
+
+The test PRD carried **seven deliberately planted ambiguities**. That turned "does the never-decide-an-
+ambiguity rule work?" from an impression into a score: **5 of 7 → 7 of 7**.
+
+Without planted defects there is no way to know whether a fix worked. With them the answer is a
+number, and regression becomes visible.
+
+**A companion worth copying:** ask the executor to **declare when it decided something silently**,
+making clear that this is the data and not a failure on its part. That is how the discount that
+matters surfaced — 7 of 7 by the metric "nobody filled a gap in silence", but 4 of 7 by the metric "a
+human actually decided".
 
 ---
 
-## Padrão que atravessa tudo
+## The pattern running through all of it
 
-**Acréscimo sem reconciliação.** Toda vez que uma release acrescentou um fato num lugar, os lugares
-que **escrevem**, **auditam** e **documentam** esse fato ficaram na versão anterior. Explicou 15 de 37
-achados numa revisão completa, e voltou a acontecer duas releases depois, cometido enquanto se
-consertava outra coisa.
+**Accretion without reconciliation.** Every time a release added a fact in one place, the places that
+**write**, **audit** and **document** that fact stayed on the previous version. It explained 15 of 37
+findings in a full review, and then happened again two releases later, committed while fixing
+something else.
 
-Duplicar fato de propósito — para cada arquivo ser autossuficiente — é uma escolha defensável. Não
-ter mecanismo para manter as cópias em sincronia não é. Enquanto isso depender de memória do
-mantenedor, a memória vai falhar; aqui falhou em pelo menos cinco fatos distintos em duas releases — que é por que
-`scripts/check-consistency.py` existe.
+Duplicating a fact on purpose — so each file is self-sufficient for the agent reading it — is a
+defensible choice. Having no mechanism to keep the copies in step is not. While that depends on the
+maintainer's memory, the memory will fail; here it failed on at least five distinct facts across two
+releases, which is why `scripts/check-consistency.py` exists.
 
-## O que não funcionou
+## What did not work
 
-Registrado para não ser tentado de novo:
+Recorded so it is not attempted again:
 
-- **Registro manual de fatos** (`facts.yaml` e afins) para manter cópias em sincronia. Medido: cobre
-  ~13% das afirmações normativas, precisa de manutenção manual, e o próprio registro deriva — as duas
-  tabelas declarativas deste repositório apodreceram em semanas.
-- **Portão de release por julgamento de LLM** sem determinismo. Sem CI, sem hook e com custo por
-  release, vira teatro: gera um artefato que *parece* verificação.
-- **Cortar arquivo por tamanho.** Dividir só funcionou onde havia uma costura real — dois gatilhos e
-  dois leitores no mesmo arquivo. Cortar pelo número de linhas é o tipo de cirurgia que introduziu
-  defeito três vezes.
+- **A hand-maintained fact registry** (`facts.yaml` and the like) for keeping copies in step.
+  Measured: covers ~13% of the normative sentences, needs manual upkeep, and the registry itself
+  drifts — this repository's two declarative tables rotted within weeks.
+- **A release gate resting on LLM judgement**, with no determinism. No CI, no hook, and a cost per
+  release: it becomes theatre, producing an artifact that *resembles* verification.
+- **Splitting a file by size.** Splitting worked only where there was a real seam — two triggers and
+  two readers in one file. Cutting by line count is the kind of surgery that introduced defects three
+  times.
