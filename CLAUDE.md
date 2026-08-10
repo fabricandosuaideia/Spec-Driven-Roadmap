@@ -50,6 +50,22 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
    version.
 6. `bash scripts/bump-version.sh <version>` — it runs the gate and exits non-zero if anything fails.
 
+**One agent, one copy. Non-negotiable.** Every agent in a test gets its own freshly created copy of
+the fixture, under its own parent directory. Never point two agents at one tree, never reuse a tree a
+previous run wrote to, and never score a run whose directory you did not create for it. Use
+`scripts/run-benchmark.py setup --agents N`, which builds N isolated copies and refuses to reuse a
+path; hand-rolling the setup is where this goes wrong every time.
+
+The escape hatch exists and is narrow: **shared state is allowed only when the interference is the
+thing being measured** — two agents racing for the same lock, a conversion running against a tree
+another process is writing. Say so out loud when you take it, and say what you expect to see.
+
+This rule has been broken three times here, each time by someone who knew it. Seven finished runs
+under one parent, any able to `ls ..` and read another's answers. An answer key sitting beside the
+fixtures it grades, which an executor grepped into its own context. Three agents handed one directory,
+overwriting each other's work until the run was unattributable and had to be thrown away. It is
+lesson 9 below, and being a lesson was not enough — which is why it is a rule up here instead.
+
 **Ask before committing, tagging or pushing.** Every release here is a public artifact with a tag;
 none of it is yours to decide unprompted.
 
@@ -221,14 +237,30 @@ The most useful metric this produced: the share of friction of the kind **"impro
 deciding something the procedure should have decided. It fell from 56% to 33% and pointed straight at
 what to fix.
 
-## 9. Isolate the test environment
+## 9. Isolate the test environment — and the granularity keeps getting finer
 
-Seven completed runs sat side by side under one parent directory. Any of them could `ls ..` and see
-the others' results for the same input.
+Three occurrences, each one a level below the last, each committed by someone who already knew the
+rule:
 
-**So:** the test project's parent directory contains **only it**. And archive the previous state
-before cleaning — it is the baseline for everything measured, and deleting it costs you the "before"
-of every number.
+```
+directory   7 finished runs under one parent; any could `ls ..` and read another's answers
+file        the answer key beside the fixtures it grades — an executor grepped it into context
+agent       3 agents given one directory; they overwrote each other and the run was unusable
+```
+
+**So:** the test project's parent directory contains **only it**, the answer key lives outside the
+directory it grades, and every agent gets its own copy. And archive the previous state before
+cleaning — it is the baseline for everything measured, and deleting it costs you the "before" of
+every number.
+
+**What each occurrence taught that the previous one had not.** The first says isolate the runs. The
+second says the *grader* is part of the environment, not an observer of it. The third says the unit
+of isolation is not the run, it is the **reader** — anything that reads or writes the tree needs its
+own, and two agents sharing one tree do not produce two results, they produce none.
+
+Stated as a hard rule at the top of this file, because being lesson 9 was not enough to stop the
+third. And made mechanical in `run-benchmark.py setup --agents N`, because a rule that requires
+remembering is a rule that fails on the day you are busy — which is lesson 2 pointed at this one.
 
 ## 10. Plant known defects so quality becomes a score
 

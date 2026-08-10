@@ -127,6 +127,10 @@ def cmd_setup(args):
         die("no benchmark/fixture at %s" % FIXTURE)
 
     label, wants = SCENARIOS[args.scenario]
+    if getattr(args, "agents", 1) < 1:
+        die("--agents must be at least 1")
+    if getattr(args, "agents", 1) > 1:
+        return setup_many(args, label, wants)
     stamp = args.label or args.scenario
     # One run per parent. Nothing else is ever placed beside it, which is the
     # whole point: `ls ..` from inside must reveal no other run's answers.
@@ -172,6 +176,31 @@ def cmd_setup(args):
     print("\nGive the agent that path and nothing else. benchmark/README.md has the")
     print("launch rules — fresh agent, follow literally, friction is the output,")
     print("never say what changed.")
+    return 0
+
+
+def setup_many(args, label, wants):
+    """One freshly created copy per agent, each under its own parent.
+
+    Hand-rolled setups are where isolation fails. Three agents were once given a
+    single directory and overwrote each other until the run was unattributable and
+    had to be thrown away -- the third time this repository broke its own
+    isolation rule, after directory level and file level. Making the right thing
+    one flag is worth more than restating the rule a fourth time."""
+    base = args.label or args.scenario
+    made = []
+    for i in range(1, args.agents + 1):
+        sub = argparse.Namespace(**vars(args))
+        sub.agents = 1
+        sub.label = "%s-%d" % (base, i)
+        if cmd_setup(sub) != 0:
+            return 1
+        made.append(os.path.join(RUNROOT, sub.label, "project"))
+        print("")
+    print("%d isolated copies. Give each agent exactly one of these paths, and never"
+          % len(made))
+    print("the same one to two agents -- a shared tree does not produce two results,")
+    print("it produces none. Score them separately.")
     return 0
 
 
@@ -360,6 +389,9 @@ def main():
     s.add_argument("scenario")
     s.add_argument("--label", help="name this run (default: the scenario name)")
     s.add_argument("--force", action="store_true", help="replace an existing run")
+    s.add_argument("--agents", type=int, default=1,
+                   help="create this many isolated copies, one per agent — never give "
+                        "two agents the same tree")
     s.set_defaults(fn=cmd_setup)
 
     c = sub.add_parser("score", help="score a finished run against expected.md")

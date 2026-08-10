@@ -53,6 +53,13 @@ python3 scripts/run-benchmark.py score <path> --record
 seven finished runs once sat side by side under one parent, and any of them could `ls ..` and read
 another's answers to the same PRD.
 
+**Running several agents on one scenario — `setup <scenario> --agents N`.** It builds N separate
+copies, each under its own parent, and prints one path per agent. Give each agent exactly one, and
+never the same one to two of them: a shared tree does not produce two results, it produces none.
+Three agents were once handed a single directory, overwrote each other, and the whole run had to be
+thrown away. Hand-rolling the copies is where this fails, so the flag exists to make it not worth
+hand-rolling.
+
 `score` checks the seven planted ambiguities reached a destination, runs `check-roadmap.py`, and with
 `--record` appends a row to `RESULTS.md`. Exit `1` means a planted ambiguity is missing.
 

@@ -100,6 +100,9 @@ The part that decides whether a result means anything is **how the agent is laun
 told what changed, following the text literally, treating friction as the output. Those four rules
 are in that README and they are not stylistic.
 
+Running more than one agent? `setup <scenario> --agents N` gives each its own copy. One agent, one
+copy is a hard rule here — [`CLAUDE.md`](CLAUDE.md) states it and says why it is not a preference.
+
 ## The three languages
 
 `guide/HOW-IT-WORKS.md` and the READMEs exist in English, Portuguese and Spanish at **exact
