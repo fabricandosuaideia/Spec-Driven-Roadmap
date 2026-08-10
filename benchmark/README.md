@@ -29,11 +29,11 @@ it would be worth having; as the benchmark, no.
 | `fixture/PRD.md` | 26 numbered scope units across six sections, and **seven planted ambiguities** |
 | `fixture/brownfield/` | a working FastAPI + React project with no scope document, for the 0c path |
 | [`expected.md`](expected.md) | the answer key — where each planted ambiguity must land, and why |
-| [`reports/`](reports/) | thirteen `validation.md` reports, for the Step 2 completion test |
+| [`reports/`](reports/) | seventeen `validation.md` reports, for the Step 2 completion test |
 | `RESULTS.md` | the scoreboard, **appended by the runner**, never edited by hand |
 
 **`reports/` is a different kind of test and runs differently.** The scenarios above execute the
-whole skill and score the roadmap it produces; that one hands an agent a single rule and thirteen files
+whole skill and score the roadmap it produces; that one hands an agent a single rule and seventeen files
 and asks what the rule yields. It exists because Step 2 decides which features are done, the seed
 skips every feature it calls done, and a wrong `done` means the loop builds on top of work that never
 passed. Run it the way a rule change should always be checked — two variants, agents that have seen
@@ -62,6 +62,11 @@ hand-rolling.
 
 `score` checks the seven planted ambiguities reached a destination, runs `check-roadmap.py`, and with
 `--record` appends a row to `RESULTS.md`. Exit `1` means a planted ambiguity is missing.
+
+**`clean` when the run is scored.** Its number is in `RESULTS.md` by then, so the tree is spent — and
+a spent tree on disk is what the next session accidentally inherits. `clean` prints what it would
+remove and does nothing without `--yes`. Keep one deliberately if you need it as evidence, and say so
+where somebody will read it.
 
 ## Launching the agent — the part no script can do
 

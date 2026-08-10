@@ -368,6 +368,37 @@ def record(version, run, score, lintline, missing):
         fh.write(row)
 
 
+def cmd_clean(args):
+    """Remove finished run trees, so the next test cannot inherit one.
+
+    Leftovers are how a test session contaminates the next: a stale tree gets
+    reused, an agent reads a previous run's answers, or a score is taken from a
+    directory nobody created for it. Scored runs have already deposited their
+    numbers in RESULTS.md, so the tree itself is spent — but deleting is not
+    guessing, so this lists what it will remove and needs --yes to do it."""
+    targets = []
+    for root in (RUNROOT, BASELINES):
+        if os.path.isdir(root):
+            targets.append(root)
+    if not targets:
+        print("nothing to clean — no run trees on disk")
+        return 0
+    print("would remove:")
+    total = 0
+    for t in targets:
+        n = sum(len(f) for _, _, f in os.walk(t))
+        total += n
+        print("  %s  (%d files)" % (t, n))
+    if not args.yes:
+        print("\nNothing was removed. Pass --yes to do it.")
+        print("Keep a tree only when you mean to — say why, out loud, in the same breath.")
+        return 0
+    for t in targets:
+        shutil.rmtree(t, ignore_errors=True)
+    print("\nremoved %d files. The next run starts from a tree it created itself." % total)
+    return 0
+
+
 def cmd_list(args):
     print("scenarios:")
     for k, (label, _) in SCENARIOS.items():
@@ -399,6 +430,10 @@ def main():
     c.add_argument("--version", help="skill version (default: read from SKILL.md)")
     c.add_argument("--record", action="store_true", help="append to benchmark/RESULTS.md")
     c.set_defaults(fn=cmd_score)
+
+    cl = sub.add_parser("clean", help="remove finished run trees so the next test cannot inherit one")
+    cl.add_argument("--yes", action="store_true", help="actually remove them")
+    cl.set_defaults(fn=cmd_clean)
 
     l = sub.add_parser("list", help="scenarios, and runs on disk")
     l.set_defaults(fn=cmd_list)

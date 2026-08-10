@@ -56,6 +56,12 @@ previous run wrote to, and never score a run whose directory you did not create 
 `scripts/run-benchmark.py setup --agents N`, which builds N isolated copies and refuses to reuse a
 path; hand-rolling the setup is where this goes wrong every time.
 
+**And clean up after a run, for the same reason.** A finished tree left on disk is the next session's
+contamination: it gets reused, an agent reads a previous run's answers out of it, or a score is taken
+from a directory nobody created for that run. `scripts/run-benchmark.py clean` lists what it will
+remove and needs `--yes`. Keeping a tree is fine when you mean to — say why, in the same breath, so
+the next person knows it is evidence and not debris.
+
 The escape hatch exists and is narrow: **shared state is allowed only when the interference is the
 thing being measured** — two agents racing for the same lock, a conversion running against a tree
 another process is writing. Say so out loud when you take it, and say what you expect to see.

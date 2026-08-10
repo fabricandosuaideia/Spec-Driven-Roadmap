@@ -6,7 +6,7 @@ run. That is the isolation rule this repository already learned once, at directo
 seven runs under one parent, any of them able to read another's answers — reappearing at file
 granularity. Give an executor the `reports/` path, never this one.
 
-Thirteen `validation.md` reports, and what the completion test in
+Seventeen `validation.md` reports, and what the completion test in
 [`references/handoff-seed.md`](../references/handoff-seed.md) Step 2 must conclude about each.
 
 **Why these exist.** Step 2 decides whether a feature is done, and the seed skips every feature it
@@ -35,6 +35,10 @@ tree.
 | `heading-mark-only.md` | **not done** | the only mark is in the **title**, and no consolidated verdict exists |
 | `pt-fail-mark-drifted.md` | **not done** | a real failure whose mark drifted off the verdict position |
 | `sensor-pass-only.md` | **not done** | a green sensor is the **only** verdict line — mutants died, nothing else was verified |
+| `pt-fail-unnamed-label.md` | **not done** | the failing label is a word the rule never names, and its mark drifted |
+| `pt-fail-word-no-mark.md` | **not done** | the failure is a translated word carrying no mark at all |
+| `green-summary-red-row.md` | **not done** | a green summary sits above a red acceptance-criterion row |
+| `prose-failure-green-label.md` | **not done** | the failure is a sentence; the only labelled verdict is green |
 
 ## The five the rule used to get wrong
 
@@ -94,31 +98,41 @@ this repository names first in its own lessons, committed while fixing something
 The file is what the rule's opening paragraph condemns, made concrete: every mutant killed, an
 acceptance criterion whose evidence is "reviewed by hand", and a green result.
 
-## Four ways this rule can still say `done` about unfinished work
+## The four wrong-`done` paths, and how they closed
 
-Named rather than left implicit, because a wrong `done` is the only direction that costs anything:
-a wrong `not done` re-targets the seed at built work and a person sees it in the Step 7 report, while
-a wrong `done` makes the loop build on top of work that never passed and nothing revisits it. All
-four were constructed by agents executing the rule, and **none has a fixture** — writing one for each
-is the next piece of work here.
+A wrong `done` is the only direction that costs anything: a wrong `not done` re-targets the seed at
+built work and a person sees it in the Step 7 report, while a wrong `done` makes the loop build on
+top of work that never passed and nothing revisits it. These four were reasoned to by agents
+executing the rule — argued from the text, with no failing case to point at.
 
-1. **A verdict label the rule does not name, whose mark drifted off the verdict position, beside a
-   green sibling that is mark-first.** `**Veredito**: Não Pronto ❌` above `**Situação**: ✅ …`. The
-   positional selection rule cannot reach the failing line and the printed label list is English, so
-   the only defence is the reader choosing to add the spelling. `pt-fail-mark-drifted.md` tests this
-   shape — but with `Geral:`, a label the rule names in its own worked example, so what it proves is
-   that a reader follows a worked example, not that the general permission works.
-2. **A verdict expressed as a translated word with no mark at all**, beside a green mark-bearing
-   sibling. Scoring is defined on `PASS`, `FAIL` and the marks that stand for them; a translated word
-   is neither, so the failing line contributes nothing even when correctly selected. Without the
-   green sibling the file falls to the fallback and its ceiling saves it — the danger needs the
-   sibling.
-3. **A green consolidated summary above a red acceptance-criterion row.** Table rows are excluded
-   from selection by design, which is the right fix for the opposite error and creates the symmetric
-   hole: the red row never scores. The rule stops looking at the table rather than declaring the
-   consolidated verdict authoritative over it.
-4. **A failure stated as a prose sentence** — *"a feature não está pronta; falta a integração de
-   canal"* — beside a green labelled verdict. Nothing selects the sentence.
+**Written as fixtures, all four came back `done`. Unanimously, 4-0, on the first run.** Four
+arguments became a score of 0 out of 4, and every one of them was the expensive direction.
+
+| the shape | why the rule missed it |
+|---|---|
+| `pt-fail-unnamed-label.md` | the extension test listed equivalents of *Result*, *Overall*, *Status*; `**Veredito**` is *Verdict*, a fourth concept the rule never named |
+| `pt-fail-word-no-mark.md` | `**Geral**: Não Pronto` is neither `PASS`, nor `FAIL`, nor a mark, so it scored nothing at all |
+| `green-summary-red-row.md` | table rows are excluded from selection by design, so a red criterion row never counted |
+| `prose-failure-green-label.md` | nothing selected the sentence *"a feature não está pronta"* |
+
+One structural cause under all four: **the rule asked whether anything was green and never whether
+anything was red.** Two asymmetries fixed it, both of which can only withhold a `done`:
+
+- **Acceptance-criteria rows can refuse a feature and never pass one** — the same asymmetry the
+  sensor already had. They stay out of the selection because a genuine FAIL report is full of
+  `| ✅ PASS |` rows; letting a red one *refuse* costs nothing and closes the mirror hole.
+- **A bullet that asks whether anything in the file says the work is unfinished**, placed before the
+  `done` bullet so the ordered list reaches it. It reads the whole file, in one direction only.
+
+The rule test is by **concept**, not by a closed list of English words: a label qualifies when it
+states the report's overall judgement — `Result`, `Overall`, `Status`, `Verdict`, `Conclusion` and
+their translations — and does not when it names a document or an activity.
+
+`0/4 → 1/4 → 4/4`. The middle round is the instructive one: the fix worked and the score barely
+moved, because the requirement had been written as a clause *after* the arrow and then pointed at
+with *"read the last paragraph"* — a reference that resolves to the wrong paragraph. A reader
+executing "stop at the first match" recorded `done` at the arrow. The condition is now a bullet of
+its own, and the list closes on every path: eleven bullets, one `→ done`, seven `→ not done`.
 
 ## What six executions left standing
 
@@ -141,7 +155,7 @@ from the bullets alone before the test was moved into them.
 The reports are written by someone who knows which rule is under test, so they sample the raggedness
 somebody already named. The six title forms in [`state-scenarios.md`](state-scenarios.md) were
 found by reading a real project for an afternoon, after nine releases of prose review found nothing —
-these thirteen were not, and no count of them replaces reading real output.
+these seventeen were not, and no count of them replaces reading real output.
 
 Specifically untested here: a report that carries **no** mark and no English verdict word; mixed
 scripts inside one report; a verdict expressed as a sentence rather than a labelled line; and any

@@ -242,9 +242,14 @@ one of these words in the report's language. The literals printed above are **ob
 complete**: they are the spellings somebody has seen, and the next project writes one nobody wrote
 down.
 
-The test for adding one is narrow — it must be *that word* translated, not a different word sitting
-nearby. `Situação:`, `Estado:`, `Geral:`, `General:` and `Resultado:` qualify; `Relatório:` is
-*Report* and `Comprobación:` is *Check*, so neither does. The same test governs rule 1's headings.
+The test for adding one is narrow, but it is about **which concept**, not which of three English
+words. A label qualifies when it states the report's own overall judgement of the feature — `Result`,
+`Overall`, `Status`, `Verdict`, `Conclusion` and their translations all do. It does not qualify when
+it names a document, a section or an activity. `Situação:`, `Estado:`, `Geral:`, `General:`, `Resultado:`, `Veredito:`, `Veredicto:` and
+`Conclusão:` qualify; `Relatório:` is *Report*, `Resumo:` is *Summary* and `Comprobación:` is *Check*
+— those name the artifact or the act, not the judgement, so none of them does. The same test governs
+rule 1's headings. Reading this as a closed list of three English words is what let
+`**Veredito**: Não Pronto ❌` go unselected on a report that said in its own words it was not ready.
 Name every spelling you added when you report, and treat skipping this step as skipping the test:
 `**Geral**: Não Pronto ❌` beside `**Situação**: ✅ Critérios cobertos` reads as a finished feature
 until `Geral:` is on the list. What you may not do is
@@ -296,6 +301,10 @@ without:
   the report and contribute no word and no mark to any bullet — otherwise a title reading
   `# pauta-item-archive Validation ✅` satisfies the `done` bullet by itself, on a report carrying no
   verdict anywhere.
+- **A `path.ext:NN` citation** is a filename carrying an extension, then a colon, then a line
+  number — `api/app/routers/items.py:42`. Prose like *"reviewed by hand"* is not one. It counts
+  anywhere in the file, evidence columns included, because that is where the Verifier is told to put
+  it.
 - **The lists are already extended.** If you have not yet added the report's own translated verdict
   labels to rules 1 and 2, stop and do that before reading further; half these bullets score lines
   that only exist once you have. The test is narrow — the word must be *that word* translated, not a
@@ -319,8 +328,24 @@ without:
   report this step opened by condemning: every mutant killed, an acceptance criterion with no
   evidence, and a green result. A sibling `**Status**: ✅` or `**Overall**: ✅` is also a scoring line,
   so this bullet does not fire merely because the sensor's is the only line spelling `PASS` in letters.
-- **at least one** `PASS` or `✅` on a scoring line and no `FAIL` or mark against it, with at least
-  one such citation → **done**
+- an acceptance-criteria row carrying a `FAIL`, a `❌` or a `⚠️` → **not done**. **This is the one
+  bullet that reads the table rows, and it is deliberate** — every other bullet scores selected lines,
+  and the rows are not selected. Read them here anyway, for refusal only: **those rows can refuse a
+  feature and never pass one** — the same asymmetry as the sensor, and for the same reason.
+  They are kept out of the selection because a genuine FAIL report is full of `| ✅ PASS |` rows, so
+  letting them establish a pass is what this step opened by refusing. Letting a red one *refuse* costs
+  nothing and closes the mirror hole: a green summary sitting above `| AC-3 | not implemented | ❌ FAIL |`
+  used to read as **done**, unanimously.
+- **anything anywhere in the file saying this work is unfinished** → **not done**, and name the
+  sentence that decided it. Read the whole file for this one; it is the only bullet that looks past
+  the scoring lines. Three shapes reach this point with every other condition satisfied and their own
+  text saying the opposite: a verdict line the selection could not reach
+  (`**Veredito**: Não Pronto ❌`), a translated verdict carrying no mark (`**Geral**: Não Pronto`), a
+  plain sentence (*"a feature não está pronta"*). **This bullet runs in one direction only** — it can
+  withhold a `done`, never grant one — so it cannot resurrect the whole-file `PASS` match this step
+  opened by forbidding.
+- **at least one** `PASS` or `✅` on a scoring line, no `FAIL` or mark against it, and at least one
+  `path.ext:NN` citation → **done**
 - no scoring line carried a verdict word or a mark at all → **not done**, and take the reason to
   record from the fallback below. This bullet is why the two above say *at least one*: read them as
   satisfiable by the absence of any verdict and they swallow this case, and a report with no verdict
@@ -337,6 +362,22 @@ Reading a finished feature as unfinished re-targets the seed at built work — v
 report, and a person catches it in one glance. Reading a failed feature as finished makes the seed
 skip past it, and the loop builds on top of work that never passed; nothing downstream ever revisits
 it. Prefer the recoverable error, and say which one you took.
+
+**A `done` has to survive one last read of the whole file.** Before recording it, read the report
+end to end and ask one question only: **does anything here say this work is not finished?** A verdict
+line the selection could not reach — `**Veredito**: Não Pronto ❌`, whose label is a word no list
+names and whose mark drifted off the verdict position. A translated verdict carrying no mark at all,
+`**Geral**: Não Pronto`, which is neither `PASS` nor `FAIL` nor a mark and so scores nothing. A plain
+sentence: *"a feature não está pronta; falta a integração de canal."* Any of those turns the answer
+into **not done**, and you say which sentence did it.
+
+**This reads in one direction only, and that is what makes it safe.** It can turn a `done` into a
+`not done` and never the reverse, so it cannot resurrect the defect this step opened by forbidding —
+that was matching `PASS` across the whole file, which reports failed work as finished. This is
+reading the whole file for evidence of *failure*, which is the opposite error and the recoverable
+one. It also uses the one thing you have that a pattern does not: you can read. Every shape above was
+found by executing this rule against a report built to carry it, and all three came back **done**
+before this paragraph existed.
 
 **When nothing selected carried a verdict — the fallback, and its one restriction.** That is the
 case whether the selection matched no line at all, or matched only a heading — which selects the

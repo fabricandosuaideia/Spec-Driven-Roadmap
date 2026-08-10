@@ -430,12 +430,68 @@ but never leave one silently unrecorded either:
   down why. This is the one stop where continuing costs more than halting: a verified PASS is the
   only evidence this run produces, and a test bent to produce it destroys the evidence rather than
   the defect.
+- **The same forgery from the implementation side is also forbidden, and it is the one that hides.**
+  Never change behaviour in a way that contradicts an acceptance criterion or a settled
+  `## Cross-Cutting Decisions` entry in order to turn a test green. Inverting a rule usually satisfies
+  the assertion, leaves `tests/` untouched, and arrives in a diff of the source carrying no label that
+  says what was traded away. When the only implementations that pass are ones the spec forbids, that
+  is a genuinely wrong test: leave it red and say which criterion each rejected implementation
+  violated.
+- **Where a feature's own artifacts demand what this instruction forbids, this instruction wins.** A
+  `tasks.md` whose done-when is *"test X passes"*, a roadmap entry claiming `open questions — none`
+  while an unanswered one blocks the work — rewrite the artifact to match the acceptance criterion,
+  and record that you rewrote it and why. Left unstated, this is the pressure point that manufactures
+  a bent test: a task list ordering the very thing the rule refuses.
+
+**A feature counts as done only when its `validation.md` carries a consolidated verdict line reading
+PASS, with at least one `file:line` citation.** A report whose acceptance-criteria rows contain the
+word `PASS` while its verdict says otherwise is **not** a pass — never decide this by searching the
+file for `PASS`, which is exactly how a failed feature gets skipped. Write your own verdict so that
+test cannot be got wrong: one consolidated line, and nothing above it that reads like one.
+
+**Nobody is reviewing this run, so every verification is self-verification.** Say so in the report:
+name the artifacts you approved yourself and the verdict you reached on your own work. A PASS this
+run records is evidence the suite was green, not evidence anyone independent agreed — and the
+difference matters to whoever reads it next.
 
 If the same feature comes out of verification without a PASS twice, stop the whole run and report it.
-Do not try a third time and do not move on to the next feature — a feature that cannot pass is the
-one thing this loop cannot settle by itself, and continuing past it builds on top of it.
+Two verification runs, not two rewrites: you are never required to ship a change you have already
+shown to be wrong merely to spend a cycle. Do not try a third time and do not move on to the next
+feature — a feature that cannot pass is the one thing this loop cannot settle by itself, and
+continuing past it builds on top of it. **This stop outranks the finishing condition below.** That
+one asks for a PASS on every feature and can therefore never be reached when a feature has none;
+stopping here, and saying which feature and why, is the correct end of the run.
 
-Backlog position is at <STATUS-PATH> `## Status`. Stop when every name in <BUILD-ORDER-TXT> from
+**Write a FAIL so it cannot be misread, the same way you write a PASS.** One consolidated verdict
+line and nothing above it that resembles one — per-criterion rows say `MET` / `NOT MET`, never
+`PASS`. **When a criterion is met by the code and denied by the test guarding it**, say exactly that
+rather than collapsing it either way: `MET, contradicted by <test>`. Calling it `MET` hides a red
+suite and calling it `NOT MET` blames code that is correct, and the consolidated verdict is a FAIL in
+both readings anyway — what a later reader needs is which of the two is broken.
+
+**A phase with nothing to do is done, not skipped.** If the implementation already satisfies every
+acceptance criterion, execute is complete: say so and move to verification. Do not manufacture a
+change to have something to show — an edit made for that reason is indistinguishable, in a diff, from
+one made to bend a result. A FAIL that a later iteration mistakes for a pass is how the loop skips past unfinished work,
+which is the one outcome every rule here is aimed at.
+
+**When a feature ends without a PASS, no task inside it is complete either.** Leave its checkboxes
+unticked, whatever their individual done-whens say. A `tasks.md` full of ticks under a failed feature
+is read by the next reviewer as progress that did not happen.
+
+**Leave the work uncommitted.** No branch, no commit, no tag — a red suite entering history is a
+handoff nobody asked for, and the point of stopping is that a person looks before anything lands.
+
+**Reconcile every claim an artifact makes about itself, not only the ones named here.** `open
+questions — none` beside an unanswered question is the example; a task's done-when, a comment
+asserting a project fact the data beside it contradicts, a status line describing work that did not
+happen are the same defect. Where the artifact and the evidence disagree, the evidence wins: fix the
+artifact and record that you did.
+
+Write the run's outcome into <STATUS-PATH> `## Status` before you stop: which feature you were on,
+what state it reached, and — when you stopped — the reason, in one line each. A run that halts and
+leaves no trace in the roadmap looks, to the next reader, exactly like one that never started.
+Backlog position is at that same block. Stop when every name in <BUILD-ORDER-TXT> from
 `<target>` onward has a verified PASS or is on the discharged list above; report and stop there
 rather than continuing into another roadmap.
 ```

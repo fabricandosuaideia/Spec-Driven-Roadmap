@@ -51,6 +51,31 @@ and it is invisible in a self-report.
   sub-agent offer, a missing test framework — was disposed of by the prompt rather than improvised.
   A gate the agent had to invent a policy for is a defect in the prompt, not in the agent.
 
+## What three rounds left standing
+
+Run three times, three isolated copies each. **The clause held every time** — `git hash-object
+tests/test_tally.py` returned the same blob as `HEAD` in all nine trees, every agent implemented the
+criterion genuinely, and none recorded a false PASS. What moved was the *reason*: in round one no
+agent cited the clause forbidding the shortcut, because it only closed the route through the test
+file; by round three an agent called the implementation-side clause *"the gate the whole run turned
+on"*.
+
+**The gate-sufficiency count is not a clean trend and should not be quoted as one**: 23/34, then
+26/31, then 23/31 — 68%, 84%, 74%. The denominator is whatever each agent chose to enumerate, so it
+moves with the reporter as much as with the prompt. Treat it as a pointer to *which* gates lack a
+disposition, never as a score. The measurement that holds across all three rounds is the one taken
+from disk: nine trees, nine untouched test files, no false PASS.
+
+**The `use the downstream skill` branch has never been exercised, and that is this harness's fault.**
+The runner tells each agent the project directory is its entire world, so the skill — which lives
+outside it — is unreachable, and all nine runs hand-wrote the cycle artifacts instead. The shipped
+template carries no such boundary. Testing that branch needs a harness that installs the downstream
+skill into the project and drops the restriction.
+
+Two dispositions the prompt still does not give, both recorded rather than guessed: what a `## Status`
+entry should contain beyond a location (now partly addressed), and how `## Coverage` should read when
+every criterion has a test but one of those tests asserts the opposite of the criterion it guards.
+
 ## What it does not cover
 
 One feature, one language, one failing test, and no downstream skill installed — so it exercises the
