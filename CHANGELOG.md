@@ -9,6 +9,38 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.20.0 — 2026-08-10
+
+**The loop prompt now disposes of the sub-agent offer instead of leaving it to improvisation.**
+
+The downstream skill offers phase-batch workers above its own task threshold and then **waits for an
+answer it can never get** in an unattended run. This prompt used to dispose of that with *"a choice
+about how to execute — pick one, say which, continue"*, which is not a disposition: three runs met the
+offer and each invented a different policy.
+
+Step 8 now asks one more question when option B is chosen, and it is about **capability, not
+preference**: *can the session you will run this in spawn sub-agents?* Told yes, Step 10 emits
+`Accept it: let that skill batch the feature's phases into workers by its own rule`. Told no, it emits
+`Decline it and execute inline in this window. Do not attempt to spawn anything.` Verified by
+executing both answers: neither leaked the placeholder, and each got the sentence its answer calls for.
+
+**Deliberately not asked in terms of an effort tier.** Tier names are one CLI's vocabulary and they
+move between versions; this skill also ships to Cursor and OpenCode users. The question is what the
+session can *do*, which stays true. The existing recommendation to run on the strongest model at the
+highest effort is unchanged.
+
+**And the answer is framed honestly, because the obvious reading of it is wrong.** Batching does not
+make the loop faster. Features are still built one at a time and the next never starts before this one
+has a verified PASS — that ordering is the dependency guarantee, not a scheduling choice, and the
+prompt now says so in its own body so no run treats idle capacity as permission to build ahead. What
+batching buys is a **leaner main window**: whole phases packed into workers of roughly seven tasks
+each, each returning a compact summary, so the orchestrator's context does not accumulate every task's
+detail. On a long roadmap that is the difference between a loop still coherent at the end and one that
+has degraded. Step 8 says exactly that before asking, so the answer is informed.
+
+The threshold and the batch size are **read from the downstream skill's own reference at run time**,
+never copied here — they are its numbers and they move between its versions.
+
 ## 3.19.1 — 2026-08-10
 
 **v3.19.0 shipped two procedure changes nobody had executed.** Running them found four defects, one

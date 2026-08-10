@@ -16,7 +16,14 @@ the numbering is continuous across the two files because it is one procedure. A 
 (`index-phase Step 4`, `decompose-phase Step 7`). Nothing is renumbered by the split.
 
 Step 6's placeholder table is the authority on `<ROADMAP-PATH>`, `<STATUS-PATH>` and
-`<BUILD-ORDER-TXT>`; Step 10 resolves all three against it.
+`<BUILD-ORDER-TXT>`; Step 10 resolves all three against it. `<SUBAGENT-DISPOSITION>` is Step 8's, and
+Step 10 resolves it to one of exactly two sentences:
+
+- **the session can spawn sub-agents** → `Accept it: let that skill batch the feature's phases into
+  workers by its own rule, and keep the orchestrator on summaries rather than task detail.`
+- **it cannot** → `Decline it and execute inline in this window. Do not attempt to spawn anything.`
+
+Never emit the placeholder itself, and never emit both.
 
 ## Contents
 
@@ -83,6 +90,21 @@ to name, not a veto: option B remains the user's to choose, exactly as this step
 
 If Step 6 recorded a blocker, say so here: option A cannot give a clean start command until that
 question is answered, and option B's sweep is what answers it.
+
+**Option B only — one more question, and it is about capability, not preference:** *can the session
+they will run this in spawn sub-agents?* Claude Code can; other CLIs vary, and the same CLI varies
+with how it was started. It matters because the downstream skill **offers** phase-batch workers above
+a task threshold and then waits for an answer, and an unattended run has nobody to answer. Told yes,
+the prompt disposes of that offer by accepting it; told no, by declining it and executing inline.
+Left unasked, the run improvises, and both improvisations are wrong half the time.
+
+**Say what it buys, so the answer is informed — and it is not a faster loop.** Features are still
+built one at a time and the next never starts before this one has a verified PASS; that ordering is
+the dependency guarantee, not a scheduling choice. What batching buys is a **leaner main window**:
+that skill packs whole phases into workers of roughly seven tasks each, each reporting a compact
+summary, so the orchestrator's context does not accumulate every task's detail. On a long roadmap
+that is the difference between a loop still coherent at the end and one that has degraded. Say that
+plainly rather than promising a parallelism the loop cannot have.
 
 Option A → skip to Step 10. Option B → Step 9.
 
@@ -419,8 +441,12 @@ but never leave one silently unrecorded either:
 - A request to approve this run's own spec, context, design or task list — approve and continue,
   then note in that same section which artifacts were self-approved. Nobody reviewed them, and that
   line is what lets somebody review them later.
-- A choice about how to execute — sub-agents, batching, ordering inside a feature — pick one, say
-  which, continue.
+- **The offer of phase-batch sub-agents**, which the downstream skill makes above its own task
+  threshold and then waits on. <SUBAGENT-DISPOSITION> Say which you took, in that feature's spec.
+  Read that skill's own sub-agent reference from disk for the threshold and the batch size — they are
+  its numbers, not this prompt's, and they move between its versions.
+- Any other choice about how to execute — ordering inside a feature, how much to do before checking —
+  pick one, say which, continue.
 - A project-level fact the run cannot invent, such as which test framework to use — take it from
   `## Cross-Cutting Decisions`; if it is not there, record it as an open question and choose the most
   conservative option that exists in the repository already. Never invent a credential and never
@@ -519,6 +545,11 @@ artifact and record that you did.
 Write the run's outcome into <STATUS-PATH> `## Status` before you stop: which feature you were on,
 what state it reached, and — when you stopped — the reason, in one line each. A run that halts and
 leaves no trace in the roadmap looks, to the next reader, exactly like one that never started.
+**Features are built one at a time and that is not negotiable.** Never start the next one before this
+one has a verified PASS, whatever capacity is idle. Every dependency in this roadmap points backwards
+to a feature in the same file, so building ahead means building on work nothing has verified. Batching
+happens *inside* a feature; the sequence *between* features is the guarantee.
+
 Backlog position is at that same block. Stop when every name in <BUILD-ORDER-TXT> from
 `<target>` onward has a verified PASS or is on the discharged list above; report and stop there
 rather than continuing into another roadmap.
