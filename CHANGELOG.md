@@ -61,6 +61,45 @@ seven-ambiguity grep refuses them outright, because the input already contains a
   the arriving scope falsifies **may and must** be amended, because a wrong closed row is worse than
   an open one, nothing ever re-reading it.
 
+### The three that were left, closed
+
+**The extend-versus-own-section answer now leaves a line**, the way the size question already did:
+`wave recorded (as of <date>): extended in place — <reason>` or `own section \`<slug>\` — <reason>`,
+under the H1 of the file the wave lands in. Until this, it was the only decision of its weight that
+left no trace — a run that *asked* and a run that *inferred* produced byte-identical output, so
+nobody could tell them apart afterwards. Rule 1 forbids deciding an ambiguity in silence, and **a
+decision recorded nowhere is indistinguishable from one taken in silence**, whatever happened in the
+conversation. It also earns the line twice: the next wave lands on the same fork, and a reader six
+months later can see why a section roadmap is a section.
+
+**The loop prompt's downstream-skill branch was never unreachable.** It went unexercised through nine
+runs because the fixture had no `.claude/skills/` — the skill installs *into* the project, which is
+what a per-project install is. Calling that a harness limitation was wrong. `setup` now installs the
+skill under test and its downstream into every run, `loop-build` is a scenario key, and
+`0b-interview` is the one exception, because the branch it tests is the absence.
+
+That install had been done by hand in every run of this session, which is precisely where setup
+mistakes come from: a run scored against a project with no skill in it measures the agent's
+improvisation, not the skill.
+
+**And the conversion's refusals have a test.** `scripts/check-conversion-guards.py` breaks one thing
+per case — an unclosed fence, a `.txt` naming a feature the roadmap lacks, a section roadmap with no
+index, an index already present, a taken rename target — runs the real conversion, and asserts two
+things: it exited non-zero, and it left the tree byte-for-byte as it found it. **A guard that refuses
+after writing is worse than no guard**, because the operator is left with a half-converted project
+and a message saying it did not happen. A control case converts a clean tree, so a script that
+refuses everything cannot pass. Six guards, called by the release gate and by the pre-commit hook
+when the conversion or its fixture changes.
+
+Measuring it found that `D5`'s `.md` half is unreachable from outside — anything carrying
+`docs/ROADMAP-<slug>.md` trips the section-without-index check first — and that only the lowercase
+`.txt` target reaches it. Worth knowing rather than assuming, and worth keeping: `D5` is what protects
+the rename if either earlier guard is ever narrowed.
+
+The `--rollback` path also ran against real git history for the first time, now that the state fixture
+carries a commit. It converted, left two staged renames, and the rollback restored the tree to its
+exact pre-run state.
+
 ### And the scorer committed the same defect the gates kept committing
 
 `state-rerun` asserted that no conversion had happened — which is only true if the simulated user

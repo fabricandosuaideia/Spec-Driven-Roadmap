@@ -39,6 +39,21 @@ fi
 output="$(python3 "$checker" --root "$repo" 2>&1)"
 status=$?
 
+# The conversion guards, only when the conversion or the tree they run against
+# changed. They build and delete their own temporary projects, so they cost a
+# second and leave nothing behind — but a commit that touches neither has no
+# reason to pay even that.
+guards="$repo/scripts/check-conversion-guards.py"
+if [[ -f "$guards" ]] && git diff --cached --name-only --diff-filter=ACMR \
+     | grep -qE '^(scripts/convert-to-multi\.py|scripts/check-conversion-guards\.py|benchmark/fixture/state/)'; then
+    if ! guard_out="$(python3 "$guards" 2>&1)"; then
+        output="$output
+
+$guard_out"
+        status=1
+    fi
+fi
+
 if [[ $status -ne 0 ]]; then
     echo "$output" >&2
     cat >&2 <<'MSG'

@@ -175,6 +175,18 @@ right, not that the result was what the user wanted: the first run of this scena
 assertion while reporting that the skill has no path for *"split this into several sections"* at all.
 The score measures the operation; read the friction for whether it was the right operation.
 
+### `loop-build` — the loop prompt's own project
+
+Not a roadmap scenario at all: a small git project whose only failing test cannot pass without real
+implementation work, used to execute the option-B loop prompt. `setup` installs the skill **and the
+downstream skill** into it, which is the whole reason it is a scenario key — the prompt's
+*"use the `<downstream-skill>` skill"* branch went unexercised through nine runs for no better reason
+than the fixture having no `.claude/skills/`, and `.gitignore` forbids shipping one inside it.
+
+What it asserts is in [`loop-fixture/README.md`](loop-fixture/README.md), and the short version is
+that `git diff -- tests/` must be empty: the prompt forbids reaching a PASS by bending a test, and
+that is the one clause whose failure destroys the only evidence the loop produces.
+
 ## Friction: the second number
 
 Agent-reported, not scriptable, and worth recording anyway. Classify each point as `travou`,

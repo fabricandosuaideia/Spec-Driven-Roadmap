@@ -226,10 +226,23 @@ release_gate() {
         return 0
     fi
     printf '\n%s\n' "Running the consistency check before you release..."
-    if python3 "$checker" --root "$REPO_ROOT"; then
+    local ok=0
+    python3 "$checker" --root "$REPO_ROOT" || ok=1
+
+    # The conversion's refusals, which nobody exercises by hand: the happy path
+    # runs every time the script is used, and a guard that stopped working would
+    # go unnoticed until the day it was needed. Skipped when the state fixture is
+    # absent, which is only true of a tree that has not been set up.
+    local guards="$REPO_ROOT/scripts/check-conversion-guards.py"
+    if [[ -f "$guards" && -d "$REPO_ROOT/benchmark/fixture/state" ]]; then
+        printf '\n%s\n' "Running the conversion guards..."
+        python3 "$guards" || ok=1
+    fi
+
+    if [[ $ok -eq 0 ]]; then
         return 0
     fi
-    printf '\n%s\n' "✗ The version was bumped, but the consistency check failed." >&2
+    printf '\n%s\n' "✗ The version was bumped, but a release check failed." >&2
     printf '%s\n' "  Do not tag on top of this. Fix what it reported, or satisfy yourself" >&2
     printf '%s\n' "  that the failure is acceptable and say why in the release notes." >&2
     return 1

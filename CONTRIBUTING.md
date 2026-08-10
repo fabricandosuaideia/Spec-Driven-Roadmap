@@ -60,7 +60,8 @@ it.
 
 ## Requirements
 
-`python3` for the scripts, `bash` for the installer, `git`. No package to install, no virtualenv, no
+`python3` for the scripts, `bash` for the installer, `git` — the conversion guards and the state
+scenarios both build throwaway repositories to run against, and delete them afterwards. No package to install, no virtualenv, no
 build. The scripts are standard library only, which is deliberate — a benchmark that needs a
 dependency is a benchmark that stops running.
 

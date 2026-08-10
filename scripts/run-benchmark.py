@@ -64,7 +64,17 @@ SCENARIOS = {
     "state-rerun": ("existing roadmap, a new wave arrives", ["state:state-rerun"]),
     "state-inflight": ("existing roadmap, work in flight", ["state:state-inflight"]),
     "state-conversion": ("oversize single-section, names frozen on disk", ["state:state-conversion"]),
+    # The loop prompt's own fixture, wired here so the downstream skill actually
+    # gets installed. Its `use the downstream skill` branch went unexercised
+    # through nine runs for no better reason than the fixture having no
+    # `.claude/skills/` — which the .gitignore forbids shipping, so it has to
+    # happen at setup or not at all.
+    "loop-build": ("the loop prompt's project, with a test that cannot pass", ["loop-fixture"]),
 }
+
+# Scenarios that must NOT get the downstream skill: their whole point is the
+# branch this skill takes when none is installed.
+NO_DOWNSTREAM = {"0b-interview"}
 
 # The seven, keyed to how they surface in a roadmap. Each pattern list is
 # alternatives in the languages the skill may write in — it follows the source
@@ -160,6 +170,10 @@ def cmd_setup(args):
             copy_tree(os.path.join(FIXTURE, "state"), proj)
             copy_tree(os.path.join(FIXTURE, want.split(":", 1)[1]), proj)
             continue
+        if want == "loop-fixture":
+            copy_tree(os.path.join(REPO, "benchmark", "loop-fixture"), proj)
+            os.remove(os.path.join(proj, "README.md"))
+            continue
         src = os.path.join(FIXTURE, want)
         if want == "PRD.md":
             os.makedirs(os.path.join(proj, "docs"), exist_ok=True)
@@ -179,7 +193,9 @@ def cmd_setup(args):
     # answers at setup, and it would print 7/7 and exit 0 whatever the run did.
     # That is the empty green: a gate switching off the attention of whoever
     # reads it. Record the baseline here so the score can subtract it.
-    if any(w.startswith("state:") for w in wants):
+    installed = install_skills(proj, args.scenario)
+
+    if any(w.startswith("state:") for w in wants) or "loop-fixture" in wants:
         git_init(proj)
         os.makedirs(BASELINES, exist_ok=True)
         with open(os.path.join(BASELINES, stamp + ".snapshot.json"), "w",
@@ -192,6 +208,7 @@ def cmd_setup(args):
     print("scenario : %s — %s" % (args.scenario, label))
     print("project  : %s" % proj)
     print("parent   : %s  (contains only this run)" % parent)
+    print("skills   : %s" % installed)
     if pre:
         print("baseline : %d of 7 already present in the input — excluded from the"
               % len(pre))
@@ -244,6 +261,40 @@ def copy_tree(src, dst):
             if f == ".keep":
                 continue
             shutil.copyfile(os.path.join(root, f), os.path.join(out, f))
+
+
+def install_skills(proj, scenario):
+    """Put the skill under test, and its downstream, inside the run.
+
+    Every run this session needed this and every one of them got it by hand,
+    which is where setup mistakes come from -- a run scored against a project
+    that had no skill in it measures the agent's improvisation, not the skill.
+    Installing into the project rather than globally is also how this is used for
+    real: one version per repository, nothing shared between them.
+    """
+    dest = os.path.join(proj, ".claude", "skills", "spec-driven-roadmap")
+    os.makedirs(os.path.join(dest, "scripts"), exist_ok=True)
+    shutil.copyfile(os.path.join(REPO, "SKILL.md"), os.path.join(dest, "SKILL.md"))
+    copy_tree(os.path.join(REPO, "references"), os.path.join(dest, "references"))
+    for name in ("check-roadmap.py", "convert-to-multi.py"):
+        shutil.copyfile(os.path.join(REPO, "scripts", name),
+                        os.path.join(dest, "scripts", name))
+
+    if scenario in NO_DOWNSTREAM:
+        return "spec-driven-roadmap only (this scenario tests the no-downstream branch)"
+
+    vendored = os.path.join(REPO, ".claude", "skills")
+    got = []
+    for name in ("tlc-spec-driven", "not-your-babysitter"):
+        src = os.path.join(vendored, name)
+        if os.path.isdir(src):
+            copy_tree(src, os.path.join(proj, ".claude", "skills", name))
+            got.append(name)
+    if "tlc-spec-driven" not in got:
+        print("! no downstream skill at %s — a run without one takes the "
+              "\"no downstream skill installed\" branch, which is a different "
+              "test. See CONTRIBUTING.md." % vendored)
+    return ", ".join(["spec-driven-roadmap"] + got)
 
 
 def git_init(proj):

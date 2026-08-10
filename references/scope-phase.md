@@ -161,6 +161,25 @@ recur.
    its own `docs/ROADMAP-<slug>.md`, with its own build order, its own coverage table and its own
    loop.
 
+**Record the answer, whichever it is** — one plain line immediately under the H1 of the file the wave
+lands in, above `## Status`, in the same place and shape as Step 8's size record:
+
+```
+wave recorded (as of <YYYY-MM-DD>): extended in place — <reason>
+wave recorded (as of <YYYY-MM-DD>): own section `<slug>` — <reason>
+```
+
+**Why this line exists, and it is not bookkeeping.** Until it did, this was the only decision of its
+weight that left no trace: the size question records its answer, this one did not, so a run that
+*asked* and a run that *inferred* produced byte-identical output. Nobody could tell them apart
+afterwards — not a reviewer, not the next run, not a test. Rule 1 forbids deciding an ambiguity in
+silence, and a decision recorded nowhere is indistinguishable from one taken in silence, whatever
+actually happened in the conversation.
+
+It earns its line twice over: the next wave lands on this same fork and the previous answer is the
+most useful thing to know, and a reader six months later opening a section roadmap can see why it is
+a section at all.
+
 **Why the choice matters — and this part has to be said, because it is not obvious.** A roadmap costs
 what is *loaded*, not what is written, and the `/loop` prompt names one roadmap as the spec source
 for **every** feature it builds (handover-prompt.md Step 10), so a roadmap of N features is re-opened N
