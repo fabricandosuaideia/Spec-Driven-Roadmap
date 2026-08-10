@@ -95,6 +95,17 @@ Step 1's work-in-flight test still applies in full. When it fires, Step 6 is ski
 pointers are **not** repaired — which is what that section's pre-condition tells you to settle
 before renaming anything.
 
+**A third trigger — somebody stopped mid-feature and the planning artifacts are stale.** A run
+asked to "bring the artifacts up to date" after a pause found no documented way in: `SKILL.md` routes
+*resume work* to the downstream skill, and the two triggers above are both about a roadmap that just
+closed. It improvised an entry and reached the right answer, which is luck rather than procedure.
+
+That situation **is** this step's business, because `## Status` is this skill's own block and goes
+stale on its own. Enter here, run Steps 1-7 in full, and expect Step 1 to find work in flight and
+Step 6 to be skipped — the point of the run is the durable `## Status`, not a new Handoff. What this
+step never does is resume the work itself; that belongs to the downstream skill, and rule 10 has not
+moved.
+
 Never run this speculatively "just to check" — it is a write step, not a status query. To answer
 "what's next?" without writing, read `docs/roadmap*.txt` and the relevant `validation.md` files
 directly.

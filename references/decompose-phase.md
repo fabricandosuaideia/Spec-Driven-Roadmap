@@ -372,8 +372,17 @@ the feature created to answer it.
 - Single-section mode → `## Cross-Cutting Decisions` in `docs/ROADMAP.md`.
 - Multi-section mode → in `docs/ROADMAP-INDEX.md`. Section roadmaps reference it, never restate it.
 
-Multi-section decomposition is lazy, so a later section runs this step against a ledger that already
-exists. **Read it first, and treat its states differently:**
+**A later run meets a ledger that already exists**, and there are two ways to arrive: a later
+section in multi-section mode, where decomposition is lazy by design, and a **single-section roadmap
+being extended by a new wave**, which Phase 0's own fork sanctions. The rules below govern both.
+
+An earlier wording named only the multi-section case, and a run extending a single-section roadmap
+had to improvise every one of them — including whether a fully decided row may be corrected when the
+new wave falsifies it. It may, and must: a `decided` row that asserts something the arriving scope
+contradicts is worse than an open one, because nothing will ever re-read it. Amend it, and say in the
+row that you did and why.
+
+**Read the ledger first, and treat its states differently:**
 
 - A **decision** is settled — never re-ask it. A second answer to a settled theme is exactly how two
   sections end up built against contradicting rules.

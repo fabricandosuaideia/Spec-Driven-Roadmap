@@ -107,10 +107,20 @@ worse skill. Read before reacting.
 
 ## What is not covered yet
 
-The four entry paths and the loop all start from **input only**. Three scenarios need a project with
-a past — re-run over an existing roadmap, seed with work in flight, conversion over generated output —
-and none has ever been run. [`state-scenarios.md`](state-scenarios.md) records what a fixture for them
-must carry, measured against a real six-month project rather than imagined.
+The three scenarios that need a project with a past — re-run, work in flight, conversion — now exist
+and have been executed; [`expected.md`](expected.md) carries what each asserts and
+[`state-scenarios.md`](state-scenarios.md) records how the fixture was built and why.
+
+What is still uncovered, honestly:
+
+- **A roadmap in a shape older than v3.5.0.** `handoff-seed.md` carries a branch for a legacy roadmap
+  with no `## Cross-Cutting Decisions` block, and `convert-to-multi.py` a placeholder path for the
+  same. The oldest tag in this repository already has that block, so no generated fixture can reach
+  either branch. It would have to be hand-written, and a hand-written legacy shape is a guess.
+- **The `use the downstream skill` branch of the loop prompt**, unreachable while the harness tells
+  each agent the project directory is its entire world — see [`loop-fixture/`](loop-fixture/).
+- **That a question was *asked* rather than inferred.** Nothing about it lands on disk, in any
+  scenario. Capturing the transcript is the only way, and the runner does not.
 
 ## Changing the fixture
 

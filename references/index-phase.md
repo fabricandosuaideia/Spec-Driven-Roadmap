@@ -202,11 +202,31 @@ ones below it, silently, in another file.
 
 ## Converting a single-section project to multi-section
 
-**When this applies.** The project is single-section today — it has a `docs/ROADMAP.md` — a new wave
-of scope has arrived, and the user chose to give that wave **its own roadmap** instead of extending
-the existing one (scope-phase.md, "New scope arriving at a project that already has a roadmap").
-Nothing else triggers a conversion: a single-section project that is merely large stays
-single-section until the user asks otherwise.
+**When this applies.** Two triggers, and only two:
+
+1. **A new wave arrived and the user chose to give it its own roadmap** instead of extending the
+   existing one (scope-phase.md, "New scope arriving at a project that already has a roadmap").
+2. **The user asked for the shape change outright**, with no new wave — the case scope-phase.md's
+   mode exception already allows, *"unless the user explicitly asks to change shape, which is
+   disruptive enough to confirm again before touching anything already written"*. Confirm, then
+   convert. Size is the argument for **asking**, never the authority to switch on your own.
+
+An earlier wording said *"nothing else triggers a conversion: a project that is merely large stays
+single-section until the user asks otherwise"* — which denied trigger 2 in its main clause and
+admitted it in its trailing one. A run asked to split a long roadmap took the literal reading and
+converted; the reading was defensible and the sentence was not.
+
+**What this conversion does, and what it does not.** It moves the project into multi-section
+**shape**: the whole existing roadmap becomes one section, and the index is written so the *next*
+wave can have a section of its own. It does **not** carve the existing roadmap into several files.
+
+Say that plainly when the user's words were "split this into sections", because the result will
+otherwise read as a failure — they asked for several files and got one renamed file and a one-row
+index. Carving an existing backlog into several sections is a different operation this skill does not
+perform: the boundaries are the user's to draw, and each new section needs its own prefix, which
+would rename features whose names froze the moment `.specs/features/<name>/` appeared (rule 6). What
+they can do instead is convert now and let the next wave land in its own section, which is the shape
+they were reaching for.
 
 **The conversion is a script, and it is the only sanctioned way to perform it.**
 

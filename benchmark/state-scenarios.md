@@ -1,4 +1,25 @@
-# State scenarios — the fixtures that still need building
+# State scenarios — built, executed, and what they found
+
+> **Built and running as of v3.19.0.** `benchmark/fixture/state/` is the shared tree, three overlays
+> give the scenarios their deltas, and `run-benchmark.py` knows them as `state-rerun`,
+> `state-inflight` and `state-conversion`. What follows is how the fixture was made and why, kept
+> because the reasoning is what a later change has to respect.
+>
+> **How the past was manufactured.** The wave-1 roadmap was **generated** by running the skill on the
+> Pauta PRD with `single-section confirmed` at the size re-raise — 17 features, oversize, carrying the
+> record line the procedure prescribes. That is a real state a real team reaches, and it is the input
+> the conversion scenario needs. The drift on top of it was **authored by hand from the measured
+> shapes below**: 27 orphan directories under three dead prefixes, one `SUPERSEDED` entry absent from
+> the `.txt`, four of the six title forms, one genuine FAIL, one uncited PASS, and the eight-field
+> Handoff. The split is the one this file argued for and it held.
+>
+> **Two things the build measured rather than assumed.** Generating wave 1 from an older tag would
+> have unlocked the legacy-roadmap branches — except the ledger already exists in `v3.5.0`, the oldest
+> tag here, so those branches stay unreachable and that is now written down instead of attempted. And
+> the fixture's `check-roadmap.py` baseline is **1 failed, 1 warning on purpose**; a run that "fixes"
+> either has repaired the fixture rather than done its job.
+
+# The original analysis
 
 The benchmark in [`README.md`](README.md) covers the four entry paths and the loop, and every one of
 them starts from **input only**: a PRD, or a codebase with no scope document. Three scenarios cannot

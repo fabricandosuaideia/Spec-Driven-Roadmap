@@ -1,0 +1,16 @@
+pauta-account-signup
+pauta-team-membership
+pauta-team-invites
+pauta-user-profile
+pauta-agenda-lifecycle
+pauta-agenda-items
+pauta-item-voting
+pauta-time-budget
+pauta-team-roles
+pauta-undiscussed-carryover
+pauta-meeting-decisions
+pauta-notification-events
+pauta-meeting-reminder
+pauta-notification-preferences
+pauta-public-read-api
+pauta-closure-webhook

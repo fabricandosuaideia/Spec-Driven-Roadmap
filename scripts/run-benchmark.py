@@ -21,6 +21,7 @@ Exit codes: 0 scored clean, 1 a planted ambiguity is missing, 2 usage error.
 
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -56,6 +57,13 @@ SCENARIOS = {
     "0b-interview": ("empty project, no downstream skill", []),
     "0c-brownfield": ("working code, no scope document", ["brownfield"]),
     "loop": ("PRD in docs/, single-section, option B", ["PRD.md"]),
+    # The three that need a project with a PAST. Each is the frozen `state/`
+    # tree plus a small overlay: a wave-2 source and a clean Handoff for the
+    # re-run, nothing for the other two, which differ only in what the run is
+    # asked to do with the same disk.
+    "state-rerun": ("existing roadmap, a new wave arrives", ["state:state-rerun"]),
+    "state-inflight": ("existing roadmap, work in flight", ["state:state-inflight"]),
+    "state-conversion": ("oversize single-section, names frozen on disk", ["state:state-conversion"]),
 }
 
 # The seven, keyed to how they surface in a roadmap. Each pattern list is
@@ -144,6 +152,14 @@ def cmd_setup(args):
     os.makedirs(proj)
 
     for want in wants:
+        if want.startswith("state:"):
+            # The shared past, then the scenario's overlay on top of it. Copying
+            # base-then-overlay rather than keeping three full trees is what stops
+            # a fix landing in one and not the others — the drift this repository
+            # commits most often, applied to its own fixtures.
+            copy_tree(os.path.join(FIXTURE, "state"), proj)
+            copy_tree(os.path.join(FIXTURE, want.split(":", 1)[1]), proj)
+            continue
         src = os.path.join(FIXTURE, want)
         if want == "PRD.md":
             os.makedirs(os.path.join(proj, "docs"), exist_ok=True)
@@ -163,6 +179,13 @@ def cmd_setup(args):
     # answers at setup, and it would print 7/7 and exit 0 whatever the run did.
     # That is the empty green: a gate switching off the attention of whoever
     # reads it. Record the baseline here so the score can subtract it.
+    if any(w.startswith("state:") for w in wants):
+        git_init(proj)
+        os.makedirs(BASELINES, exist_ok=True)
+        with open(os.path.join(BASELINES, stamp + ".snapshot.json"), "w",
+                  encoding="utf-8") as fh:
+            json.dump(snapshot(proj), fh, indent=2)
+
     pre = pre_existing_hits(proj)
     save_baseline(stamp, args.scenario, pre)
 
@@ -177,6 +200,67 @@ def cmd_setup(args):
     print("launch rules — fresh agent, follow literally, friction is the output,")
     print("never say what changed.")
     return 0
+
+
+def snapshot(proj):
+    """What the tree looked like before the agent touched it.
+
+    The state scenarios are scored by comparison, not by grep: the question is
+    never "does a word appear" but "did the run extend this without disturbing
+    what was already built". A grep cannot tell an extension from a rewrite.
+    """
+    roadmaps = find_roadmaps(proj)
+    heads, txt = [], {}
+    for path in roadmaps:
+        heads += re.findall(r"^###\s+`?([\w.-]+)`?\s*$", read(path), re.M)
+    docs = os.path.join(proj, "docs")
+    if os.path.isdir(docs):
+        for f in sorted(os.listdir(docs)):
+            if f.endswith(".txt"):
+                txt[f] = [l.strip() for l in read(os.path.join(docs, f)).splitlines() if l.strip()]
+    state = read(os.path.join(proj, ".specs", "STATE.md"))
+    decisions = ""
+    m = re.search(r"^##\s+Decisions\s*$(.*?)(?=^##\s|\Z)", state, re.M | re.S)
+    if m:
+        decisions = m.group(1).strip()
+    feats = os.path.join(proj, ".specs", "features")
+    return {
+        "headings": heads,
+        "txt": txt,
+        "roadmap_files": sorted(os.path.basename(p) for p in roadmaps),
+        "state_sha": hashlib.sha256(state.encode()).hexdigest(),
+        "decisions_sha": hashlib.sha256(decisions.encode()).hexdigest(),
+        "feature_dirs": sorted(os.listdir(feats)) if os.path.isdir(feats) else [],
+    }
+
+
+def copy_tree(src, dst):
+    """Merge src into dst, overwriting files and keeping what is already there."""
+    for root, _, files in os.walk(src):
+        rel = os.path.relpath(root, src)
+        out = dst if rel == "." else os.path.join(dst, rel)
+        os.makedirs(out, exist_ok=True)
+        for f in files:
+            if f == ".keep":
+                continue
+            shutil.copyfile(os.path.join(root, f), os.path.join(out, f))
+
+
+def git_init(proj):
+    """One commit, made here rather than stored.
+
+    state-scenarios.md asks for it, and it is what makes the scenarios' central
+    assertions mechanical: `git diff --exit-code -- .specs/STATE.md` is the whole
+    work-in-flight test, and the conversion's `git mv` and `--rollback` paths have
+    never run against a tree with history.
+    """
+    env = dict(os.environ, GIT_AUTHOR_NAME="benchmark", GIT_AUTHOR_EMAIL="b@example.invalid",
+               GIT_COMMITTER_NAME="benchmark", GIT_COMMITTER_EMAIL="b@example.invalid")
+    for cmd in (["init", "-q", "."], ["add", "-A"], ["commit", "-qm", "fixture"]):
+        r = subprocess.run(["git"] + cmd, cwd=proj, env=env,
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            die("git %s failed in the fixture: %s" % (cmd[0], r.stderr.strip()))
 
 
 def setup_many(args, label, wants):
@@ -259,6 +343,125 @@ def find_roadmaps(proj):
     return out
 
 
+def load_snapshot(rundir):
+    d = os.path.abspath(rundir).rstrip(os.sep)
+    if os.path.basename(d) == "project":
+        d = os.path.dirname(d)
+    path = os.path.join(BASELINES, os.path.basename(d) + ".snapshot.json")
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def score_state(proj, scenario, before):
+    """Score a scenario that started from a project with a past.
+
+    Every assertion here is a comparison against `before`. What these scenarios
+    are for is the behaviour no input-only run can reach -- extending a roadmap
+    without disturbing built work, refusing to overwrite a paused session,
+    deriving a slug rather than choosing one -- and none of that is visible to
+    the seven-ambiguity grep, which is why that scorer refuses them outright.
+    """
+    now = snapshot(proj)
+    checks = []
+
+    def ck(name, ok, detail=""):
+        checks.append((name, ok, detail))
+
+    # -- shared: built work is never disturbed, whatever the scenario asked for
+    kept = [h for h in before["headings"] if h in now["headings"]]
+    ck("every feature the roadmap already named survives",
+       len(kept) == len(before["headings"]),
+       "gone: " + ", ".join(h for h in before["headings"] if h not in now["headings"]))
+    ck("their relative order is unchanged",
+       kept == [h for h in now["headings"] if h in before["headings"]],
+       "order moved")
+    ck("no feature was renamed",
+       set(before["feature_dirs"]) <= set(now["feature_dirs"]),
+       "directories that vanished: "
+       + ", ".join(sorted(set(before["feature_dirs"]) - set(now["feature_dirs"]))))
+    ck("`## Decisions` was not touched",
+       now["decisions_sha"] == before["decisions_sha"],
+       "the downstream skill owns that block and this skill never writes it")
+
+    if scenario == "state-rerun":
+        # The scenario tests a FORK, and both answers are the user's to give:
+        # extend the existing roadmap, or give the wave its own section. An
+        # earlier version of this scorer asserted the extend branch outright and
+        # failed a correct run that took the other one — grading the simulated
+        # user's answer instead of the skill's behaviour, which is the same false
+        # red this repository has now committed at three different layers.
+        converted = any(f.startswith("ROADMAP-") and f != "ROADMAP-INDEX.md"
+                        for f in now["roadmap_files"])
+        print("  disposition: %s" % ("own section (converted)" if converted else "extended in place"))
+
+        # The build order survives either way — under its own name, or under the
+        # name the conversion renamed it to.
+        for f, lines in before["txt"].items():
+            after = now["txt"].get(f)
+            if after is None and converted:
+                cands = [v for k, v in now["txt"].items() if v[:len(lines)] == lines]
+                after = cands[0] if cands else []
+            ck("the pre-run build order survives in full and in order",
+               (after or [])[:len(lines)] == lines,
+               "%s: the pre-run order is not a prefix of any post-run .txt" % f)
+
+        if converted:
+            ck("the conversion produced an index",
+               "ROADMAP-INDEX.md" in now["roadmap_files"], "")
+            ck("the new wave got a section of its own",
+               sum(1 for f in now["roadmap_files"]
+                   if f.startswith("ROADMAP-") and f != "ROADMAP-INDEX.md") >= 2,
+               "only one section roadmap exists, so the wave did not get its own")
+        else:
+            ck("nothing was converted behind the user's back",
+               "ROADMAP-INDEX.md" not in now["roadmap_files"],
+               "an index appeared although the answer was to extend in place")
+
+        ck("the new wave actually landed",
+           len(now["headings"]) > len(before["headings"]),
+           "no feature was added — the wave-2 source produced nothing")
+
+    if scenario == "state-inflight":
+        ck("`.specs/STATE.md` was not rewritten",
+           now["state_sha"] == before["state_sha"],
+           "rule 11: a paused session's Handoff is never overwritten")
+        status = ""
+        for path in find_roadmaps(proj):
+            m = re.search(r"^##\s+Status\s*$(.*?)(?=^##\s|\Z)", read(path), re.M | re.S)
+            if m:
+                status += m.group(1)
+        ck("`## Status` records the work in flight",
+           re.search(r"not rewritten this run", status, re.I) is not None,
+           "the Status block never says the Handoff was left alone")
+
+    if scenario == "state-conversion":
+        sections = [f for f in now["roadmap_files"] if f.startswith("ROADMAP-")
+                    and f != "ROADMAP-INDEX.md"]
+        ck("the roadmap was converted", bool(sections), "no ROADMAP-<slug>.md exists")
+        ck("an index was written", "ROADMAP-INDEX.md" in now["roadmap_files"], "")
+        names = next(iter(before["txt"].values()), [])
+        prefix = os.path.commonprefix(names).rstrip("-") if names else ""
+        ck("the slug was DERIVED from the frozen prefix, not chosen",
+           bool(prefix) and any(f == "ROADMAP-%s.md" % prefix for f in sections),
+           "expected ROADMAP-%s.md from prefix %r, found %s"
+           % (prefix, prefix, ", ".join(sections) or "nothing"))
+
+    print("")
+    failed = 0
+    for name, ok, detail in checks:
+        print("  %s %s" % ("✓" if ok else "✗", name))
+        if not ok and detail:
+            print("      " + detail)
+        failed += 0 if ok else 1
+    print("\n  %d passed, %d failed" % (len(checks) - failed, failed))
+    return 1 if failed else 0
+
+
 def cmd_score(args):
     proj = os.path.abspath(args.dir)
     if os.path.isdir(os.path.join(proj, "project")):
@@ -274,6 +477,16 @@ def cmd_score(args):
     print("  files: %s\n" % ", ".join(os.path.basename(p) for p in roadmaps))
 
     base = load_baseline(args.dir)
+    if base and str(base.get("scenario", "")).startswith("state-"):
+        print("scoring %s" % proj)
+        print("  scenario : %s — compared against the tree as it was at setup"
+              % base["scenario"])
+        snap = load_snapshot(args.dir)
+        if snap is None:
+            die("no setup snapshot for this run — a state scenario is scored by "
+                "comparison, so it cannot be scored without one. Re-run setup.", 2)
+        return score_state(proj, base["scenario"], snap)
+
     if base is None:
         print("  ! no setup baseline recorded for this run — every hit below is")
         print("    being credited to the run. That is right only if the scenario")

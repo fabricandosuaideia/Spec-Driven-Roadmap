@@ -9,6 +9,75 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.19.0 — 2026-08-10
+
+**The three scenarios that need a project with a past exist, and have run.** They were the oldest
+open item here: every other path starts from input only, and these are what the skill meets after the
+first wave has shipped — a roadmap already written, features already built, someone stopped
+mid-feature.
+
+### How the past was manufactured, and why it matters
+
+Hand-writing a project's history tests the author's imagination; this repository already ate that
+lesson when a real project turned out to carry **six** `validation.md` title forms where a template
+shows one. So the fixture is built the way `state-scenarios.md` argued for:
+
+- **The wave-1 roadmap was generated** — the skill run against the Pauta PRD with `single-section
+  confirmed` at the size re-raise. Seventeen features, oversize, carrying the record line the
+  procedure prescribes. That is a real state a real team reaches and the exact input the conversion
+  scenario needs.
+- **The drift was authored from measured shapes**: 27 orphan `.specs/features/` directories under
+  three dead prefixes against 7 with content, one `SUPERSEDED` entry absent from the `.txt`, four of
+  the six recorded title forms, one genuine FAIL, one PASS whose evidence reads *"revisado à mão"*,
+  and the eight-field Handoff with its parenthetical label.
+- **The fixture's linter baseline is 1 failed, 1 warning, on purpose.** A run that "fixes" either has
+  repaired the fixture instead of doing its job, and that is now recorded by failing-check name.
+
+Two things were measured rather than assumed. Generating wave 1 from an older tag would have unlocked
+the legacy-roadmap branches — except the ledger already exists in `v3.5.0`, the oldest tag here, so
+those branches are unreachable by any generated fixture and that is written down instead of attempted.
+And the scenarios are **scored by comparison, not by grep**: `setup` snapshots heading order, the
+`.txt`, the feature directories, `## Decisions` and `STATE.md`, and `score` diffs against it. The
+seven-ambiguity grep refuses them outright, because the input already contains all seven.
+
+### What the first execution found
+
+- **A contradiction inside one sentence.** *"Nothing else triggers a conversion: a single-section
+  project that is merely large stays single-section **until the user asks otherwise**"* — the main
+  clause denies the case the trailing one admits, and `scope-phase.md` separately called the new-wave
+  fork the **only** sanctioned exit. Asked to split a long roadmap, a run took the literal reading and
+  converted. There are now two declared triggers, and the second is the one that was being denied.
+- **And the operation is not what that user asked for.** The conversion moves a project into
+  multi-section *shape* so the **next** wave gets a section of its own; it does not carve an existing
+  roadmap into several files. Carving would need new prefixes, which would rename features whose names
+  froze when `.specs/features/<name>/` appeared. Now said plainly, because the result otherwise reads
+  as a failure: they asked for several files and got one renamed file and a one-row index.
+- **No documented way in for "somebody stopped mid-feature; bring the artifacts up to date."**
+  `SKILL.md` routes *resume work* downstream and the seed's two triggers are both about a roadmap that
+  just closed. A run improvised an entry and reached the right answer, which is luck. It is now the
+  third declared trigger.
+- **The already-populated-ledger rules were scoped to multi-section**, and a single-section extension
+  needs every one of them. They now govern both — plus the answer that was missing: a `decided` row
+  the arriving scope falsifies **may and must** be amended, because a wrong closed row is worse than
+  an open one, nothing ever re-reading it.
+
+### And the scorer committed the same defect the gates kept committing
+
+`state-rerun` asserted that no conversion had happened — which is only true if the simulated user
+answered *extend*. The second run answered *own section*, which is equally the user's call, and a
+correct run scored 5/7. **A scorer that assumes one answer to a question the procedure deliberately
+asks is grading the user, not the skill.** It now detects the disposition and asserts what that branch
+requires, sharing the half that holds either way.
+
+That is the third layer this release found a false red in: the linter, the benchmark scorer, and now
+the state scorer. `check_disjoint` was the fourth — it accused a correct gray-area line of duplicating
+a roll-up entry on four coincident long words, two of which were the feature's own slug, which appears
+in both blocks by construction. The agent that hit it **rewrote correct output to escape the warning**,
+which is precisely the damage. It now requires a shared six-word phrase.
+
+Final: **8/8, 6/6, 7/7**, and the three scorers still fail an untouched tree on exactly the checks that
+require the run to have done something.
+
 ## 3.18.2 — 2026-08-09
 
 **Two things had never been executed. Both were run, and both were wrong in ways reading had not

@@ -183,8 +183,9 @@ file for good.
 sitting beside a surviving `docs/ROADMAP.md`. SKILL.md's rule 9 treats the two coexisting as a
 contradiction: the next run stops and asks which one is authoritative before touching anything.
 
-This fork is the **only** sanctioned exit from rule 9's "already fixed the mode — continue in it"
-clause. The mode changes here because the user explicitly asked for it at this fork — never by
+This fork is one of **two** sanctioned exits from rule 9's "already fixed the mode — continue in it"
+clause; the other is the user asking for the shape change outright, with no new wave, which the mode
+exception above already allows and `index-phase.md`'s conversion section lists as its second trigger. The mode changes here because the user explicitly asked for it at this fork — never by
 inference, and never because the roadmap grew large. Size is the argument *for asking*, never the
 authority to switch on your own.
 

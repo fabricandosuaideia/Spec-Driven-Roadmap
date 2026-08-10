@@ -443,11 +443,27 @@ def check_disjoint(rm, text, feats):
         skip(rm, "gray areas and open questions are disjoint", "one of the two blocks is absent")
         return
     gl = [l.strip(" -*") for l in bullets(gray)]
+    # A shared PHRASE, not four scattered long words. Bag-of-words overlap flagged
+    # a correct line whose four "matches" were two halves of the feature's own slug
+    # — which appears in both blocks by construction — plus two ordinary words of
+    # the source language. The agent that hit it rewrote a correct gray-area line to
+    # get past the warning, which is the damage a false red does: it does not just
+    # mislead, it invites someone to repair what was already right.
+    names = {n.lower() for n, _, _ in feats}
+    name_words = {w for n in names for w in re.split(r"[^a-z]+", n) if len(w) > 3}
+    def content(t):
+        """Content words only, in order — the same filter on both sides, or a run
+        from one never matches the other because a stopword sits between them."""
+        flatten = re.sub(r"\s+", " ", re.sub(r"[^a-z ]", " ", t.lower()))
+        return [w for w in flatten.split() if len(w) > 3 and w not in name_words]
+
+    flat = " ".join(content(rollup))
     overlap = []
     for line in gl:
-        key = re.sub(r"[^a-z ]", " ", line.lower())
-        words = [w for w in key.split() if len(w) > 5]
-        if len(words) >= 4 and sum(w in rollup.lower() for w in words) >= 4:
+        words = content(line)
+        # Any run of six consecutive content words appearing verbatim in the roll-up.
+        # Six is long enough that no two independently written sentences share one.
+        if any(" ".join(words[i:i + 6]) in flat for i in range(max(0, len(words) - 5))):
             overlap.append(line[:90])
     (ok if not overlap else warn)(rm, "gray areas and open questions are disjoint",
                                   "these look like they appear in both:\n  " + "\n  ".join(overlap)
