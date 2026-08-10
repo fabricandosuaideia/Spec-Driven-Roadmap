@@ -399,6 +399,17 @@ row that you did and why.
   and the build order already enforces it. Do not re-ask the theme, do not rewrite the row, and
   create no `cross-cutting` entry for it.
 
+  **One exception, and it is narrow.** A `deferred` row often carries settled text beside its
+  deferral — *"team data is reachable only by members"* — and an arriving wave can falsify that text
+  while leaving the deferral itself untouched. Correct the falsified sentence and nothing else: the
+  deferral stands, the theme is still not re-asked, and no `cross-cutting` entry appears. Say in the
+  row which sentence you corrected and which unit falsified it.
+
+  Without this the deferral clause and the amendment clause collide on one row — *never rewrite a deferred row* against *a decided
+  assertion the new scope contradicts must be amended* — and a run met exactly that and had to
+  improvise. When the falsified sentence **is** the deferral, there is no conflict to resolve: that is
+  a decided row, and the paragraph above governs it.
+
 If Phase 1 Step 5 listed project-level decision candidates, they are inputs here — a candidate that
 passes the three tests becomes one of these rows.
 

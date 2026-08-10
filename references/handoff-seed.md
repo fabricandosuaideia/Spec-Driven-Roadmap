@@ -124,6 +124,17 @@ Work is in flight if **any** of these hold:
 - The feature named in `## Handoff` has a `.specs/features/<name>/spec.md` on disk **and** does not
   have a real PASS (per Step 2's test).
 
+**What this test does not see, said here so a `not in flight` is not read as more than it is.** It
+answers one question — *is the feature the Handoff names still being built?* — and nothing else. A
+`.specs/features/<other>/` carrying a `spec.md` and a half-ticked `tasks.md` with no `validation.md`
+is visibly mid-build work, and this test returns `not in flight` anyway, because that feature is not
+the one the Handoff names. A run hit exactly that and reported it.
+
+That is the scope on purpose, not an oversight: widening it to any half-built directory would block
+every later seed on the first feature anyone ever paused inside, and the whole point of Steps 3-4 is
+to move past finished work. What the run owes is honesty — when you write `## Status`, say which
+feature the test looked at, so `not in flight` cannot be read as *nothing is being built*.
+
 **All three are scoped to the feature `## Handoff` names, and none of them fires once that feature
 has a real PASS.** A downstream skill that finished a feature and then paused leaves `**Completed**`
 populated, which reads as in-flight on the first bullet alone — but the work it describes is done,

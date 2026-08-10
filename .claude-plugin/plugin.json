@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "spec-driven-roadmap",
   "description": "Generates a dependency-ordered feature backlog from a PRD, architecture doc, interview, or existing codebase, then seeds the downstream spec-driven build skill.",
-  "version": "3.19.0",
+  "version": "3.19.1",
   "author": {
     "name": "Fabricando Sua Ideia",
     "url": "https://github.com/fabricandosuaideia"

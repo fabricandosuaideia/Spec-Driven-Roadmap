@@ -425,8 +425,11 @@ but never leave one silently unrecorded either:
   `## Cross-Cutting Decisions`; if it is not there, record it as an open question and choose the most
   conservative option that exists in the repository already. Never invent a credential and never
   reach a network service to resolve one.
-- A failing test — never edit, weaken, skip or delete a test to reach a PASS, and never record a
-  feature as done while its suite is red. If a test is genuinely wrong, leave it failing and write
+- A failing test — never edit, weaken, skip or delete a test to reach a PASS, **and never add one
+  either**. A new test asserting the opposite of the failing one leaves the suite holding two
+  contradictory claims about the same input and manufactures the look of coverage; the prohibition
+  covers adding for the same reason it covers editing. Never record a feature as done while its
+  suite is red. If a test is genuinely wrong, leave it failing and write
   down why. This is the one stop where continuing costs more than halting: a verified PASS is the
   only evidence this run produces, and a test bent to produce it destroys the evidence rather than
   the defect.
@@ -454,6 +457,13 @@ name the artifacts you approved yourself and the verdict you reached on your own
 run records is evidence the suite was green, not evidence anyone independent agreed — and the
 difference matters to whoever reads it next.
 
+**When the downstream skill's own loop cannot terminate, this instruction ends it.** That skill
+treats a red gate as *stop, fix, re-run* — correct in general, and a deadlock here: if the only fixes
+that would turn the gate green are ones this instruction forbids, its loop can never exit and the
+feature can never reach verification. Reaching that point **is** the answer. Record the feature as
+not done, name every fix you rejected and which criterion each violated, and let the rule below end
+the run.
+
 If the same feature comes out of verification without a PASS twice, stop the whole run and report it.
 Two verification runs, not two rewrites: you are never required to ship a change you have already
 shown to be wrong merely to spend a cycle. Do not try a third time and do not move on to the next
@@ -462,9 +472,24 @@ continuing past it builds on top of it. **This stop outranks the finishing condi
 one asks for a PASS on every feature and can therefore never be reached when a feature has none;
 stopping here, and saying which feature and why, is the correct end of the run.
 
-**Write a FAIL so it cannot be misread, the same way you write a PASS.** One consolidated verdict
-line and nothing above it that resembles one — per-criterion rows say `MET` / `NOT MET`, never
-`PASS`. **When a criterion is met by the code and denied by the test guarding it**, say exactly that
+**Write a FAIL the downstream gate can actually read.** Its own script decides by looking at
+headings matching `## Validation…` and at any line containing `Result:` — a verdict written anywhere
+else is invisible to it. A run that wrote `## VERDICT: FAIL` was told by that gate that the report
+*"has no PASS/FAIL verdict"*, which is the worst possible outcome: a feature that failed, recorded in
+a way the thing checking for failure cannot see. **Read the downstream skill's own template from disk
+and match it** — never invent a heading of your own, however clear it reads.
+
+**Those two demands collide if you follow the template literally, so reconcile them this way.** That
+gate joins *every* line it recognises into one string before deciding, and the template emits three
+such lines — the sensor's `**Result**:`, Gate Check's `- **Result**:` and the chat block's
+`## Validation: <feature> - [PASS | FAIL]`. Together they put both words in the haystack, and the gate
+then reports *"still the template placeholder"* instead of your verdict. Keep every section heading
+verbatim, **relabel only the inline result fields** so they stop matching that pattern —
+`**Sensor verdict** —`, `**Gate outcome** —` — and let one `## Validation: <feature> — <verdict>`
+line be the only thing the gate sees. Verified against the real script: it then reads `FAIL` as
+`FAIL`.
+
+Per-criterion rows say `MET` / `NOT MET`, never `PASS`. **When a criterion is met by the code and denied by the test guarding it**, say exactly that
 rather than collapsing it either way: `MET, contradicted by <test>`. Calling it `MET` hides a red
 suite and calling it `NOT MET` blames code that is correct, and the consolidated verdict is a FAIL in
 both readings anyway — what a later reader needs is which of the two is broken.
@@ -479,8 +504,11 @@ which is the one outcome every rule here is aimed at.
 unticked, whatever their individual done-whens say. A `tasks.md` full of ticks under a failed feature
 is read by the next reviewer as progress that did not happen.
 
-**Leave the work uncommitted.** No branch, no commit, no tag — a red suite entering history is a
-handoff nobody asked for, and the point of stopping is that a person looks before anything lands.
+**Do not commit the failure.** The downstream skill may make its own atomic commit after each task
+whose gate passed — that is its contract and this instruction does not override it. What must not
+happen is a **feature** landing in history as done while its suite is red: no commit closing it, no
+branch merged, no tag. Leave that state in the working tree, where a person sees it before it becomes
+part of the record.
 
 **Reconcile every claim an artifact makes about itself, not only the ones named here.** `open
 questions — none` beside an unanswered question is the example; a task's done-when, a comment

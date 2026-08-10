@@ -375,15 +375,7 @@ def check_ledger(rm, text, root=None, path=None):
     paired = rows + extra
     states = {"decided": 0, "n/a": 0, "not decided": 0, "deferred": 0}
     for r in rows:
-        low = r.lower()
-        if "deferred to feature" in low:
-            states["deferred"] += 1
-        elif "not decided" in low:
-            states["not decided"] += 1
-        elif "n/a because" in low:
-            states["n/a"] += 1
-        else:
-            states["decided"] += 1
+        states[row_state(r)] += 1
     if not rows:
         warn(rm, "cross-cutting ledger has one row per theme",
              "the block is present but no table rows were found")
@@ -419,7 +411,7 @@ def check_ledger(rm, text, root=None, path=None):
             except OSError:
                 continue
     for r in paired:
-        if "not decided" in r.lower() and "deferred to feature" not in r.lower():
+        if row_state(r) == "not decided":
             theme = r.strip("| ").split("|")[0].strip()
             # Same bullet-grouping the roll-up check uses. Splitting on physical
             # lines here made a wrapped entry invisible to one check and visible
@@ -434,6 +426,38 @@ def check_ledger(rm, text, root=None, path=None):
                 unresolved.append("%r has a `cross-cutting` entry with no `affects:` line" % theme)
     (ok if not unresolved else fail)(rm, "every `not decided` row has its question",
                                      "\n".join(unresolved))
+
+
+def decision_cell(row):
+    """The decision column of a ledger row, lowercased.
+
+    A row's state used to be read from the WHOLE row, which meant prose anywhere
+    in it could set the state. A run amending two rows explained the change by
+    quoting the other states' wording -- "this row was `not decided` until wave 2"
+    -- and both genuinely decided rows were reclassified as undecided, failing a
+    check on a correct roadmap. The state lives in the decision column; read it
+    there.
+    """
+    cells = [c.strip() for c in row.strip().strip("|").split("|")]
+    return (cells[1] if len(cells) > 1 else row).lower()
+
+
+def row_state(row):
+    """`decided` | `n/a` | `not decided` | `deferred`, from how the cell OPENS.
+
+    The three non-decided states are conventions that begin the cell -- Step 7a
+    writes `not decided (...)`, `N/A because ...`, ``deferred to feature `x` ``.
+    Matching them anywhere inside it lets a decided row that merely mentions one
+    ("the rule that was deferred to feature `y` was absorbed here") be read as
+    that state. Anchor to the start and the mention is just prose.
+    """
+    cell = decision_cell(row).lstrip("*_ `")
+    for state, opener in (("deferred", "deferred to feature"),
+                          ("not decided", "not decided"),
+                          ("n/a", "n/a because")):
+        if cell.startswith(opener):
+            return state
+    return "decided"
 
 
 def check_disjoint(rm, text, feats):

@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.19.0"
+  version: "3.19.1"
 ---
 
 # Spec-Driven Roadmap

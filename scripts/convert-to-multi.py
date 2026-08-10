@@ -544,7 +544,15 @@ def report_work_in_flight(root):
         if m and m.group(1).strip().lower() not in ("none", "none.", "—", "-"):
             findings.append("%s = %s" % (field, m.group(1).strip()))
     if findings:
-        return "WORK MAY BE IN FLIGHT — " + "; ".join(findings)
+        # Deliberately not a verdict. This is the unrefined field test, and
+        # handoff-seed.md Step 1 refines it: a real PASS on the feature the Handoff
+        # names overrides both fields, because a skill that finished a feature and
+        # then paused leaves `Completed` populated forever. A run met this script
+        # shouting IN FLIGHT while Step 1 said otherwise and had to reconcile two
+        # gates on one question, so the wording now says which one decides.
+        return ("Handoff fields are populated (%s) — this is the raw field test, "
+                "NOT a verdict. handoff-seed.md Step 1 decides: a real PASS on the "
+                "feature the Handoff names overrides these." % "; ".join(findings))
     return "Handoff present, Completed/In-progress read none"
 
 

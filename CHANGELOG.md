@@ -9,6 +9,67 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.19.1 — 2026-08-10
+
+**v3.19.0 shipped two procedure changes nobody had executed.** Running them found four defects, one
+of them introduced by that same release — which is the shape this repository's first lesson describes,
+committed in the commit whose message cited it.
+
+### The wave record works, and the loop met the real downstream skill
+
+The `wave recorded` line appeared exactly as prescribed, third line of the new section's roadmap,
+carrying the disposition and the reason. And `loop-build` ran with `tlc-spec-driven` actually
+installed — the first time in ten runs, the previous nine having hand-written the artifacts because
+the fixture had no `.claude/skills/`. Meeting the real skill exposed three collisions that no
+hand-written run could reach:
+
+- **A FAIL the gate could not read.** The instruction said *"write a FAIL so it cannot be misread"*;
+  the run wrote `## VERDICT: FAIL`; `validate_state.py` answered *"validation.md has no PASS/FAIL
+  verdict"*. A failed feature, recorded where the thing checking for failure cannot see it. The
+  instruction now says to read that skill's template from disk and match it.
+- **And matching it literally produces an unfilled verdict** — found by the run that followed the
+  fix. The gate joins every line it recognises into one string, and the template emits three: the
+  sensor's `**Result**:`, Gate Check's `- **Result**:`, and the chat block's `## Validation: …
+  [PASS | FAIL]`. Both words land in the haystack and the gate reports *"still the template
+  placeholder"*. Keep the headings, relabel the inline result fields, leave one
+  `## Validation: <feature> — <verdict>` visible. Verified against the real script: it reads `FAIL`
+  as `FAIL`.
+- **A deadlock.** That skill treats a red gate as *stop, fix, re-run*; this instruction forbids the
+  only fixes that would turn it green. Its loop could never exit. Reaching that point is now stated
+  to **be** the answer, and the two-strikes rule ends the run. The run that verified it went further
+  than the argument: its discrimination sensor *measured* the deadlock — reversing the tie-break
+  turns all three tests green, so the suite is green exactly when the acceptance criterion is
+  violated.
+- **A commit clause that overreached.** *"Leave the work uncommitted"* collided with the downstream
+  skill's own per-task atomic commits. Now scoped: its commits are its contract, and what must not
+  happen is a **feature** landing in history as done while its suite is red.
+- **Adding a test was not forbidden**, only editing, weakening, skipping and deleting. A run reasoned
+  its way to not adding one — a new test asserting the opposite of the failing one leaves the suite
+  holding two contradictory claims and manufactures the look of coverage. Now written down.
+
+### And v3.19.0's own new clause contradicted an older one
+
+The rule that a `decided` ledger row falsified by arriving scope *must* be amended collided with the
+rule that a `deferred` row is never rewritten — on rows that are both, which is common: a deferral
+usually sits beside settled text, and a new wave can falsify the text while leaving the deferral
+untouched. The exception is now narrow and named: correct the falsified sentence, the deferral stands.
+
+### The fifth false red, and a test that was reading the wrong column
+
+`check-roadmap.py` classified a ledger row's state by substring over the **whole row**, so a run that
+amended two rows and explained itself by quoting the other states' wording had both genuinely decided
+rows reclassified as undecided. The state now comes from how the decision **cell opens**, which is
+where the convention puts it. Six cases verified, including the two that only prose distinguishes.
+
+`convert-to-multi.py` also shouted `WORK MAY BE IN FLIGHT` while `handoff-seed.md` Step 1's refined
+test said otherwise — two gates disagreeing on one question, with the script's own docstring already
+admitting it does not decide. Its message now says which one does.
+
+And Step 1 now states **what it cannot see**: a half-built feature directory that the Handoff does not
+name returns `not in flight`, correctly and by design, because widening the test would block every
+later seed on the first feature anyone ever paused inside. What the run owes is saying which feature
+the test looked at, so `not in flight` is not read as *nothing is being built*.
+
 ## 3.19.0 — 2026-08-10
 
 **The three scenarios that need a project with a past exist, and have run.** They were the oldest
