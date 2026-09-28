@@ -190,7 +190,7 @@ def field(fields, *names):
 # leave every per-feature check with nothing to read.
 KNOWN_FIELDS = ("objective", "scope-unit", "depends", "external contract", "size",
                 "task estimate", "tasks", "implicit dimension", "open question",
-                "needs pre-written context", "needs context", "discharge")
+                "needs pre-written context", "needs context", "discharge", "risk tier")
 
 
 def has_known_field(fields):
@@ -584,6 +584,62 @@ def check_context_flag(rm, feats):
                                     "\n".join(wrong))
 
 
+# The risk-tier floor (decompose-phase.md Step 6). Measured on the one project
+# with per-feature attempt counts (146 features, WordPress AI Agent Manager,
+# 2026-09-28): Large size was the strongest predictor of rework (3.18 vs 2.25
+# attempts), concurrency next. Auth and payments did NOT predict rework there;
+# they are A because a missed defect in them is the unrecoverable direction of
+# error, not because they were retried more. State transitions and external calls
+# stay B: in that data they separated little once size was accounted for.
+TIER_A_SIZES = ("large", "complex")
+TIER_A_DIMS = ("concurren", "auth", "payment")
+TIER_RANK = {"C": 0, "B": 1, "A": 2}
+
+
+def derive_tier(fields):
+    """(tier, reason) — the floor Phase 2 may raise with a reason and never lower."""
+    size = (field(fields, "size") or "").strip().lower()
+    dims = (field(fields, "implicit dimension") or "").lower()
+    consumed = field(fields, "external contract") or "none"
+    if any(size.startswith(s) for s in TIER_A_SIZES):
+        return "A", "size %s" % size.split()[0]
+    hit = [d for d in TIER_A_DIMS if d in dims]
+    if hit:
+        return "A", "dimension %s" % ", ".join(hit)
+    if reads_as_none(dims) and reads_as_none(consumed):
+        return "C", "no implicit dimension, consumes no contract, not Large"
+    return "B", "has a dimension or consumes a contract, none of them an A trigger"
+
+
+def stated_tier(fields):
+    """(tier letter or None, raised-with-reason: bool) from the entry's own field."""
+    v = (field(fields, "risk tier") or "").strip()
+    m = re.match(r"`?([ABC])`?\b", v)
+    if not m:
+        return None, False
+    return m.group(1), re.search(r"raised\b.*\S", v[m.end():], re.I) is not None
+
+
+def check_tiers(rm, feats):
+    below, unexplained, absent = [], [], []
+    for name, fields, _ in feats:
+        floor, why = derive_tier(fields)
+        got, raised = stated_tier(fields)
+        if got is None:
+            absent.append(name)
+        elif TIER_RANK[got] < TIER_RANK[floor]:
+            below.append("%s: states %s, floor is %s (%s)" % (name, got, floor, why))
+        elif TIER_RANK[got] > TIER_RANK[floor] and not raised:
+            unexplained.append("%s: states %s above its floor %s with no `raised ...` reason" % (name, got, floor))
+    if len(absent) == len(feats):
+        skip(rm, "each feature's risk tier is at or above its floor",
+             "no feature carries `risk tier` (a roadmap older than 3.24.0); feature-brief.py derives it")
+        return
+    (ok if not below else fail)(rm, "each feature's risk tier is at or above its floor", "\n".join(below))
+    (ok if not unexplained else fail)(rm, "a tier raised above its floor says why", "\n".join(unexplained))
+    (ok if not absent else fail)(rm, "every feature carries a risk tier", "missing: " + ", ".join(absent))
+
+
 def check_txt_agreement(rm, feats, txt, txt_path):
     if txt is None:
         fail(rm, "build-order .txt agrees with the roadmap",
@@ -737,6 +793,7 @@ def main():
         check_coverage(rm, text)
         if legible:
             check_context_flag(rm, feats)
+            check_tiers(rm, feats)
         check_txt_agreement(rm, feats, txt, os.path.relpath(tp, root))
         check_size(rm, text)
     check_global_names(root, all_feats)

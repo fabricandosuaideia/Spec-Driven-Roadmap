@@ -468,6 +468,26 @@ def check_changelog(root):
           "no '## %s' heading" % version)
 
 
+def check_tier_rule(root):
+    """The risk-tier floor is written twice on purpose: as prose an agent writing a
+    roadmap follows (decompose-phase.md Step 6), and as code the linter and the
+    brief run (check-roadmap.py). Every trigger the code uses must be named in the
+    prose, or Phase 2 writes a tier the linter then fails."""
+    code = read(root, "scripts", "check-roadmap.py") or ""
+    prose = read(root, "references", "decompose-phase.md") or ""
+    stems = []
+    for const in ("TIER_A_SIZES", "TIER_A_DIMS"):
+        m = re.search(r"^%s = \(([^)]*)\)" % const, code, re.M)
+        stems += re.findall(r'"([^"]+)"', m.group(1)) if m else []
+    m = re.search(r"^- \*\*risk tier\*\*(.*?)(?=^- \*\*)", prose, re.M | re.S)
+    bullet = (m.group(1) if m else "").lower()
+    missing = [st for st in stems if st not in bullet]
+    check("decompose-phase's tier rule names every trigger check-roadmap.py uses",
+          bool(stems) and bool(bullet) and not missing,
+          ("no TIER_A_* constants read" if not stems else "no `risk tier` bullet in Step 6" if not bullet
+           else "not named in the prose: " + ", ".join(missing)))
+
+
 def check_loop_templates(root):
     """The two `/loop` templates in handover-prompt.md share clauses on purpose.
 
@@ -519,6 +539,7 @@ def main():
     print("procedure"); check_step_numbering(root); check_step_pointers(root); check_no_orphan_constants(root)
     print("benchmark"); check_benchmark(root)
     print("loop templates"); check_loop_templates(root)
+    print("risk tier"); check_tier_rule(root)
     print("changelog"); check_changelog(root)
 
     print("\n%d checks, %d failed" % (checks_run, len(failures)))

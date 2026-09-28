@@ -9,6 +9,57 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.24.0 — 2026-09-28
+
+**Step 3 of the build kit: every feature gets a risk tier, derived rather than chosen, and the tier
+says how much verification and how many attempts the feature gets downstream.** A new eleventh field
+in decompose-phase.md Step 6 (the thirteen rules are untouched); Step 6's Next step, Step 10's Option A
+and both loop templates now tell the builder to follow the tier the brief prints.
+
+**The rule was chosen from data, and the first draft lost.** On the WordPress AI Agent Manager, the
+one project with per-feature attempt counts (146 features with both an entry and build labels), the
+obvious rule — A for concurrency, auth, payments, state transitions or Large — put 71% of features in
+A and separated them weakly (2.71 against 2.23 mean attempts): a tier that puts most work at the top
+buys nothing. Large size was the strongest predictor (3.18 against 2.25 attempts; 44% reach a 4th
+attempt, against 22%), concurrency next; auth and payments did not predict rework there. The shipped
+floor: **A** when Large or Complex, or concurrency, auth or payments; **C** when no implicit dimension
+and no consumed contract; **B** otherwise. On that project it separates at **2.78 / 2.29 / 2.12**
+attempts, with 35% / 23% / 12% reaching a 4th, and puts 57% of features in A (MakeContent: 26%). Auth
+and payments are A for the direction of error — a missed defect there is the unrecoverable one — not
+for the rework data, and the reference says so. One project is thin evidence, and the reference says
+that too.
+
+- `check-roadmap.py`: `derive_tier()` and a check that every stated tier is at or above its floor, a
+  raise says why (`A — raised from B: <reason>`), and no tier is missing; a roadmap written before the
+  field is reported as not judged, never failed.
+- `feature-brief.py` prints `## Risk tier` — stated or derived, and the floor winning over a stated
+  tier below it — with what the tier sets for each downstream skill (`TIER_MEANING`, the one place it
+  is written): tlc-spec-lean's `Profile:` (A and B `standard`, C `light`: `light` injects no faults, and
+  8 of 9 verification failures on the project behind the user's testing guide were tests that could
+  not fail), tlc-spec-driven's document depth, the verifier/reviewer shape, and attempt ceilings 5/4/3
+  carried over from the WordPress pipeline as a starting point, not measured as optimal.
+- `check-consistency.py` checks that decompose-phase's prose names every trigger the code uses. It
+  failed when a trigger was added to the code alone.
+- **A defect in 3.23.0's `status-block.py`, found while writing this.** It ended `## Status` only at a
+  `###` whose bare name was in a `.txt`; MakeContent carries entries like `` ### `x` — SUPERSEDED ``,
+  absent from the `.txt`. One of those right after the block would have been taken for the block's own
+  text and moved to the history — its entry gone from the roadmap. A `###` whose first token is
+  feature-shaped (`<prefix>-<kebab>`) now always ends the block; the self-test plants that entry.
+  decompose-phase's output-shape paragraph still described the pre-3.23.0 cut and was corrected.
+
+**Executed.** Self-test defects injected: 5 of 5 caught for the tier, 2 of 2 for the status-block fix.
+Two blind agents added tiers to an eight-feature roadmap built with traps (a Medium with state
+transitions and external calls, a Small with no dimension that consumes a contract, a refund with no
+`payments` flagged): **8/8 and 8/8**, and `check-roadmap.py` passed both files. Their shared friction
+was fixed and not re-run: the value is the bare letter, the field comes last, the floor is tested A
+first, when a raise is legitimate (and that a wrong dimension is fixed rather than raised over), and an
+old roadmap may stay without the field. A leftover "ten-field entry" was corrected.
+
+**Not done here.** No pipeline consumes the tier yet — that is step 4; today the brief tells a builder
+what it sets, and the loop's own two-strikes rule still governs unattended runs.
+
+---
+
 ## 3.23.0 — 2026-09-28
 
 **Step 2 of the build kit: the roadmap files agents are pointed at stop growing, and a builder reads

@@ -8,7 +8,7 @@
 - [Step 3 — Slice into features](#step-3--slice-into-features)
 - [Step 4 — Shared ownership across sections](#step-4--shared-ownership-across-sections) (multi-section only)
 - [Step 5 — Defer work that cannot be built yet](#step-5--defer-work-that-cannot-be-built-yet) (multi-section only)
-- [Step 6 — Write each feature with all ten fields](#step-6--write-each-feature-with-all-ten-fields)
+- [Step 6 — Write each feature with all eleven fields](#step-6--write-each-feature-with-all-eleven-fields)
 - [Step 7 — Pre-empt the gray areas](#step-7--pre-empt-the-gray-areas)
 - [Step 8 — Close the roadmap](#step-8--close-the-roadmap)
 - [When to re-run, and what is frozen](#when-to-re-run-and-what-is-frozen)
@@ -155,7 +155,7 @@ roadmap, and why (citing the missing dependency); mark the unit `deferred` in th
 (Step 8). When that later roadmap is decomposed, add the feature there with a cross-reference back.
 This skill keeps no to-do list of its own — the note in the roadmap is the only record.
 
-## Step 6 — Write each feature with all ten fields
+## Step 6 — Write each feature with all eleven fields
 
 - **name** — `<prefix>-<kebab-case>`, unique across the project. English, always (it becomes a
   directory name).
@@ -180,8 +180,27 @@ This skill keeps no to-do list of its own — the note in the roadmap is the onl
   got. Qualify it in the ledger row or the roll-up, never here.
 - **needs pre-written context.md** — yes if any dimension is present or any open question is
   `status: open`; no otherwise.
+- **risk tier** — `A`, `B` or `C`: how much verification and how many attempts this feature gets
+  downstream. The last field of the entry, written as the bare letter like the other values
+  (`- **risk tier** — B`). **Derive the floor from the fields as written, never choose it**, testing in
+  this order and stopping at the first that holds: `A` when size is Large or Complex, or the implicit
+  dimensions include concurrency, auth or payments; `C` when there is no implicit dimension and it
+  consumes no external contract; `B` otherwise. You may **raise** it, and then the value says why:
+  `A — raised from B: <reason>`. Raise when the entry's own text shows a risk its fields do not flag —
+  money that moves, a secret, data deleted for good — and first ask whether that field is simply
+  wrong: a refund that moves money is a `payments` dimension, fix the dimension and the floor follows.
+  You may never lower it. A roadmap written before this field may stay without it — the brief derives
+  it — until Phase 2 next rewrites its entries. `scripts/check-roadmap.py` fails a tier
+  below its floor and a raise with no reason; `scripts/feature-brief.py` prints the tier with what it
+  sets for each downstream skill (its `TIER_MEANING` table, the one place that is written), and
+  derives it for a roadmap older than this field.
+  *Why these triggers and not others:* on the one project with per-feature attempt counts (146
+  features), Large was the strongest predictor of rework — 3.18 attempts against 2.25 — and the rule
+  above separates A/B/C at 2.78, 2.29 and 2.12 attempts. Auth and payments did **not** predict rework
+  there; they are A because a missed defect in them is the unrecoverable direction of error. One
+  project is thin evidence; re-measure with `scripts/measure-agents.py` before trusting the numbers.
 - **discharge** — *question-only features only* (Step 3): the literal line
-  `discharge: no code — answered open question or context.md`. Not one of the ten; absent on every
+  `discharge: no code — answered open question or context.md`. Not one of the eleven; absent on every
   other feature, and the seed's done-test, its target pick and the loop's skip list all key off it
   verbatim.
 
@@ -573,10 +592,11 @@ is gone, inside `## Open Questions` it reads as an entry belonging to no feature
    `docs/ROADMAP-INDEX.md` instead — exactly one `## Status` exists per project.)
 3. `## Cross-Cutting Decisions` — **single-section mode only**, same reason: in multi-section mode it
    lives in `docs/ROADMAP-INDEX.md`, exactly one per project.
-4. The feature entries, each with all ten fields (Step 6). **Each one is a `### <feature-name>`
+4. The feature entries, each with all eleven fields (Step 6). **Each one is a `### <feature-name>`
    heading** — level three, the bare name, nothing else on the line. That form is not cosmetic: four
-   consumers depend on it. The seed's Step 5 replaces the `## Status` body up to the next heading of
-   any level, so a feature written at `##` would be swallowed by that block; `scripts/convert-to-multi.py`
+   consumers depend on it. The seed's Step 5 (`scripts/status-block.py`) ends the `## Status` block at
+   a `###` whose first token is a feature name, so an entry written any other way right after that
+   block could be taken for the block's own text and moved to `docs/roadmap-history.md`; `scripts/convert-to-multi.py`
    reads these entries to reconcile `docs/roadmap.txt` against the roadmap, and finds none if they
    are a table or a list; index-phase.md's conversion resolves the section slug against them; and a
    human reading the file navigates by them.
@@ -623,8 +643,8 @@ python3 <skill-dir>/scripts/check-roadmap.py --root <project-root>
 It covers the countable half of the list below — forward dependencies, duplicate names, the task
 budget, the `discharge:` line verbatim, the two-way agreement between each feature's `open questions`
 and the roll-up, one row per rubric theme, every `not decided` row having its `cross-cutting` entry
-with an `affects:` line, `uncovered: none`, the derived `needs pre-written context.md` flag, the
-`.txt` agreeing with the roadmap, the size thresholds, and global name uniqueness against every other
+with an `affects:` line, `uncovered: none`, the derived `needs pre-written context.md` flag, every
+`risk tier` at or above its floor with any raise explained, the `.txt` agreeing with the roadmap, the size thresholds, and global name uniqueness against every other
 roadmap and every `.specs/features/` directory. A failure is a question, not a verdict: read the
 detail before changing anything, and where a check reports `·` nothing was judged there — the detail
 says why.
@@ -676,8 +696,8 @@ the script is not on disk — an install predating it — do the whole list by h
   deliberately skips the other.
 - **Warn at roughly 2,000 tokens; act at roughly 3,000.** The threshold is arithmetic, not a feeling:
   the file carries roughly 900 tokens of fixed overhead (title, the section headings, the
-  cross-cutting ledger, the coverage table's header) plus roughly 230 per feature — its ten-field
-  entry (Step 6), its row in the coverage table, its lines in `## Expected Gray Areas`, and its
+  cross-cutting ledger, the coverage table's header) plus roughly 230 per feature — its eleven-field
+  entry (Step 6; the one-line `risk tier` field came after that measurement and is not in it), its row in the coverage table, its lines in `## Expected Gray Areas`, and its
   matching entry in the roll-up under `## Open Questions`. That puts 3,000 tokens at about 9
   features and 2,000 at about 5 — measured against real roadmaps, not derived from the field list.
   The feature's line in the `.txt` is not in that sum: the limit measures the roadmap, and that line

@@ -609,8 +609,9 @@ python3 <this-skill-dir>/scripts/status-block.py <STATUS-PATH> --body <file hold
 It replaces the body, appends the previous body verbatim to `docs/roadmap-history.md` first, carries
 the block's `**Last run**:` line over, inserts the block after the H1 when it is missing, and refuses
 — writing nothing — a body that contains a heading. **Why a script, and why the old rule failed.** The
-block ends at the next `#`/`##` heading, or at a `### <name>` heading whose name is a feature in a
-`docs/roadmap*.txt`: single-section roadmaps carry their feature entries as bare `### <feature-name>`
+block ends at the next `#`/`##` heading, or at a `###` heading whose first token is a feature name —
+listed in a `docs/roadmap*.txt` or shaped like one (`<prefix>-<kebab>`), even with text after it, as a
+`— SUPERSEDED` entry has: single-section roadmaps carry their feature entries as bare `### <feature-name>`
 sections with no `##` container, so a cut that stops only at `##` would swallow them. The rule this
 replaced stopped at the next heading of **any** level, on the premise that this block never contains a
 heading of its own — and on a real project unattended runs had written `###` sub-headings and
@@ -748,7 +749,7 @@ For `tlc-spec-lean` 1.1.0, exactly these seven — bold label, colon, **no bulle
 **Feature**: <target feature name>
 **Where**: not started - no plan.md on disk yet
 **In progress**: none
-**Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Plan source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints this feature's entry from `<ROADMAP-PATH>`, the open questions and gray areas naming it, the contracts it consumes and the project-wide `## Cross-Cutting Decisions` (settled: read them before planning and do not re-decide what they answer). Do not open `<ROADMAP-PATH>` whole; if the script cannot run, read only its `### <target>` entry and the lines naming `<target>`. Backlog position: `<STATUS-PATH>` `## Status`.
+**Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Plan source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints this feature's entry from `<ROADMAP-PATH>`, its risk tier with what that tier sets for this skill (follow it), the open questions and gray areas naming it, the contracts it consumes and the project-wide `## Cross-Cutting Decisions` (settled: read them before planning and do not re-decide what they answer). Do not open `<ROADMAP-PATH>` whole; if the script cannot run, read only its `### <target>` entry and the lines naming `<target>`. Backlog position: `<STATUS-PATH>` `## Status`.
 **Blockers**: none
 **Uncommitted**: none
 **Branch**: <output of `git branch --show-current`>
@@ -763,7 +764,7 @@ For `tlc-spec-driven` v3.x, exactly these eight:
 - **Phase / Task**: not started — no spec.md on disk yet
 - **Completed**: none
 - **In-progress** (file:line): none
-- **Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Spec source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints this feature's entry from `<ROADMAP-PATH>`, the open questions and gray areas naming it, the contracts it consumes and the project-wide `## Cross-Cutting Decisions` (settled: read before Discuss and do not re-decide what it answers). Do not open `<ROADMAP-PATH>` whole; if the script cannot run, read only its `### <target>` entry and the lines naming `<target>`. Backlog position: `<STATUS-PATH>` `## Status`.
+- **Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Spec source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints this feature's entry from `<ROADMAP-PATH>`, its risk tier with what that tier sets for this skill (follow it), the open questions and gray areas naming it, the contracts it consumes and the project-wide `## Cross-Cutting Decisions` (settled: read before Discuss and do not re-decide what it answers). Do not open `<ROADMAP-PATH>` whole; if the script cannot run, read only its `### <target>` entry and the lines naming `<target>`. Backlog position: `<STATUS-PATH>` `## Status`.
 - **Blockers**: none
 - **Uncommitted files**: none
 - **Branch**: <output of `git branch --show-current`>

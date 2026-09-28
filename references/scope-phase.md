@@ -73,8 +73,10 @@ heading** (`## MVP Scope`, `## Explicitly Out of Scope`, `## Capabilities Alread
 `scripts/check-roadmap.py` matches**: the per-feature field labels decompose-phase.md Step 6
 defines, the `discharge:` line, the `status: open` / `status: answered` tags, the `cross-cutting`
 tag and its `affects:` line, the ledger's `Theme` column header and the state words `not decided` /
-`n/a because` / `deferred to feature`, and the `uncovered:` line — together with the sentinel values
-those checks read (`none`, `yes`, `no`). Those are machine-read keys, path components, and literals
+`n/a because` / `deferred to feature`, the `uncovered:` line, and the `risk tier` values `A` / `B` /
+`C` with their `raised from` — together with the sentinel values those checks read (`none`, `yes`,
+`no`), and the size and dimension words the tier is derived from (`Large`, `Complex`, `concurrency`,
+`auth`, `payments`). Those are machine-read keys, path components, and literals
 that later phases locate by exact name — translating any of them breaks the handoff, the
 `.specs/features/<name>/` directories, or a cross-file lookup. Only the prose after the key is in
 the source language.

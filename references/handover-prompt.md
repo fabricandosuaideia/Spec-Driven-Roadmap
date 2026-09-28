@@ -396,7 +396,7 @@ guess. A prompt built on a trigger the installed skill does not answer to is ine
 ```
 specify feature <target> — create it at `.specs/features/<target>/` using that exact directory name.
 Spec source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints the
-entry from <ROADMAP-PATH>, the questions naming it and <STATUS-PATH> `## Cross-Cutting Decisions`,
+entry from <ROADMAP-PATH>, its risk tier and what that tier sets (follow it), the questions naming it and <STATUS-PATH> `## Cross-Cutting Decisions`,
 which are settled before Discuss: do not re-decide what they answer. Do not open <ROADMAP-PATH> whole;
 if the script cannot run, read only its `### <target>` entry and the lines naming <target>.
 ```
@@ -412,7 +412,7 @@ source):
 ```
 specify feature <target> — create it at `.specs/features/<target>/` using that exact directory name.
 Plan source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints the
-entry from <ROADMAP-PATH>, the questions naming it and <STATUS-PATH> `## Cross-Cutting Decisions`,
+entry from <ROADMAP-PATH>, its risk tier and what that tier sets (follow it), the questions naming it and <STATUS-PATH> `## Cross-Cutting Decisions`,
 which are settled before planning: do not re-decide what they answer. Do not open <ROADMAP-PATH> whole;
 if the script cannot run, read only its `### <target>` entry and the lines naming <target>.
 ```
@@ -471,7 +471,7 @@ are already discharged and must be skipped, never built: <DISCHARGED-LIST>.
 
 Before each feature's gray-area discussion, run
 `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <current-feature>` and work from its output: the
-feature's entry, the questions naming it, the contracts it consumes, and `## Cross-Cutting Decisions`,
+feature's entry, its risk tier and what that tier sets for this skill (follow it), the questions naming it, the contracts it consumes, and `## Cross-Cutting Decisions`,
 which are settled — do not re-decide them, and keep every feature consistent with them. Never open
 <ROADMAP-PATH> or <STATUS-PATH> whole: each is shared by the whole backlog and you would carry all of
 it on every later turn. If the script cannot run, read only the `### <current-feature>` entry and the
@@ -628,7 +628,7 @@ are already discharged and must be skipped, never built: <DISCHARGED-LIST>.
 
 Before each feature's plan, run
 `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <current-feature>` and work from its output: the
-feature's entry, the questions naming it, the contracts it consumes, and `## Cross-Cutting Decisions`,
+feature's entry, its risk tier and what that tier sets for this skill (follow it), the questions naming it, the contracts it consumes, and `## Cross-Cutting Decisions`,
 which are settled — do not re-decide them, and keep every feature consistent with them. Never open
 <ROADMAP-PATH> or <STATUS-PATH> whole: each is shared by the whole backlog and you would carry all of
 it on every later turn. If the script cannot run, read only the `### <current-feature>` entry and the

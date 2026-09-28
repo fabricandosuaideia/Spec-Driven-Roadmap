@@ -47,6 +47,24 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True
 CONTRACT_RE = re.compile(r"`([\w-]+)`\s*(?:→|->)\s*`([\w-]+)`")
 
+# What a risk tier sets downstream — the one place it is written; decompose-phase.md
+# Step 6 points here. The attempt ceilings are the WordPress AI Agent Manager
+# pipeline's (5/4/3), carried over as a starting point, not measured as optimal.
+# B gets tlc-spec-lean's `standard` profile, not its `light` default: `light` injects
+# no faults, and on the project behind GUIA-TESTES-RAPIDOS 8 of 9 verification
+# failures were tests that could not tell a wrong implementation from a right one.
+TIER_MEANING = {
+    "A": ("tlc-spec-lean: `Profile: standard` in checks.md (`ui` when it changes a screen)",
+          "tlc-spec-driven: spec, design.md and tasks, whatever its size",
+          "an independent verifier AND an independent reviewer; at most 5 attempts in a pipeline; never batched"),
+    "B": ("tlc-spec-lean: `Profile: standard` in checks.md (`ui` when it changes a screen)",
+          "tlc-spec-driven: spec and tasks; design.md only above 6 tasks",
+          "an independent verifier; at most 4 attempts in a pipeline; never batched"),
+    "C": ("tlc-spec-lean: `Profile: light` in checks.md",
+          "tlc-spec-driven: a short spec (EARS criteria only) and tasks; no design.md",
+          "one independent verifier; at most 3 attempts in a pipeline; may share one gate with up to 2 other independent C features"),
+}
+
 
 def _load_checker():
     """The roadmap parsers live in check-roadmap.py; one parser, not two that drift."""
@@ -163,6 +181,17 @@ def brief(root, name):
              "_From `%s`, printed by feature-brief.py. It is the roadmap's own text, cut to this "
              "feature; the roadmap file stays the source of truth._" % rel(path),
              "", raw_entry(text, name)]
+    floor, why = CR.derive_tier(fields)
+    got, _raised = CR.stated_tier(fields)
+    tier = got if got and CR.TIER_RANK[got] >= CR.TIER_RANK[floor] else floor
+    if got is None:
+        origin = "derived: %s (the entry states none)" % why
+    elif tier == got:
+        origin = "stated in the entry (floor %s: %s)" % (floor, why)
+    else:
+        origin = "the entry states %s, below its floor — the floor wins: %s" % (got, why)
+    parts += ["", "## Risk tier: %s" % tier, "", "_%s._" % origin, ""]
+    parts += ["- %s" % line for line in TIER_MEANING[tier]]
 
     oq = [i for i in CR.bullets(raw_block(text, "## Open Questions") or "")
           if names_feature(i, name) or reaches(i, name)]
@@ -257,6 +286,14 @@ An entry looks like this:
 
 - **objective** — list notes.
 - **external contract consumed** — none
+
+### app-lowered
+
+- **objective** — rotate the signing keys.
+- **size** — Medium
+- **implicit dimensions present** — auth
+- **external contract consumed** — none
+- **risk tier** — C
 """
 
 
@@ -294,6 +331,26 @@ def selftest():
         expect("the ledger is included whole", "soft delete" in (out or ""))
         out2, _ = brief(tmp, "app-list")
         expect("a cross-cutting question naming it in affects: is included", "Audit trail" in (out2 or ""))
+        expect("the tier is derived when the entry states none (a consumed contract makes it B)",
+               "## Risk tier: B" in (out or "") and "derived" in (out or ""))
+        expect("the tier says what it sets for both downstream skills",
+               "`Profile: standard`" in (out or "") and "design.md only above 6 tasks" in (out or ""))
+        out_c, _ = brief(tmp, "app-list")
+        expect("no dimension and no contract is C", "## Risk tier: C" in (out_c or "") and "`Profile: light`" in (out_c or ""))
+        f_large = {"size": "Large", "implicit dimensions present": "none", "external contract consumed": "none"}
+        f_auth = {"size": "Small", "implicit dimensions present": "auth", "external contract consumed": "none"}
+        f_ext = {"size": "Medium", "implicit dimensions present": "external calls", "external contract consumed": "none"}
+        f_contract = {"size": "Small", "implicit dimensions present": "none", "external contract consumed": "`a` -> `b`"}
+        expect("Large is A", CR.derive_tier(f_large)[0] == "A")
+        expect("auth is A", CR.derive_tier(f_auth)[0] == "A")
+        expect("a dimension that is not an A trigger is B", CR.derive_tier(f_ext)[0] == "B")
+        expect("consuming a contract keeps it out of C", CR.derive_tier(f_contract)[0] == "B")
+        expect("a raised tier with a reason is read as raised",
+               CR.stated_tier({"risk tier": "A — raised from B: touches billing"}) == ("A", True))
+        expect("a bare higher tier is not read as raised", CR.stated_tier({"risk tier": "A"}) == ("A", False))
+        out3, _ = brief(tmp, "app-lowered")
+        expect("a stated tier below the floor is overruled by the floor",
+               "## Risk tier: A" in (out3 or "") and "floor wins" in (out3 or ""))
         miss, close = brief(tmp, "app-tags")
         expect("an unknown name prints nothing and offers close names", miss is None and "app-tag" in close)
     finally:

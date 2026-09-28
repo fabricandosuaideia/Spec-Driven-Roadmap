@@ -23,9 +23,10 @@ Two operations, both writing only the Status file and its history file:
      [--note FILE|-] line to LINE (one line), and append LINE plus the note — the
                      run's full account — to the history file.
 
-The block ends at the next `#`/`##` heading, or at a `### <name>` heading whose
-name is a feature in any docs/roadmap*.txt (single-section roadmaps carry their
-feature entries as bare `###` sections). Any other `###` inside is the block's
+The block ends at the next `#`/`##` heading, or at a `###` heading whose first
+token is a feature name — listed in a docs/roadmap*.txt, or shaped like one
+(`<prefix>-<kebab>`), with or without text after it (single-section roadmaps carry
+their feature entries as `###` sections). Any other `###` inside is the block's
 own and moves with it. Fence-aware. If the file has no `## Status`, the block is
 inserted after the H1, or at the top when there is none.
 
@@ -57,7 +58,14 @@ for _stream in (sys.stdout, sys.stderr):
 STATUS = "## Status"
 LAST_RUN = "**Last run**:"
 HISTORY_NAME = "roadmap-history.md"
-FEATURE_HEADING = re.compile(r"^###\s+`?([A-Za-z0-9][\w.-]*)`?\s*$")
+# A `###` whose first token is a feature name, bare or followed by text (real
+# roadmaps carry `### `name` — SUPERSEDED`). Feature names are `<prefix>-<kebab>`,
+# so a hyphenated identifier counts even when no .txt lists it (a superseded entry
+# is dropped from the .txt). The two errors are not symmetric: reading a run's
+# heading as a feature leaves narrative in the block, which the next rewrite can
+# still see; reading a feature as the block's own moves its entry out of the roadmap.
+FEATURE_HEADING = re.compile(r"^###\s+`?([A-Za-z0-9][\w.-]*)`?(?:\s.*)?$")
+KEBAB_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)+$")
 
 
 def feature_names(docs_dir):
@@ -84,7 +92,7 @@ def locate(lines, names):
         if re.match(r"^#{1,2}\s", line):
             return start, i
         m = FEATURE_HEADING.match(line)
-        if m and m.group(1) in names:
+        if m and (m.group(1) in names or KEBAB_NAME.match(m.group(1))):
             return start, i
     return (start, len(lines)) if start is not None else (None, None)
 
@@ -210,6 +218,17 @@ Mais narrativa de uma execucao.
 - **objective** - list.
 """
 
+SUPERSEDED_NEXT = """# Notes Roadmap
+
+## Status
+
+old status line
+
+### `notes-old` — SUPERSEDED (2026-08-07)
+
+- **objective** - replaced by notes-list.
+"""
+
 SINGLE_NO_CONTAINER = """# Notes Roadmap
 
 ## Status
@@ -274,6 +293,13 @@ def selftest():
         text = open(rm).read()
         expect("a feature's bare ### entry ends the block", "### notes-create" in text and "new status" in text
                and "old status line" not in text)
+
+        with open(rm, "w") as fh:
+            fh.write(SUPERSEDED_NEXT)
+        replace_body(rm, "new status\n", hist)
+        text = open(rm).read()
+        expect("a superseded entry absent from the .txt still ends the block (it is never archived away)",
+               "### `notes-old` — SUPERSEDED" in text and "replaced by notes-list" in text)
 
         with open(rm, "w") as fh:
             fh.write("# Title\n\nintro\n\n### notes-create\n\n- x\n")
