@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.20.0"
+  version: "3.21.0"
 ---
 
 # Spec-Driven Roadmap
@@ -115,7 +115,9 @@ Phase 2 runs it too, as its own closing check — see decompose-phase.md, "Sanit
    sets "needs pre-written context.md" to yes — an *answered* question does not, which is what lets
    the field flip back after an interview closes one. These six are the downstream skill's Discuss
    **trigger** list, and Discuss is what writes `context.md` — this field predicts that. They are not
-   rule 8's rubric; the two lists overlap but are not interchangeable.
+   rule 8's rubric; the two lists overlap but are not interchangeable. Under `tlc-spec-lean`, which
+   has no Discuss and no `context.md`, the same field predicts that the feature's **Plan** will stop
+   to put decisions to the user; the field name is a machine-read key and does not change.
 8. **Pre-empt only the gray areas that skill cannot see.** Flagging predicts *that* Discuss will
    fire; it says nothing about *what* it will demand. Phase 2's Step 7 closes that gap against the
    downstream skill's **rubric** — a different, longer list than rule 7's six triggers — and splits
@@ -140,8 +142,8 @@ Phase 2 runs it too, as its own closing check — see decompose-phase.md, "Sanit
    section roadmaps: stop and ask before writing anything. That glob is a filename pattern, not a
    proof: a `docs/ROADMAP-*.md` carrying no feature entries and named by no index is some other
    document that happens to match, so proceed and record having checked.
-10. **Delegate, never author, never loop.** Never write `spec.md`, `design.md`, `tasks.md`, or
-    application code. Never re-invoke this skill to march through features. Phase 0's own modes write
+10. **Delegate, never author, never loop.** Never write `spec.md`, `design.md`, `tasks.md`,
+    `plan.md`, `checks.md`, `verification.md`, or application code. Never re-invoke this skill to march through features. Phase 0's own modes write
     only to `docs/` — never into the downstream skill's namespace. Handing the user a `/loop` prompt
     at the seed is not an exception: this skill emits that text and stops. The loop is the user's CLI
     driving the downstream skill, never this skill running itself.
@@ -155,7 +157,8 @@ Phase 2 runs it too, as its own closing check — see decompose-phase.md, "Sanit
     a source came back empty **and** the user confirmed there is none. An empty `docs/` folder alone
     is never sufficient.
 13. **Reuse existing project knowledge before generating any.** Check for the downstream skill's own
-    project-init or codebase-mapping output, and for `codenavi`, before interviewing or scanning.
+    project-init or codebase-mapping output, for `codenavi`, and — on the no-document route — for
+    `tlc-discover`, before interviewing or scanning.
 
 ## Where this writes
 
@@ -177,13 +180,24 @@ Output directory is `docs/`. This is fixed, not configurable.
 
 ## Relationship to other skills
 
-- **Downstream, always.** The project's spec-driven skill (default assumption:
-  `tlc-spec-driven`) does all specify/design/tasks/execute/verify work and owns `.specs/`. This skill
+- **Downstream, always.** The project's spec-driven skill does all specify/design/tasks/execute/verify
+  work and owns `.specs/`. Two are supported: **`tlc-spec-lean` (the default assumption)** and
+  `tlc-spec-driven`. They share `.specs/STATE.md` and differ in almost everything the seed touches —
+  handoff-seed.md's "Downstream profiles" is the one table that says how. This skill
   never substitutes for it, never appends an `AD-NNN` decision itself (Phase 1 only proposes
   candidates), and never re-invokes itself. After the seed, every "specify feature", "resume work",
   pause and verify is the downstream skill's own flow.
 - **Complements its project-init and codebase-mapping triggers.** If the confirmed downstream skill
   has its own such step, Phase 0 reuses that output instead of running 0b or 0c (rule 13). Note these
   differ by version — `tlc-spec-driven` v2 had them, v3 does not; detect, do not assume.
+- **Upstream, on the no-document route: `tlc-discover`.** It takes an unshaped idea to a verdict and a
+  design document at `.design/<name>.md`; when it is installed and the project has no scope document,
+  Phase 0b hands the interview to it and decomposes what it confirmed (scope-phase.md, 0b Step 0). It
+  is not a downstream skill and this skill never builds from it. Not for a design that is already
+  decided — that is 0a, and this skill's job starts there.
+- **Deliberately not coupled: `tlc-plan`, `tlc-implement`.** They cut one already-decided source into
+  tasks, and build a checklist with a verifier. The first is what Phase 2 does at roadmap scale and
+  what `tlc-spec-lean`'s Plan does per feature; the second is the downstream skill's own build. Neither
+  needs a pointer from here, and adding one would give a run a third place to write the same thing.
 - **Not a decomposition-planning skill.** Skills with similar names plan monolith-to-microservices
   extraction — sprints, story points, coupling analysis. Different domain entirely.

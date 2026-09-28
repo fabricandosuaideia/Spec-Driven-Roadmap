@@ -28,12 +28,13 @@ it would be worth having; as the benchmark, no.
 |---|---|
 | `fixture/PRD.md` | 26 numbered scope units across six sections, and **seven planted ambiguities** |
 | `fixture/brownfield/` | a working FastAPI + React project with no scope document, for the 0c path |
+| `fixture/state-lean/` | the seed against `tlc-spec-lean`'s tree — scenario `state-lean` |
 | [`expected.md`](expected.md) | the answer key — where each planted ambiguity must land, and why |
-| [`reports/`](reports/) | seventeen `validation.md` reports, for the Step 2 completion test |
+| [`reports/`](reports/) | 25 reports (17 `validation.md`, 8 `lean-*` `verification.md`) for the Step 2 completion test |
 | `RESULTS.md` | the scoreboard, **appended by the runner**, never edited by hand |
 
 **`reports/` is a different kind of test and runs differently.** The scenarios above execute the
-whole skill and score the roadmap it produces; that one hands an agent a single rule and seventeen files
+whole skill and score the roadmap it produces; that one hands an agent a single rule and a folder of files
 and asks what the rule yields. It exists because Step 2 decides which features are done, the seed
 skips every feature it calls done, and a wrong `done` means the loop builds on top of work that never
 passed. Run it the way a rule change should always be checked — two variants, agents that have seen

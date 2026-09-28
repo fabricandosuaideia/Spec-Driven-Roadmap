@@ -1,0 +1,4 @@
+notes-create
+notes-list
+notes-tag
+notes-export

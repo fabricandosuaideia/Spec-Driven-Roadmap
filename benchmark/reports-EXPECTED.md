@@ -6,7 +6,7 @@ run. That is the isolation rule this repository already learned once, at directo
 seven runs under one parent, any of them able to read another's answers — reappearing at file
 granularity. Give an executor the `reports/` path, never this one.
 
-Seventeen `validation.md` reports, and what the completion test in
+25 reports — 17 `validation.md` (`tlc-spec-driven`) and 8 `verification.md` (`tlc-spec-lean`, the `lean-` prefix) — and what the completion test in
 [`references/handoff-seed.md`](../references/handoff-seed.md) Step 2 must conclude about each.
 
 **Why these exist.** Step 2 decides whether a feature is done, and the seed skips every feature it
@@ -39,6 +39,14 @@ tree.
 | `pt-fail-word-no-mark.md` | **not done** | the failure is a translated word carrying no mark at all |
 | `green-summary-red-row.md` | **not done** | a green summary sits above a red acceptance-criterion row |
 | `prose-failure-green-label.md` | **not done** | the failure is a sentence; the only labelled verdict is green |
+| `lean-pass-cited.md` | **done** | `tlc-spec-lean` happy path — `**Verdict**: PASS`, every check row PASS with `file:line`, nothing unproven, mutants killed |
+| `lean-fail-verdict.md` | **not done** | `**Verdict**: FAIL`, and one check row reading FAIL beside a PASS row |
+| `lean-pass-survived-mutant.md` | **not done** | a green verdict above a fault row whose `Killed` cell is `no` — a surviving mutant refuses the feature |
+| `lean-pass-unproven-member.md` | **not done** | a green verdict above a coverage row with an `Unproven` member (`409 duplicate title`) |
+| `lean-pass-uncited.md` | **not done** | PASS asserted, no `path.ext:NN` anywhere — evidence-or-zero |
+| `lean-unfilled-template.md` | **not done** | `**Verdict**: [PASS \| FAIL]` — the template with nobody's answer in it |
+| `lean-pt-pass.md` | **done** | prose in Portuguese, schema labels in English as that skill prescribes; a finished feature must not read unfinished for its language |
+| `lean-pass-self-verified.md` | **done** | `Verifier: self-verified (degraded - no sub-agent)` — that skill's own documented path when no sub-agent exists; it is a PASS the gate warns about, not one it refuses. Refusing it would make every unattended loop on a CLI without sub-agents unable to finish, and the seed must say the PASS is self-read |
 
 ## The five the rule used to get wrong
 

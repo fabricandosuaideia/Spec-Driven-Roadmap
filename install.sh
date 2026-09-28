@@ -218,8 +218,10 @@ cat << EOF
 Next steps:
   1. Restart Claude Code (or run /skills) to pick it up.
   2. Install a downstream spec-driven skill if you have not yet — the roadmap
-     hands off to it. Default assumption is tlc-spec-driven, with its companion:
-       npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
+     hands off to it. Default assumption is tlc-spec-lean (tlc-spec-driven is also supported),
+     with tlc-discover for the no-document interview and its companion:
+       npx @tech-leads-club/agent-skills install --skill tlc-spec-lean -a claude-code
+       npx @tech-leads-club/agent-skills install --skill tlc-discover -a claude-code
        npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-code
   3. Start it with any of:
        "generate a roadmap from docs/PRD.md"

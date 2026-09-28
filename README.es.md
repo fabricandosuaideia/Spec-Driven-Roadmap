@@ -123,12 +123,17 @@ El [`CHANGELOG.md`](CHANGELOG.md) es el registro de qué cambió en cada versió
 ## Prerrequisito
 
 El roadmap entrega el trabajo a una skill spec-driven siguiente, que hace la construcción real. La
-suposición por defecto es [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills), junto
-con su skill complementaria [`not-your-babysitter`](https://github.com/tech-leads-club/agent-skills):
+suposición por defecto es [`tlc-spec-lean`](https://github.com/tech-leads-club/agent-skills), la skill
+spec-driven actual de Tech Leads Club; [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills)
+también está totalmente soportada, y un proyecto que ya la usa sigue con ella. Dos complementarias
+valen la pena a su lado: [`tlc-discover`](https://github.com/tech-leads-club/agent-skills), que asume la
+entrevista cuando aún no tienes un documento de alcance, y
+[`not-your-babysitter`](https://github.com/tech-leads-club/agent-skills):
 
 ```bash
 git init   # solo si esta carpeta aún no tiene control de versiones — ver nota abajo
-npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
+npx @tech-leads-club/agent-skills install --skill tlc-spec-lean -a claude-code
+npx @tech-leads-club/agent-skills install --skill tlc-discover -a claude-code
 npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-code
 ```
 
@@ -140,8 +145,8 @@ npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-
 >
 > Fuera de un repositorio git, el instalador imprime `✅ Successfully installed` y termina con
 > código 0 sin escribir nada en `.claude/skills/` — sin error, así que el vacío pasa fácilmente
-> desapercibido. Verifica con `ls .claude/skills/tlc-spec-driven` y
-> `ls .claude/skills/not-your-babysitter` antes de continuar. (Los dos instaladores de arriba no
+> desapercibido. Verifica con `ls .claude/skills/tlc-spec-lean` y
+> `ls .claude/skills/tlc-discover` antes de continuar. (Los dos instaladores de arriba no
 > tienen este requisito — funcionan en cualquier directorio, con o sin git.)
 
 Sin una skill siguiente instalada, el roadmap igual se genera — solo se omite el paso de entrega, y

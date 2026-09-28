@@ -20,24 +20,26 @@ Three directories are gitignored on purpose, and one of them matters immediately
 .agents/       local skill-install bookkeeping — not in the clone
 ```
 
-**`.claude/skills/tlc-spec-driven` is the one that breaks things.** `references/handoff-seed.md`
-requires reading that skill's real field schema, exit codes and `validation.md` template **from
-disk** — explicitly never from memory, because they change between its versions. Without it an agent
+**`.claude/skills/tlc-spec-lean` and `tlc-spec-driven` are the ones that break things.**
+`references/handoff-seed.md` requires reading the downstream skill's real field schema, exit codes
+and report template **from disk** — explicitly never from memory, because they change between its versions. Without it an agent
 follows the "no downstream skill installed" branch, skips the whole seed, and writes nothing under
 `.specs/`. That is a real run this repository has on record.
 
 So install it, into the repository, before doing anything else:
 
 ```bash
+npx @tech-leads-club/agent-skills install --skill tlc-spec-lean -a claude-code
 npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
+npx @tech-leads-club/agent-skills install --skill tlc-discover -a claude-code
 npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-code
 ```
 
-Both land under `.claude/skills/` and stay ignored. They are here to be **read**, not shipped: the
+All four land under `.claude/skills/` and stay ignored. They are here to be **read**, not shipped: the
 installers copy `SKILL.md`, `references/` and the runtime `scripts/`, and nothing else.
 
 > That installer needs a git repository, and silently writes nothing outside one while still printing
-> success. Verify with `ls .claude/skills/tlc-spec-driven` before moving on.
+> success. Verify with `ls .claude/skills/tlc-spec-lean` before moving on.
 
 ## Turn the hook on
 

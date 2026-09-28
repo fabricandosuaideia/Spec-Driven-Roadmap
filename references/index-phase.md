@@ -158,7 +158,7 @@ scope — standing project decisions.
   edge came cleanly from the source: the order is a project-level constraint the downstream skill's
   Design phase should be able to re-confirm later. Word it as a decision record would be: the order
   itself, which source resolved each edge, and the trade-off if any section is gated on an open
-  question. (With `tlc-spec-driven`'s `AD-NNN` convention this reads as: *"sections build X → Y → Z
+  question. (With the `AD-NNN` convention both downstream skills use this reads as: *"sections build X → Y → Z
   per the index's dependency graph, because Y's `<table>` depends on X's `<module>`."*)
 - For any other candidate (naming convention, shared-module ownership, a gating question): if the
   project has a decision log, note these as **candidates** for it — do not write into it directly
@@ -369,7 +369,7 @@ pre-conversion paths. This skill edits none of them; it names them:
 - **`CLAUDE.md`**, if the user pasted the optional bridge lines into it (handover-prompt.md Step 10).
   Give them the new lines — but **never edit their `CLAUDE.md` yourself**.
 - **Anything under `.specs/` that cites `docs/ROADMAP.md`** — an `AD-NNN` entry in `.specs/STATE.md`,
-  or the provenance lines in the `spec.md` of features already written, which took that path from an
+  or the provenance lines in the `spec.md` (`plan.md`, under `tlc-spec-lean`) of features already written, which took that path from an
   earlier seed's **Next step** field. This skill writes only the `## Handoff` block (SKILL.md rule
   11), so none of that is its to correct.
 - **Any `/loop` prompt the user already has pasted somewhere.** Step 10 resolves all three paths into

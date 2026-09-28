@@ -123,12 +123,17 @@ O [`CHANGELOG.md`](CHANGELOG.md) é o registro do que mudou em cada versão.
 ## Pré-requisito
 
 O roadmap repassa o trabalho para uma skill spec-driven seguinte, que faz a construção de fato. A
-suposição padrão é [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills), acompanhada
-de sua skill complementar [`not-your-babysitter`](https://github.com/tech-leads-club/agent-skills):
+suposição padrão é [`tlc-spec-lean`](https://github.com/tech-leads-club/agent-skills), a skill
+spec-driven atual do Tech Leads Club; a [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills)
+também é totalmente suportada, e um projeto que já a usa continua com ela. Duas complementares valem a
+pena ao lado: a [`tlc-discover`](https://github.com/tech-leads-club/agent-skills), que assume a
+entrevista quando você ainda não tem um documento de escopo, e a
+[`not-your-babysitter`](https://github.com/tech-leads-club/agent-skills):
 
 ```bash
 git init   # apenas se esta pasta ainda não tiver controle de versão — veja a nota abaixo
-npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
+npx @tech-leads-club/agent-skills install --skill tlc-spec-lean -a claude-code
+npx @tech-leads-club/agent-skills install --skill tlc-discover -a claude-code
 npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-code
 ```
 
@@ -140,7 +145,7 @@ npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-
 >
 > Fora de um repositório git, o instalador imprime `✅ Successfully installed` e sai com código 0
 > sem escrever nada em `.claude/skills/` — sem erro, então a falha passa despercebida facilmente.
-> Verifique com `ls .claude/skills/tlc-spec-driven` e `ls .claude/skills/not-your-babysitter` antes
+> Verifique com `ls .claude/skills/tlc-spec-lean` e `ls .claude/skills/tlc-discover` antes
 > de seguir em frente. (Os dois instaladores acima não têm essa exigência — funcionam em qualquer
 > diretório, com ou sem git.)
 

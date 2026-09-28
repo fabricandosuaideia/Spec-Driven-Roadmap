@@ -9,6 +9,62 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.21.0 — 2026-09-28
+
+**Compatible with the Tech Leads Club's current skills: `tlc-spec-lean` is now the default downstream,
+`tlc-spec-driven` stays supported, and `tlc-discover` takes the no-document interview.**
+
+The upstream repository moved on after 03/08 (measured against `120b676`, 2026-09-20): `tlc-spec-driven`
+itself did not change (3.3.0), but `tlc-spec-lean` 1.1.0, `tlc-discover`, `tlc-plan` and `tlc-implement`
+arrived. `tlc-spec-lean` shares `.specs/STATE.md` with its ancestor and disagrees on everything the
+seed reads or writes: seven Handoff fields as bare `**Label**:` lines (no bullets, `Where` instead of
+`Phase / Task`/`Completed`), `plan.md`/`checks.md`/`verification.md` instead of `spec.md`/`validation.md`,
+`validate_verification.py` instead of `validate_state.py`, no Discuss and no `context.md`. Before this
+release a seed run on a lean project would have looked for a `validation.md` that never exists and read
+every feature as unfinished.
+
+- **`handoff-seed.md` — one "Downstream profiles" table** holds every fact that differs between the two
+  skills; Steps 1, 2, 6 and 7 read their column from it instead of restating it. Step 2 gets the lean
+  gate and its exit codes (`2` = gated nothing, never a pass), a bullet for the three row-level refusals
+  the gate applies (`Result` not PASS, an `Unproven` member, `Killed = no`), `Verdict:` on rule 2's list,
+  and a *visible* acceptance of `self-verified (degraded - no sub-agent)` that Step 7 must report.
+  Step 6 writes the seven-field Handoff for lean, and gives the wording for a target that is already
+  partly built (the template's `not started` is false there).
+- **`handover-prompt.md` — Step 10 is touched.** A second `/loop` template for the lean cycle
+  (plan → checks → build → verify): the stop at the end of Plan is self-approved and recorded in
+  `plan.md`'s `## Assumptions`, the Verifier is a dispatched sub-agent that the run does not write, the
+  gate is `validate_verification.py`, and a check is never edited to fit (that skill's own rule).
+  `<SUBAGENT-DISPOSITION>` has two sentences per profile. The failing-test clause, the
+  implementation-side forgery clause and the two-strikes rule are word for word in both templates, and
+  `check-consistency.py` now compares them.
+- **`scope-phase.md` — Phase 0.** Detects which downstream is installed; a project's own `.specs/` tree
+  decides between two, and only a fresh project with both asks (recommending lean). On the no-document
+  route it hands the interview to `tlc-discover` when installed and reads its `Status:` verdict:
+  `confirmed` is the source, `declined` stops the run, `draft`/`superseded` asks. Its slice statuses map
+  to open questions (`rfc`, `spike`, `design`; and `open`, whose default is quoted, not assumed).
+  Brownfield offers it for a gap that is really a bet.
+- **Deliberately not coupled: `tlc-plan`, `tlc-implement`.** They do at one-source scale what Phase 2 and
+  the downstream skill already do.
+- README (three languages), both installers and CONTRIBUTING name the new install set.
+
+**Executed, not only reviewed** (CLAUDE.md lesson 1). Eight `verification.md` fixtures (`benchmark/reports/lean-*`)
+went to blind agents in two rounds of three, names neutralised, order reshuffled: **24/24 correct, then
+24/24**, unanimous in both, every error direction accounted for. The first round's friction was the same
+in all three agents (the refusals lived only in prose; `Verdict:` unlisted; nothing said what to do with a
+self-verified report; the AC-row bullet ignored lean's rows) and was fixed before the second. A new
+scenario, `state-lean`, ran the whole seed on a tree with one verified feature and one carrying a green
+verdict over a surviving mutant: **11/11**, including the trap. Its friction (wording for a partly built
+target, an unchanged trigger, no room in `## Status`) is fixed in this release **and not re-run** — see below.
+
+**Not verified, said plainly.** The lean `/loop` template was written and its shared clauses are checked
+for drift, but it was never *executed* end to end (a loop needs a fixture with a build, and this release did
+not build one). `tlc-discover` routing in 0b was read against the real document format, which caught one
+wrong claim (`open` slices already carry a default), but no agent ran it. The three seed fixes made after
+`state-lean` were not re-run. The profile table records the upstream state on 2026-09-28; a later release can
+move a cell, and the table says the installed skill wins.
+
+---
+
 ## 3.20.0 — 2026-08-10
 
 **The loop prompt now disposes of the sub-agent offer instead of leaving it to improvisation.**

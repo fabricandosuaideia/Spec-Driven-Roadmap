@@ -456,6 +456,35 @@ def check_changelog(root):
           "no '## %s' heading" % version)
 
 
+def check_loop_templates(root):
+    """The two `/loop` templates in handover-prompt.md share clauses on purpose.
+
+    A `/loop` prompt is pasted verbatim, so each template has to carry its own
+    copy. The failing-test clause, the implementation-side forgery clause and the
+    two-strikes rule are the ones that must never drift apart: a fix made to one
+    template and not the other is the accretion this file exists to catch.
+    """
+    text = read(root, "references", "handover-prompt.md") or ""
+    blocks = re.findall(r"^```\n(/loop Implement the roadmap.*?)^```", text, re.M | re.S)
+    check("handover-prompt.md carries exactly two /loop templates (one per profile)",
+          len(blocks) == 2, "found %d" % len(blocks))
+    if len(blocks) != 2:
+        return
+    shared = {
+        "failing-test clause": (r"- A failing test.*?the defect\.\n", ),
+        "implementation-side forgery clause": (r"- \*\*The same forgery.*?violated\.\n", ),
+        "two-strikes rule": (r"If the same feature comes out of verification without a PASS twice.*?correct end of the run\.\n", ),
+    }
+    bad = []
+    for label, (pat,) in shared.items():
+        got = [re.search(pat, b, re.S) for b in blocks]
+        if not all(got):
+            bad.append("%s: not found in template %s" % (label, ", ".join(str(i + 1) for i, g in enumerate(got) if not g)))
+        elif got[0].group(0) != got[1].group(0):
+            bad.append("%s: the two templates differ" % label)
+    check("the /loop templates' shared safety clauses are word for word", not bad, "\n".join(bad))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", default=".")
@@ -477,6 +506,7 @@ def main():
     check_trilingual_parity(root, "", scope(root)["readmes"], "README")
     print("procedure"); check_step_numbering(root); check_step_pointers(root); check_no_orphan_constants(root)
     print("benchmark"); check_benchmark(root)
+    print("loop templates"); check_loop_templates(root)
     print("changelog"); check_changelog(root)
 
     print("\n%d checks, %d failed" % (checks_run, len(failures)))

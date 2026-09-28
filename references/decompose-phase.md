@@ -114,9 +114,10 @@ Common slicing moves:
 - **Formalize a blocking open question as its own feature.** When an unresolved architectural
   question gates several downstream features, give it a small feature whose first task is getting it
   answered. Dependents depend on that feature, never on a guessed answer. Such a feature produces no
-  code, so it can never earn a PASS `validation.md` — record its discharge explicitly instead: it is
-  done when the answer is written into this roadmap's `## Open Questions` with `status: answered`,
-  or when `.specs/features/<name>/context.md` exists. Mark it in the feature's own entry with this
+  code, so it can never earn a PASS `validation.md` (`verification.md` under `tlc-spec-lean`) — record
+  its discharge explicitly instead: it is done when the answer is written into this roadmap's
+  `## Open Questions` with `status: answered`, or — `tlc-spec-driven` only — when
+  `.specs/features/<name>/context.md` exists. Mark it in the feature's own entry with this
   exact line, verbatim, so the seed finds it without parsing prose:
   `discharge: no code — answered open question or context.md`. Three separate consumers key off that
   line (the seed's done-test, its target pick, and the loop prompt's skip list); a prose paraphrase
@@ -186,9 +187,9 @@ This skill keeps no to-do list of its own — the note in the roadmap is the onl
 
 ## Step 7 — Pre-empt the gray areas
 
-The downstream skill runs its own gray-area discussion inside Specify, automatically, for every
-feature with a dimension present. **That step belongs where it is** — it decides implementation shape
-with the code in front of it, and `tlc-spec-driven`'s own rule is *"facts you look up; decisions you
+The downstream skill runs its own gray-area discussion inside Specify (`tlc-spec-driven`) or Plan
+(`tlc-spec-lean`), automatically, for every feature with a dimension present. **That step belongs where it is** — it decides implementation shape
+with the code in front of it, and both skills' own rule is *"facts you look up; decisions you
 ask"*. A question asked here, that the built code would have answered for free later, spends the
 user's attention and gets asked again anyway.
 
@@ -239,8 +240,9 @@ cannot.
 The checklist is not a new invention: it is the downstream skill's own canonical
 **implicit-requirement dimensions rubric**, asked once at project scope instead of once per feature.
 Read that rubric from the confirmed skill's own reference before using it — the table below is
-`tlc-spec-driven` v3.x's nine, from `references/specify.md`, and a different downstream skill will
-have its own, of its own length.
+`tlc-spec-driven` v3.x's nine, from `references/specify.md` — and `tlc-spec-lean` 1.1.0's `plan.md`
+sweeps the **same nine** under slightly different names (measured 2026-09-28), so the ledger below
+serves either. A skill in neither column will have its own, of its own length.
 
 **If Phase 0 recorded that no skill is installed, use the table below as the rubric** — it is the
 default assumption's, and the ledger has to be complete for a human reader too. Note in the block

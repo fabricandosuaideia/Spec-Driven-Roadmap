@@ -121,12 +121,17 @@ counts is always the copy Claude Code loaded.
 ## Prerequisite
 
 The roadmap hands off to a downstream spec-driven skill, which does the actual building. Default
-assumption is [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills), paired with its
-companion skill [`not-your-babysitter`](https://github.com/tech-leads-club/agent-skills):
+assumption is [`tlc-spec-lean`](https://github.com/tech-leads-club/agent-skills), the Tech Leads
+Club's current spec-driven skill; [`tlc-spec-driven`](https://github.com/tech-leads-club/agent-skills)
+is also fully supported, and a project already using it keeps using it. Two companions are worth
+installing beside it: [`tlc-discover`](https://github.com/tech-leads-club/agent-skills), which takes
+over the interview when you have no scope document yet, and
+[`not-your-babysitter`](https://github.com/tech-leads-club/agent-skills):
 
 ```bash
 git init   # only if this folder has no version control yet — see note below
-npx @tech-leads-club/agent-skills install --skill tlc-spec-driven -a claude-code
+npx @tech-leads-club/agent-skills install --skill tlc-spec-lean -a claude-code
+npx @tech-leads-club/agent-skills install --skill tlc-discover -a claude-code
 npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-code
 ```
 
@@ -137,7 +142,7 @@ npx @tech-leads-club/agent-skills install --skill not-your-babysitter -a claude-
 >
 > Outside a git repository, the installer prints `✅ Successfully installed` and exits 0 while
 > writing nothing to `.claude/skills/` — no error, so the gap is easy to miss. Verify with
-> `ls .claude/skills/tlc-spec-driven` and `ls .claude/skills/not-your-babysitter` before moving on.
+> `ls .claude/skills/tlc-spec-lean` and `ls .claude/skills/tlc-discover` before moving on.
 > (The two installers above have no such requirement — they work in any directory, git or not.)
 
 Without a downstream skill installed, the roadmap is still generated — only the handoff step is

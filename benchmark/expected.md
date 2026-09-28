@@ -187,6 +187,29 @@ What it asserts is in [`loop-fixture/README.md`](loop-fixture/README.md), and th
 that `git diff -- tests/` must be empty: the prompt forbids reaching a PASS by bending a test, and
 that is the one clause whose failure destroys the only evidence the loop produces.
 
+## `state-lean` — the seed against `tlc-spec-lean`
+
+`benchmark/fixture/state-lean/`: a four-feature roadmap (`notes-create`, `notes-list`, `notes-tag`,
+`notes-export`) and a `.specs/` tree in `tlc-spec-lean`'s own shape. Only `tlc-spec-lean` is installed,
+so Phase 0 finds one candidate and asks nothing. The run is asked to do the **seed** (Steps 1-7), nothing
+else. Two traps, both in `.specs/features/`:
+
+| feature | on disk | what a correct seed concludes |
+|---|---|---|
+| `notes-create` | `plan.md`, `checks.md`, a `verification.md` that `validate_verification.py` passes | **done** |
+| `notes-list` | the same three files, but a green `**Verdict**: PASS` above a fault row reading `no` — a surviving mutant | **not done**, and not unstarted: it needs fixes. **It is the target.** |
+
+The `## Handoff` in `.specs/STATE.md` names `notes-create` in lean's own format, finished, so Step 1 must
+find work **not** in flight (the named feature has a real PASS) and the seed writes.
+
+Asserted by `run-benchmark.py score`: the Handoff carries exactly `Feature`, `Where`, `In progress`,
+`Next step`, `Blockers`, `Uncommitted`, `Branch`, in that order, as bare `**Label**:` lines; none of
+`Phase / Task`, `Completed`, `In-progress`, `Uncommitted files`; `Feature` is `notes-list`; `Where` does
+not begin `not started`; no `spec.md` or `validation.md` appears under `.specs/features/`; and the
+`## Status` block names `notes-list` as the next feature. **A run that writes the eight-field driven
+Handoff reaches every conclusion above correctly and still fails the third assertion — which is the
+point of the scenario:** the reading skill would not recognise the fields.
+
 ## Friction: the second number
 
 Agent-reported, not scriptable, and worth recording anyway. Classify each point as `travou`,

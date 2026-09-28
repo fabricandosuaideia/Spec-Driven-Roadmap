@@ -38,7 +38,8 @@ for _stream in (sys.stdout, sys.stderr):
 
 
 
-# tlc-spec-driven v3.x's rubric, from its references/specify.md. A different
+# tlc-spec-driven v3.x's rubric (references/specify.md); tlc-spec-lean 1.1.0's plan.md
+# sweeps the same nine. A different
 # downstream skill has its own; the count is reported, never enforced blindly.
 RUBRIC_THEMES = 9
 MAX_TASKS = 8
@@ -385,7 +386,7 @@ def check_ledger(rm, text, root=None, path=None):
         " (+%d project-specific)" % len(extra) if extra else "")
     if len(rows) != RUBRIC_THEMES:
         warn(rm, "cross-cutting ledger has one row per theme",
-             summary + " — tlc-spec-driven v3.x's rubric has %d themes; a different downstream "
+             summary + " — tlc-spec-driven v3.x's and tlc-spec-lean 1.1.0's rubric has %d themes; a different downstream "
                        "skill has its own count, so check before treating this as wrong."
                        % RUBRIC_THEMES)
     else:

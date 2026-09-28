@@ -64,6 +64,10 @@ SCENARIOS = {
     "state-rerun": ("existing roadmap, a new wave arrives", ["state:state-rerun"]),
     "state-inflight": ("existing roadmap, work in flight", ["state:state-inflight"]),
     "state-conversion": ("oversize single-section, names frozen on disk", ["state:state-conversion"]),
+    # The seed against tlc-spec-lean's tree. Standalone rather than an overlay on
+    # `state/`, because an overlay can only add files and this project must NOT
+    # carry the driven skill's spec.md/validation.md beside the lean artifacts.
+    "state-lean": ("small roadmap, tlc-spec-lean installed, one verified, one green-over-a-survivor", ["state-lean"]),
     # The loop prompt's own fixture, wired here so the downstream skill actually
     # gets installed. Its `use the downstream skill` branch went unexercised
     # through nine runs for no better reason than the fixture having no
@@ -75,6 +79,11 @@ SCENARIOS = {
 # Scenarios that must NOT get the downstream skill: their whole point is the
 # branch this skill takes when none is installed.
 NO_DOWNSTREAM = {"0b-interview"}
+
+# Scenarios whose downstream is tlc-spec-lean rather than tlc-spec-driven. Every
+# other scenario keeps the driven skill only, so that Phase 0 finds exactly one
+# candidate and never has to ask which — that question is its own test.
+LEAN_DOWNSTREAM = {"state-lean"}
 
 # The seven, keyed to how they surface in a roadmap. Each pattern list is
 # alternatives in the languages the skill may write in — it follows the source
@@ -195,7 +204,7 @@ def cmd_setup(args):
     # reads it. Record the baseline here so the score can subtract it.
     installed = install_skills(proj, args.scenario)
 
-    if any(w.startswith("state:") for w in wants) or "loop-fixture" in wants:
+    if any(w.startswith("state:") or w == "state-lean" for w in wants) or "loop-fixture" in wants:
         git_init(proj)
         os.makedirs(BASELINES, exist_ok=True)
         with open(os.path.join(BASELINES, stamp + ".snapshot.json"), "w",
@@ -285,12 +294,13 @@ def install_skills(proj, scenario):
 
     vendored = os.path.join(REPO, ".claude", "skills")
     got = []
-    for name in ("tlc-spec-driven", "not-your-babysitter"):
+    downstream = "tlc-spec-lean" if scenario in LEAN_DOWNSTREAM else "tlc-spec-driven"
+    for name in (downstream, "not-your-babysitter"):
         src = os.path.join(vendored, name)
         if os.path.isdir(src):
             copy_tree(src, os.path.join(proj, ".claude", "skills", name))
             got.append(name)
-    if "tlc-spec-driven" not in got:
+    if downstream not in got:
         print("! no downstream skill at %s — a run without one takes the "
               "\"no downstream skill installed\" branch, which is a different "
               "test. See CONTRIBUTING.md." % vendored)
@@ -438,6 +448,44 @@ def score_state(proj, scenario, before):
     ck("`## Decisions` was not touched",
        now["decisions_sha"] == before["decisions_sha"],
        "the downstream skill owns that block and this skill never writes it")
+
+    if scenario == "state-lean":
+        # The seed against tlc-spec-lean. What is asserted is the SCHEMA the
+        # seed wrote, read off the skill's own memory.md: seven bold labels, no
+        # bullets, and none of the driven skill's fields. A Handoff in the wrong
+        # dialect is silently ignored by the skill that reads it.
+        state = read(os.path.join(proj, ".specs", "STATE.md"))
+        m = re.search(r"^##\s+Handoff\s*$(.*?)(?=^##\s|\Z)", state, re.M | re.S)
+        body = m.group(1) if m else ""
+        lean = ["Feature", "Where", "In progress", "Next step", "Blockers", "Uncommitted", "Branch"]
+        got = re.findall(r"^\*\*([^*]+)\*\*:", body, re.M)
+        ck("the Handoff carries exactly the seven lean fields, in order", got == lean,
+           "found %s" % got)
+        ck("no field is a bullet (lean prints them as bare lines)",
+           not re.search(r"^\s*[-*]\s+\*\*", body, re.M), "a bulleted field is the driven dialect")
+        ck("none of the driven skill's fields leaked in",
+           not re.search(r"\*\*(Phase / Task|Completed|In-progress|Uncommitted files)\*\*", body),
+           "driven field name present")
+        feat = re.search(r"^\*\*Feature\*\*:\s*`?([\w.-]+)`?", body, re.M)
+        # notes-create is verified PASS. notes-list carries a green verdict over
+        # a surviving mutant, which the gate refuses: it is the target, and it is
+        # NOT a fresh start.
+        ck("the target is notes-list, the first feature without a real PASS",
+           bool(feat) and feat.group(1) == "notes-list",
+           "Feature = %s" % (feat.group(1) if feat else None))
+        where = re.search(r"^\*\*Where\*\*:\s*(.*)$", body, re.M)
+        ck("notes-list is not described as unstarted (it has a plan, checks and a report)",
+           bool(where) and not re.match(r"\s*not started", where.group(1), re.I),
+           "Where = %s" % (where.group(1) if where else None))
+        ck("the seed did not write a driven-format spec.md or validation.md",
+           not any(os.path.exists(os.path.join(proj, ".specs", "features", f, x))
+                   for f in now["feature_dirs"] for x in ("spec.md", "validation.md")),
+           "a downstream artifact was authored (rule 10)")
+        status = read(os.path.join(proj, "docs", "ROADMAP.md"))
+        sm = re.search(r"^##\s+Status\s*$(.*?)(?=^#)", status, re.M | re.S)
+        ck("`## Status` names notes-list as next", bool(sm) and "notes-list" in sm.group(1)
+           and re.search(r"Next feature\*\*:[^\n]*notes-list", sm.group(1)) is not None,
+           "Status block: %s" % (sm.group(1).strip()[:200] if sm else "missing"))
 
     if scenario == "state-rerun":
         # The scenario tests a FORK, and both answers are the user's to give:

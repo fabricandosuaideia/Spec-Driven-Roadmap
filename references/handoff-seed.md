@@ -4,6 +4,7 @@
 
 - [Goal](#goal) — what this step writes and where
 - [Two surfaces, two lifetimes](#two-surfaces-two-lifetimes) — why status lives in `docs/`, not in `## Handoff`
+- [Downstream profiles](#downstream-profiles) — how `tlc-spec-lean` and `tlc-spec-driven` differ; the one table every step reads
 - [When this runs](#when-this-runs)
 - [Step 1 — Determine whether real work is in flight](#step-1--determine-whether-real-work-is-in-flight)
 - [Step 2 — Determine which features are actually done](#step-2--determine-which-features-are-actually-done)
@@ -72,10 +73,46 @@ Whether a given run opens `docs/ROADMAP*.md` is therefore a bet on a directory-l
 documented behaviour, and not a bet the handoff should rest on. That is why Step 6's **Next step**
 names the exact path, and why Step 10 offers the `CLAUDE.md` bridge.
 
-**Confirm the schema before writing.** The eight-field shape below is `tlc-spec-driven` v3.x's. If
-Phase 0 confirmed a different downstream skill, read that skill's own memory/handoff reference and
-match its schema instead — write only fields it defines, and put the durable half in `docs/`
-regardless.
+**Confirm the schema before writing.** Two downstream skills are known, and their schemas differ —
+[Downstream profiles](#downstream-profiles) below is the one table that says how. If Phase 0
+confirmed a skill that is in neither column, read that skill's own memory/handoff reference and match
+its schema instead — write only fields it defines, and put the durable half in `docs/` regardless.
+
+## Downstream profiles
+
+Phase 0 confirms which skill builds from this roadmap (scope-phase.md, Preamble). Two are known.
+**`tlc-spec-lean` is the default** — it is the newer of the two and the one the Tech Leads Club now
+points people at — and `tlc-spec-driven` stays fully supported. Both keep their state under
+`.specs/` and both use `## Decisions` and `## Handoff` in `.specs/STATE.md`; **everything else on
+this list differs**, and this table is the single place it is written down. Steps 1, 2 and 6 and
+handover-prompt.md read their column from here instead of restating it.
+
+| | `tlc-spec-lean` (≥ 1.1.0) | `tlc-spec-driven` (v3.x) |
+|---|---|---|
+| Fresh-start trigger | `specify feature` (it also answers `plan feature`) | `specify feature` |
+| Artifacts per feature | `plan.md`, `checks.md`, `verification.md`; a change under about three files with no one-way door may have only `checks.md` | `spec.md`, `context.md` (only when Discuss fired), `design.md`, `tasks.md`, `validation.md` |
+| Feature has been started | a `plan.md` **or** a `checks.md` on disk | a `spec.md` on disk |
+| Report that says done | `verification.md` | `validation.md` |
+| Completion gate | `scripts/validate_verification.py <feature> --root <project-root>` | `scripts/validate_state.py <feature> --root <project-root>` |
+| Gate exit codes | `0` = a report was read and held up; `1` = not done; `2` = could not gate (nothing found) — **also not done**, and never a pass | `0` = pass **and** the feature directory existed; `1` = not done; `2` = usage error — also not done |
+| Gate on a project with no `.specs/features/` | exits `2` — it refuses to gate nothing | exits `0` — "nothing to check". **A trap:** see Step 2's precondition |
+| Verdict line in the report | `**Verdict**: PASS` (or `FAIL`), plus a `**Profile**:` line and a `Result` column per check | none of its own; the verdict is inferred by Step 2's selection |
+| Handoff | seven fields, `**Field**:` lines with **no bullet** — Step 6 | eight fields, in bullets — Step 6 |
+| Question-only feature is done when | the roadmap's `## Open Questions` shows `status: answered` — **only**; this skill has no `context.md` | `status: answered`, **or** `.specs/features/<name>/context.md` exists |
+| Does it stop for a human? | yes: at the end of Plan (the plan is reviewed), and at the size gate when the estimate exceeds its `budget` | yes: Discuss is interactive; task-batch sub-agents are offered and wait |
+
+**Detect which is installed by reading the disk**, in Step 2's search order, and say which path
+answered. **When both are found**, the project's choice decides: a `.specs/` tree already holding
+`plan.md`/`checks.md` is a lean project, one holding `spec.md`/`tasks.md` is a driven one; when the
+tree says nothing, ask (scope-phase.md, Preamble) rather than picking. A tree holding **both** is a
+project mid-migration: Step 2 judges each feature by the artifacts it actually has, and Step 6 writes
+the profile the *target* feature will be built under, which is the one the user confirmed.
+
+**Read the table against the installed skill before trusting it.** It is the maintainer's reading of
+the upstream repository on 2026-09-28 (`tlc-spec-lean` 1.1.0, `tlc-spec-driven` 3.3.0). A later
+release can move any row, and an install can lag it. If the installed skill's own reference
+disagrees with a cell, the installed skill wins — say which cell — and if its Handoff field list
+cannot be read, Step 6 is skipped exactly as it is when no skill is installed.
 
 ## When this runs
 
@@ -117,12 +154,15 @@ skill's own prior seed always leaves it non-empty, and so does every downstream 
 emptiness test would permanently block every later seed and no section after the first would ever
 get one. Test for **evidence of actual work** instead:
 
-Work is in flight if **any** of these hold:
+Work is in flight if **any** of these hold. Field names are the [profile table](#downstream-profiles)'s
+— the left form is `tlc-spec-driven`'s, the right one `tlc-spec-lean`'s:
 
-- `## Handoff`'s `**Completed**` field is present and is not `none`.
-- `## Handoff`'s `**In-progress**` field is present and is not `none`.
-- The feature named in `## Handoff` has a `.specs/features/<name>/spec.md` on disk **and** does not
-  have a real PASS (per Step 2's test).
+- `## Handoff`'s `**Completed**` field (lean: `**Where**`) is present and is not `none`. Lean has no
+  `Completed`; its `**Where**` reads `not started …` in this skill's own seed, and anything else there
+  (a check id and what is done) is progress.
+- `## Handoff`'s `**In-progress**` field (lean: `**In progress**`) is present and is not `none`.
+- The feature named in `## Handoff` has a `.specs/features/<name>/spec.md` on disk (lean: a `plan.md`
+  or a `checks.md`) **and** does not have a real PASS (per Step 2's test).
 
 **What this test does not see, said here so a `not in flight` is not read as more than it is.** It
 answers one question — *is the feature the Handoff names still being built?* — and nothing else. A
@@ -164,12 +204,34 @@ no evidence. Worse, a genuine FAIL report normally contains per-criterion rows r
 so **never substring-match `PASS` across the whole file** — that reports failed work as done and
 makes the seed skip past it.
 
+**Which report and which gate.** The [profile table](#downstream-profiles) names them: for
+`tlc-spec-lean` the report is `verification.md` and the gate is `validate_verification.py`; for
+`tlc-spec-driven` they are `validation.md` and `validate_state.py`. Everything below is written
+against the second pair because it is the harder case — its report has no verdict line of its own —
+and applies to the first with these substitutions: read `verification.md` for `validation.md`; add
+`Verification` (any case) to rule 1's heading words; `Verdict:` is already on rule 2's printed list
+below, and it is the one line of lean's report that says whether the feature passed — its
+`**Profile**:`, `**Round**:`, `**Diff range**:` and `**Verifier**:` lines are metadata, not verdicts,
+so they score nothing; the Discrimination Sensor bullets apply only where a report has a `N/N killed`
+line, which lean's does not; and read the **acceptance-criteria row** bullet as covering lean's three
+kinds of row too, which the ordered list below spells out in its own bullet.
+
+**A lean report may say it was self-verified, and that is a PASS — a disclosed one.** When the
+`**Verifier**:` line reads `self-verified (degraded - no sub-agent)`, that skill is on its own
+documented path for a session that cannot spawn a sub-agent, and its gate prints a warning and still
+exits `0`. This step agrees with the gate: the line refuses nothing, and the feature counts as done
+**if the ordered list below says so**. What it changes is Step 7's report, which must name the
+feature and say that its PASS was read by the builder's own session. Refusing these would leave every
+unattended run on a CLI without sub-agents unable ever to finish a roadmap, and the seed's whole
+posture is to prefer the recoverable error — but this is a *visible* acceptance, never a silent one.
+
 **Precondition for the PASS test — check the directory exists.** If `.specs/features/<name>/` is not
 on disk, the feature is **not done** by that test. Stop there; run no gate script. This precondition
 does **not** reach the question-only exception below: that feature normally has no directory at all,
 and its own test is the `discharge:` marker.
 
-This is not a formality. `tlc-spec-driven` v3.3.0's `validate_state.py` returns **exit 0 when
+This is not a formality for `tlc-spec-driven`, and is a harmless belt-and-braces for `tlc-spec-lean`,
+whose gate refuses to gate nothing (exit 2). `tlc-spec-driven` v3.3.0's `validate_state.py` returns **exit 0 when
 `.specs/features/` does not exist at all** (it prints "nothing to check" and exits before it ever
 looks at the feature argument). A fresh project — the normal state when this skill runs, since it is
 a prequel to the build cycle — would therefore report *every* feature as verified, and the seed would
@@ -210,6 +272,18 @@ while v3.2.0 ships only `lessons.py` and documents no validation script at all, 
 install the command below resolves to nothing. That failure is worse than having no script: the run
 either errors in the middle of a write procedure, or records a gate it never ran.
 
+**When `tlc-spec-lean`'s `validate_verification.py` is present** (same rule: only if the file is on
+disk *and* that skill documents it as its gate — `tlc-spec-lean` 1.1.0 does, as critical rule 7):
+
+```
+python3 <skill-dir>/scripts/validate_verification.py <feature> --root <project-root>
+```
+
+Exit `0` = a report was read and its own rows did not contradict its verdict = real PASS, subject to
+the floor-not-equivalent paragraph below. Exit `1` = not done. Exit `2` = it found nothing to gate —
+**not done, and never a pass**. Never add `--allow-empty`: that flag turns "gated nothing" into
+exit `0`, which is the very reading this step exists to refuse.
+
 **When `tlc-spec-driven`'s `validate_state.py` is present:**
 
 ```
@@ -241,7 +315,7 @@ Collect three kinds of line. The selection is case-**in**sensitive:
 
 1. a **heading** (1-4 `#`) whose text contains `Validation`, `Validação`, `Validación`, `Verifier`,
    `Verificação`, `Verificación` or `Verificador` anywhere in it;
-2. a line containing `Result:`, `Overall:` or `Status:`, with or without the `**`;
+2. a line containing `Result:`, `Overall:`, `Status:` or `Verdict:`, with or without the `**` — markup is ignored when matching a label, so `**Verdict**: PASS` is a `Verdict:` line;
 3. a line shaped **`**<anything>**:` immediately followed by a `✅`, `❌` or `⚠️`** — the mark is the
    first non-space character after the colon, not merely somewhere on the line.
 
@@ -358,6 +432,14 @@ without:
   letting them establish a pass is what this step opened by refusing. Letting a red one *refuse* costs
   nothing and closes the mirror hole: a green summary sitting above `| AC-3 | not implemented | ❌ FAIL |`
   used to read as **done**, unanimously.
+- **`tlc-spec-lean` only — a table row that refuses the feature** → **not done**: a check row whose
+  `Result` cell is not `PASS`; a `Coverage` row whose `Unproven` cell names a member (`-`, `none` and
+  an empty cell name none); a fault row whose `Killed` cell reads `no`, which is a surviving mutant.
+  These are the three refusals `validate_verification.py` applies, written here so a run without the
+  script reaches the same answer. Like the acceptance-criteria-row bullet they **refuse and never
+  pass**, and they sit above the one `done` bullet because a green verdict line does not outrank
+  them: a `**Verdict**: PASS` above a `Killed` cell reading `no` is a report contradicting itself, and
+  the row is the evidence.
 - **anything anywhere in the file saying this work is unfinished** → **not done**, and name the
   sentence that decided it. Read the whole file for this one; it is the only bullet that looks past
   the scoring lines. Three shapes reach this point with every other condition satisfied and their own
@@ -440,7 +522,8 @@ not a `FAIL` verdict.
 **One exception — question-only features.** Phase 2 may formalize a blocking open question as its own
 feature (decompose-phase Step 3). It produces no code, so it can never earn a PASS report and would
 block the seed forever. Such a feature is **done** when the roadmap's `## Open Questions` shows its
-question `status: answered`, or when `.specs/features/<name>/context.md` exists. Its roadmap entry carries the literal line
+question `status: answered`, or — `tlc-spec-driven` only, since `tlc-spec-lean` has no such file —
+when `.specs/features/<name>/context.md` exists. Its roadmap entry carries the literal line
 `discharge: no code — answered open question or context.md` (decompose-phase Step 3) — that marker,
 and nothing else, selects this test instead of the PASS test. A feature without it takes the PASS
 test, whatever its objective says.
@@ -587,6 +670,11 @@ re-run exit writes this instead:
 Step 5 runs before Step 6, so decide from Step 1's evidence test and Step 6's own two skip cases. One
 line, regenerated on every seed, so it cannot go stale.
 
+One exception to "counts, names and paths": when the target is partly built, add **one** sub-bullet
+under its line naming the state in a sentence (`on disk but not done: a surviving mutant`), and one
+more if the in-flight test looked at a feature other than the target (Step 1's honesty note). Those
+are facts about position, not feature detail.
+
 Keep it to counts, names and paths. Never copy feature objectives or task lists here — that detail
 already lives in the roadmap body below it. The version and the date are part of the block's own
 header line rather than any feature's detail, so they are not what that rule excludes.
@@ -611,9 +699,30 @@ its `**Handoff**` line and go to Step 7.
 Otherwise: locate the `## Handoff` header in `.specs/STATE.md` and replace only the body between it
 and the next `##` or EOF. Never touch `## Decisions`. If the file does not exist, create it in the shape the
 downstream skill prescribes — for `tlc-spec-driven`, an H1 `# STATE`, then `## Decisions` with an
-empty body, then `## Handoff`.
+empty body, then `## Handoff`; for `tlc-spec-lean`, an H1 `# Project state`, then `## Decisions` with
+only its table header (`| ID | Decision | Rationale | Status | Date |` and the separator row), then
+`## Handoff`.
 
-Emit **only** the fields that skill defines. For `tlc-spec-driven` v3.x, exactly these eight:
+Emit **only** the fields that skill defines, and pick the block by the profile Phase 0 confirmed. Do
+not mix them: a `**Where**` line in a `tlc-spec-driven` Handoff, or a bulleted `Completed` in a
+`tlc-spec-lean` one, is a field the reading skill does not know.
+
+For `tlc-spec-lean` 1.1.0, exactly these seven — bold label, colon, **no bullet**, as its own
+`references/memory.md` prints them:
+
+```markdown
+## Handoff
+
+**Feature**: <target feature name>
+**Where**: not started - no plan.md on disk yet
+**In progress**: none
+**Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Plan source: `<ROADMAP-PATH>` section `<target>` (objective, scope-units, dependencies, flagged dimensions and open questions are there — read it before asking anything). Project-wide decisions already settled: `<STATUS-PATH>` `## Cross-Cutting Decisions` — read them before planning and do not re-decide what they answer. Backlog position: `<STATUS-PATH>` `## Status`.
+**Blockers**: none
+**Uncommitted**: none
+**Branch**: <output of `git branch --show-current`>
+```
+
+For `tlc-spec-driven` v3.x, exactly these eight:
 
 ```markdown
 ## Handoff
@@ -655,12 +764,24 @@ Notes on the fields that carry real weight:
   Verification Chain, but nothing there points at `## Cross-Cutting Decisions`. Unless the path is put
   in front of it, a project decision the user already made gets asked again per feature — and answered
   inconsistently, which is worse than not having asked at all.
+- **When the target already has artifacts — the template's `not started` line is then false.** Step 4
+  says not to assert what you did not check; this is the wording. `Where` (lean) or `Phase / Task`
+  (driven) names what is on disk and the state of its report, in one line: `plan.md and checks.md on
+  disk; verification.md says PASS but a fault row shows a surviving mutant — not done, needs fixes`.
+  The trigger in **Next step** stays `specify feature`, because it is the one phrase this skill has
+  confirmed, but the clause is then followed by: `Artifacts already exist at
+  .specs/features/<target>/ — read them and the report first and do not start the plan over.` A FAIL
+  or refused report is *needs fixes*, never *unstarted*.
+- **What the profiles change in Next step, and only that.** The four clauses (a)-(d) are the same for
+  both. The word differs: `tlc-spec-driven` reads `<STATUS-PATH>` before its **Discuss**, while
+  `tlc-spec-lean` has no Discuss and reads it before **planning** — write the word the confirmed
+  skill uses, because a pointer to a phase that skill does not have is a pointer it skips.
 - On a **legacy roadmap with no `## Cross-Cutting Decisions` block** (Step 10 names the one case that
   produces it), drop clause (d) rather than pointing the downstream skill at a heading that is not
   there.
 - **Branch** is unconditional. Obtain it with `git branch --show-current`; use `none` only outside a
   git repo.
-- **Uncommitted files** — report what `git status --porcelain` actually shows, not a blind `none`.
+- **Uncommitted files** (lean: `**Uncommitted**`) — report what `git status --porcelain` actually shows, not a blind `none`.
   The downstream skill's resume reconciles this field against git, so a false `none` is a claim it
   will catch and have to work around. Outside a git repo that command errors rather than returning
   an empty list, so there is nothing to report: write exactly `none — not a git repository`. The
@@ -715,6 +836,10 @@ Tell the user, plainly:
   user who never opens that file sees it only in chat: there and here. Report it even though the run
   already opened with it;
 - the roadmap status list from Step 3, one line each;
+- **every feature counted done on a self-verified PASS** (`tlc-spec-lean` only; Step 2's paragraph on
+  `self-verified (degraded - no sub-agent)`), by name, with one sentence saying its PASS was read by
+  the builder's own session and not by an independent one. A `done` that carries that qualifier and
+  is reported without it is the silent version of what Step 2 chose to make visible;
 - which feature is next, and whether it was seeded into `.specs/STATE.md` or not — and if not, why
   (work in flight / nothing left to build / no downstream skill to seed into or a schema you could
   not read — in which case the target is still named, from Step 5's `## Status`). A Handoff that

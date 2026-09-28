@@ -36,15 +36,26 @@ not a question**: it asks for nothing and expects no answer, so it neither batch
 turn, and the "One question at a time — never batch" cadence below is untouched. Do not wait for a
 reply — continue straight into the first question.
 
-**Confirm the downstream spec-driven skill.** Default assumption is `tlc-spec-driven`, but the seed
-needs that skill's exact fresh-start trigger phrase and its exact `.specs/STATE.md` field schema, and
+**Confirm the downstream spec-driven skill.** Two are supported and the default assumption is
+**`tlc-spec-lean`**; `tlc-spec-driven` is the other. They keep the same `.specs/STATE.md` but
+disagree on nearly everything the seed writes and reads — the Handoff fields, the report that says a
+feature is done, the gate that judges it (handoff-seed.md, "Downstream profiles", is the one table).
+The seed needs the confirmed skill's exact fresh-start trigger phrase and its exact field schema, and
 0b/0c need to know whose project-init output to reuse (rule 13). **Look for it on disk before
 asking**, in the search order handoff-seed.md's Step 2 prescribes — a project install, then a global
-one, then a plugin — and say which path answered. Concluding "none installed" without having looked
-is what sends a run down the no-downstream-skill branch while the skill is sitting there. Ask only
-when the search is genuinely empty, or when what you found is not evidently the project's choice.
+one, then a plugin — and say which path answered, and which of the two it is. Concluding "none
+installed" without having looked is what sends a run down the no-downstream-skill branch while the
+skill is sitting there.
 
-*If nothing is installed yet:* **generate the roadmap anyway.** Phases 1 and 2 write only to `docs/`
+**Deciding between two that are both there.** Read the project first: a `.specs/features/` tree with
+`plan.md`/`checks.md` is a lean project, one with `spec.md`/`tasks.md` is a driven one, and the
+project keeps using what it already uses. Only when the tree says nothing — a fresh project with both
+installed — is it a real choice, and it is the user's: ask, with `tlc-spec-lean` first and marked as
+the recommendation. Ask too when what you found is not evidently the project's choice, or when the
+search is genuinely empty.
+
+*If nothing is installed yet:* **generate the roadmap anyway.** Tell the user which to install —
+`tlc-spec-lean` first — and that the two companions below are worth having beside it. Phases 1 and 2 write only to `docs/`
 and produce artifacts a human or any agent can use. The seed still runs — it just stops after its
 `docs/` half and writes nothing under `.specs/` (handoff-seed.md Step 6's skip). Record the pending
 seed on the `## Status` block's `**Handoff**` line, tell the user which skill to install, and say
@@ -87,7 +98,8 @@ Evaluate in order; the first match wins, so the paths never overlap:
 2. **No document, but a substantial codebase exists** → **0c, Brownfield Mode** — regardless of
    whether the user knows what to build next. 0c asks them that directly, and what already exists
    constrains what to build next, so the codebase must be read either way.
-3. **No document and no substantial codebase** → **0b, Interview Mode**.
+3. **No document and no substantial codebase** → **0b, Interview Mode** — which begins by handing the
+   interview to `tlc-discover` when it is installed (0b, Step 0).
 
 **Substantial codebase** means: a dependency manifest plus at least one non-scaffold source
 directory. A bare `create-*-app` skeleton is not substantial — that is a greenfield project, so it
@@ -223,6 +235,39 @@ Handoff pointer, which names files by path; index-phase.md's procedure carries t
 
 ### Step 0 — Reuse and overwrite checks (interview)
 
+0. **Is `tlc-discover` installed? Then it runs this interview — not this file.** It is the Tech Leads
+   Club's own skill for exactly this situation: it takes an unshaped idea to a *verdict* (build it, or
+   don't) and then to a design document that names the decisions, slices, flows and contracts. Step 1's
+   six questions below produce a thin `docs/PROJECT.md`; a run that has `tlc-discover` on disk and
+   skips it is choosing the thinner source for no reason, and Phase 2 then spends its budget
+   re-deriving what that skill would have settled. Find it by the search order handoff-seed.md's Step
+   2 prescribes (`<name>` = `tlc-discover`) and say which path answered. Its own SKILL.md says not to
+   use it on a design that is already decided — which is why this is *here*, on the no-document
+   route, and not in 0a.
+
+   It writes `.design/<name>.md`. Read the header's `Status:` line first, because it is the verdict:
+   - `confirmed by <who>, <date>` → that document is the source. Go to 0a with it, and skip Steps 1-2
+     below. Do not re-ask which document describes the scope. Its `## Work` table is the inventory
+     of units, one row per slice; Phase 2 cites a slice by its name. Each slice's own `Status`
+     (`clear | open | rfc | spike | design`) is a fact, not a suggestion. `rfc` (*"Not decided"*),
+     `spike` (knowledge only building produces) and `design` (a drawing somebody still owes) are
+     things nobody has settled: each becomes the carrying feature's `open questions` (rule 1), never
+     an assumption. `open` is different and must not be read as the same — the design already took a
+     default for each numbered item (*"question - default"*), but it took it as a default, not as a
+     confirmed answer, so carry each one as an `open question` that **quotes the design's default and
+     its number**. That keeps rule 1 whole (nothing is decided in silence) and costs the user one
+     yes/no per item at Step 9 instead of an interview. Its `## Key decisions` are candidates for
+     `## Cross-Cutting Decisions` — cite the design's path as where each was settled, and do not
+     record one as answered that the document does not state as decided.
+   - `declined - <reason>, <who>, <date>` → **stop.** The user decided not to build this. There is
+     nothing to decompose; say so, cite the document, and do not offer to produce a roadmap anyway.
+   - `draft` or `superseded by <path>` → the verdict is not in. Say which, and ask whether to finish
+     that document first or to use the superseding one. Never decompose a draft.
+
+   When `tlc-discover` is **not** installed, run Steps 1-2 below as written, and say once that the
+   Club's discovery skill would have gone deeper and where to get it (README). The interview below is
+   a fallback, not a lesser copy to be quietly preferred.
+
 1. **Does the downstream skill already have project-init output?** (e.g. `tlc-spec-driven` **v2's**
    `.specs/project/PROJECT.md` — v3.x has no such step, so detect rather than assume.) If present,
    read it and go to 0a with it as the source. Do not interview over something that already exists.
@@ -299,6 +344,13 @@ Then resolve the source in this order; never skip ahead while an earlier option 
 2. **The `codenavi` skill**, if installed. Delegate exploration to it rather than reading files
    natively.
 3. **A light native scan**, when neither is available.
+
+**A gap that is really an open bet goes to `tlc-discover`, not into the roadmap as a feature.** When
+the user's answer below is *"should we…?"* or *"which of these two ways?"* rather than *"add X"*, that
+is a decision nobody has made, and decomposing it invents a feature around a guess (rule 1). If
+`tlc-discover` is installed, offer to run it on that one gap and treat its confirmed design as the
+gap's source, exactly as 0b's Step 0 does; if the user declines, record the gap as an open question.
+A gap that is a plain *"add X"* needs none of this — do not route the whole codebase through it.
 
 **Branches 1 and 2 describe what exists — they never say what to build next.** So whichever branch
 supplied the first three sections, you must **always** produce `## Gaps / Likely Next Work`, and its
