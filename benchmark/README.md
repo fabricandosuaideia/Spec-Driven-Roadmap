@@ -28,7 +28,9 @@ it would be worth having; as the benchmark, no.
 |---|---|
 | `fixture/PRD.md` | 26 numbered scope units across six sections, and **seven planted ambiguities** |
 | `fixture/brownfield/` | a working FastAPI + React project with no scope document, for the 0c path |
+| `fixture/state/` + `state-rerun/`, `state-inflight/`, `state-conversion/` | a project with a past, and the overlay each state scenario adds to it |
 | `fixture/state-lean/` | the seed against `tlc-spec-lean`'s tree — scenario `state-lean` |
+| [`loop-fixture/`](loop-fixture/) | the loop prompt's project, with a test that cannot pass honestly — scenario `loop-build` |
 | [`expected.md`](expected.md) | the answer key — where each planted ambiguity must land, and why |
 | [`reports/`](reports/) | 25 reports (17 `validation.md`, 8 `lean-*` `verification.md`) for the Step 2 completion test |
 | `RESULTS.md` | the scoreboard, **appended by the runner**, never edited by hand |

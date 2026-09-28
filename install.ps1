@@ -46,7 +46,8 @@ $RequiredRefs = @(
     'handoff-seed.md',
     'handover-prompt.md',
     'loop-tlc-spec-driven.md',
-    'loop-tlc-spec-lean.md'
+    'loop-tlc-spec-lean.md',
+    'upgrade-project.md'
 )
 
 function Write-Status  { param($m) Write-Host "-> $m" }

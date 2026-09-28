@@ -9,6 +9,48 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.29.0 — 2026-09-28
+
+**Upgrading a project that already uses the skill is now one request, and the human docs say what the
+skill does again.**
+
+**The drift, found by an audit.** Across 3.22.0 → 3.28.0 the procedures moved and the docs people read
+did not: the README showed an option-A prompt the skill no longer emits and knew nothing of option C;
+the guide still named `tlc-spec-driven` the default and `validation.md` the only report, and explained
+the roadmap's size cost by a mechanism the brief had replaced; CONTRIBUTING said two scripts ship when
+nine do; `CLAUDE.md` placed the protected loop templates in a file they had left. This repository's own
+name for it is accretion without reconciliation, and `check-consistency.py` could not see it because it
+never compared those docs with the skill. All of it is corrected, in the three languages (the two
+translations mirrored by agents from the English diff and held to parity by the existing checks), and two
+checks now make the two recurring drifts mechanical: every shipped script must be named in CONTRIBUTING
+and `CLAUDE.md`, and the README's option-A prompt must be, text for text, the lean template Step 10
+emits. Both failed when a script was unnamed or the prompt reworded.
+
+- **`references/upgrade-project.md`**, a new entry — *"upgrade this project"*, or
+  `/spec-driven-roadmap upgrade this project`: save a cost baseline from the project's transcripts
+  (`docs/process/cost-baseline.json`), lint, note the sizes, re-run the seed (which empties `## Status`
+  into `docs/roadmap-history.md`), offer to replace old `CLAUDE.md` bridge lines — edited only on the
+  user's yes — then Steps 8-10 as on any seed. It never regenerates the roadmap and never installs the
+  skill itself: a run cannot replace the files it is reading, so the README tells the user to ask for
+  both in one sentence (*"reinstall spec-driven-roadmap in this project, then upgrade this project"*).
+- README: a section for upgrading, the three build options with the current prompt, the two things to
+  know about sub-agents (types load when a session starts in the project; `CLAUDE_CODE_EFFORT_LEVEL`
+  overrides their effort), and "How it fits with the TLC skills".
+- **A defect the upgrade run found:** `check-roadmap.py`'s check of `needs pre-written context.md` read
+  the dimensions only under the label `implicit dimension` and failed a correct roadmap labelled
+  `flagged dimensions` — the same defect 3.25.0 fixed in the tier derivation and left in its sibling.
+  Both now read the same labels.
+
+**Executed.** A blind agent (Sonnet 5.5) ran *"upgrade this project"* on `state-lean` with a `CLAUDE.md`
+carrying the old bridge lines: no transcripts, so the baseline step said so and continued; the lint
+asked its question (the defect above, now fixed and re-checked on that tree: 13 passed); the old Status
+narrative, `### Encerramento` included, moved verbatim to the history; the Handoff was rewritten in the
+lean schema toward the partly built feature; the bridge lines were replaced on the yes; option A was
+handed over. Two wording fixes after it, not re-run: replace the old bridge block as a whole, and close
+the report with Step 10's own output verbatim.
+
+---
+
 ## 3.28.0 — 2026-09-28
 
 **Step 6, the last of the build kit: time the project's own full gate instead of adopting someone

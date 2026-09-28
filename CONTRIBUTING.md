@@ -63,7 +63,9 @@ it.
 ## Requirements
 
 `python3` for the scripts, `bash` for the installer, `git` — the conversion guards and the state
-scenarios both build throwaway repositories to run against, and delete them afterwards. No package to install, no virtualenv, no
+scenarios both build throwaway repositories to run against, and delete them afterwards. `node` for
+`scripts/check-pipeline.mjs`, which the release gate runs to prove the pipeline's control flow on
+stubbed agents; without it the gate warns and skips that one check. No package to install, no virtualenv, no
 build. The scripts are standard library only, which is deliberate — a benchmark that needs a
 dependency is a benchmark that stops running.
 
@@ -80,7 +82,7 @@ marker, because the console encoding has no `✗`. From WSL2 you can drive the h
 |---|---|
 | `SKILL.md` | the map, and the 13 non-negotiable rules |
 | `references/` | the procedures — this is the skill; `SKILL.md` is a map to it |
-| `scripts/` | two shipped to users (`convert-to-multi.py`, `check-roadmap.py`), the rest maintainer-only ([`CLAUDE.md`](CLAUDE.md) lists which) |
+| `scripts/` | the ones in `install.sh`'s `REQUIRED_SCRIPTS` ship to users (`convert-to-multi.py`, `check-roadmap.py`, `measure-agents.py`, `feature-brief.py`, `status-block.py`, `write-agents.py`, `plan-pipeline.py`, `roadmap-pipeline.js`, `bench-gate.py`); the rest are maintainer-only ([`CLAUDE.md`](CLAUDE.md) lists them all) |
 | `benchmark/` | frozen fixture, answer key, scoreboard — see [`benchmark/README.md`](benchmark/README.md) |
 | `guide/` | the human guide, in three languages, kept at structural parity |
 | `install.sh` / `install.ps1` | must stay behaviourally identical; a check enforces the payload |

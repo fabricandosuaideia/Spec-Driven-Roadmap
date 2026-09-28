@@ -14,7 +14,7 @@ Otros idiomas: [English](HOW-IT-WORKS.md) · [Português](HOW-IT-WORKS.pt-BR.md)
 
 Esta skill descubre **qué construir y en qué orden** — nunca escribe código, specs ni tests.
 Piénsala como el paso que ocurre *antes* de entregar una feature a tu skill de build
-(`tlc-spec-driven` por defecto): convierte lo que ya tengas — un documento, una idea, o un código
+(`tlc-spec-lean` por defecto, `tlc-spec-driven` también soportada): convierte lo que ya tengas — un documento, una idea, o un código
 existente — en un backlog ordenado, y luego se hace a un lado.
 
 ## Cómo activarla
@@ -68,6 +68,11 @@ que ya hayas respondido antes en la conversación. Respuestas breves están bien
 le permite ser delgado. Ella escribe tus respuestas en `docs/PROJECT.md` por ti — nunca escribes ese
 archivo a mano — y luego lo descompone, igual que el camino A.
 
+**Si `tlc-discover` está instalada, ella hace esta entrevista en su lugar** — va más a fondo, y termina
+con un veredicto sobre si conviene construir siquiera. Un diseño que confirmó pasa a ser la fuente,
+exactamente como en A; uno que rechazaste detiene la ejecución, porque no hay nada que descomponer;
+un borrador nunca se descompone.
+
 ### C — "Tengo código, pero nada que describa qué hace"
 
 Di *"map this codebase into a roadmap source"*. La skill verifica si tu skill de build (o la skill
@@ -106,11 +111,16 @@ detiene y te pregunta cuál es el autoritativo.
 | `docs/PROJECT.md` | Solo si pasaste por la entrevista (camino B) |
 | `docs/CODEBASE-SUMMARY.md` | Solo si mapeó tu código (camino C) |
 | `.specs/STATE.md` (cuerpo de `## Handoff` reescrito) | Solo si hay algo que sembrar *y* una skill de build confirmada cuyo esquema sea legible — cuatro casos que se saltan, abajo |
+| `docs/roadmap-history.md` | Siempre que la siembra reescribe el bloque de Status: el bloque viejo va aquí, textual. Un registro para personas; a ningún agente se le apunta hacia él |
+| `.claude/agents/roadmap-*.md` | Solo si eliges la opción B y tu sesión puede lanzar sub-agentes |
+| `docs/process/pipeline.json` | Solo si eliges la opción C (el pipeline), con el comando de gate que confirmaste |
+| `docs/process/cost-baseline.json` | Solo cuando actualizas un proyecto, o le pides guardar una línea base de costos |
 
 El propio archivo de roadmap contiene, por feature: un objetivo, de qué depende, una estimación
 honesta de tareas (≤8 — si una feature necesita más, se divide), qué dimensiones "delicadas" están
-presentes (auth, persistencia, llamadas externas, etc.), y cualquier pregunta abierta que no pudo
-responder por ti. Cierra con una tabla de cobertura que prueba que nada quedó fuera.
+presentes (auth, persistencia, llamadas externas, etc.), un **nivel de riesgo** — A, B o C, derivado de
+su tamaño y de esas dimensiones, que fija cuánta verificación y cuántos intentos recibe después — y
+cualquier pregunta abierta que no pudo responder por ti. Cierra con una tabla de cobertura que prueba que nada quedó fuera.
 
 **La descomposición es perezosa.** En modo multi-sección solo la sección que pediste recibe su par
 `.md`/`.txt`; las demás quedan en el índice como `NOT YET DECOMPOSED`, y la skill simplemente reporta
@@ -215,16 +225,23 @@ posterior pueda distinguir "nunca se sembró" de "se sembró y luego se sobrescr
 skill, pide la siembra otra vez, y la cadena se completa **sin volver a correr la Fase 2**.
 
 Cuando hay un objetivo y una skill confirmada, dice que el trabajo de planificación terminó y
-pregunta **cómo quieres construirlo**. Dos opciones:
+pregunta **cómo quieres construirlo**. Dos opciones — tres en Claude Code:
 
 **A — una feature a la vez.** Recibes el comando solo de la siguiente feature, lo ejecutas, y vuelves
 cuando pase:
 
 ```
 specify feature tt-create-task — create it at `.specs/features/tt-create-task/` using that exact
-directory name. Spec source: docs/ROADMAP.md. Read docs/ROADMAP.md `## Cross-Cutting Decisions`
-before Discuss and treat it as settled — do not re-decide what it answers.
+directory name. Plan source: run `python3 .claude/skills/spec-driven-roadmap/scripts/feature-brief.py
+tt-create-task` — it prints the entry from docs/ROADMAP.md, its risk tier and what that tier sets
+(follow it), the questions naming it and docs/ROADMAP.md `## Cross-Cutting Decisions`, which are
+settled before planning: do not re-decide what they answer. Do not open docs/ROADMAP.md whole.
 ```
+
+Esa es la forma de `tlc-spec-lean`; con `tlc-spec-driven` dice *spec* y *Discuss* en su lugar. El
+constructor lee solo la porción del roadmap de su propia feature — en dos proyectos reales, una
+mediana de alrededor de una décima parte de los archivos que abriría de otro modo — porque cada turno
+de un agente vuelve a leer todo lo que ya leyó.
 
 **B — un roadmap completo en un loop.** Recibes un prompt que empieza con `/loop` (el comando de loop
 de tu propio CLI — Claude Code, Cursor y OpenCode tienen uno) y que no se detiene hasta que todas las
@@ -236,15 +253,25 @@ quedó nada abierto. Solo entonces te entrega el prompt. Esas respuestas se qued
 siempre, como el registro de qué se decidió y por qué — vale la pena tenerlas, y son también la
 mayor razón de que un roadmap crezca de una ola a la siguiente.
 
+**La sesión del loop solo coordina.** Si la sesión donde lo ejecutas puede lanzar sub-agentes (la
+skill lo pregunta), cada feature la construye un sub-agente nuevo y luego la verifica otro — nunca un
+hijo del propio constructor — y en la conversación del loop queda solo una línea por feature. Importa
+porque una conversación vuelve a leer todo lo que contiene en cada turno: en una construcción
+multi-agente real, releer contexto fue cerca de tres cuartas partes del costo. La skill escribe las
+definiciones de sub-agente en `.claude/agents/` para que cada rol corra con su propio esfuerzo; el
+modelo sigue siendo tuyo de elegir. Sin sub-agentes, toda la construcción ocurre en la única
+conversación, y la skill te dice claramente que entonces la opción A, en una sesión nueva por
+feature, es el camino más barato.
+
 **Lo que la opción B sacrifica no es "que no queden preguntas".** El loop no elimina las zonas grises
 que la skill dejó deliberadamente para tu skill de build — decide cada una con el default y **la deja
-escrita**, con su justificación, en el `.specs/features/<name>/spec.md` de esa feature, en su sección
-de supuestos y preguntas abiertas; revisar esas secciones después es el paso esperado, no trabajo
+escrita**, con su justificación, en el spec de esa feature (`tlc-spec-driven`, bajo Assumptions & Open
+Questions) o en su plan (`tlc-spec-lean`, bajo `## Assumptions`); revisar esas secciones después es el paso esperado, no trabajo
 extra. El conteo del bloque `## Expected Gray Areas` de ese roadmap dimensiona ese trade-off por
 adelantado, y es un **piso, no un techo** — solo contiene lo que encontró el barrido de
 planificación, mientras que la discusión propia de cada feature genera más encima. Tampoco es un
-truco: enrutar una zona gris declinada hacia el spec con el default del agente y su justificación es
-el fallback documentado por el propio `tlc-spec-driven`.
+truco: enrutar una zona gris declinada hacia el spec o el plan con el default del agente y su
+justificación es el fallback documentado por cada skill.
 
 **Dos cosas que el loop no hace, y un lugar donde se detiene.** Nunca edita, debilita, omite ni
 borra una prueba para llegar a un `PASS`, y nunca registra una feature como hecha con la suite en
@@ -262,7 +289,17 @@ secciones es donde el plan se encuentra con lo que se entregó. Es un checkpoint
 mantener con un humano presente. Cuando la sección termina, vuelves, la skill re-siembra, y la
 siguiente sección recibe su propio loop.
 
-⚠️ **En ambos casos, ejecuta ese prompt en una sesión de chat nueva, con contexto limpio** — no en la
+**C — una ejecución en pipeline, solo Claude Code.** El mismo roadmap único, construido por un script
+de Workflow que la skill incluye: por feature un constructor, un probador nuevo que ejecuta tu gate
+completo una vez y escribe un recibo, el verificador de tu skill de build — que reutiliza ese recibo
+en vez de volver a ejecutar la suite —, un revisor para las features de nivel de riesgo A, y un
+integrador que ejecuta el gate sobre el árbol exacto antes de hacer el merge. Los intentos tienen un
+tope según el nivel, y al tercero se le pide nombrar el invariante que sus predecesores seguían
+pasando por alto antes de escribir código. La skill te pide una sola vez el comando que ejecuta todo
+tu gate, porque cada PASS que registra el pipeline se apoya en él, y puede medir el tiempo de ese
+comando por ti. Misma precondición que B: cero preguntas abiertas.
+
+⚠️ **En cualquier caso, ejecuta ese prompt en una sesión de chat nueva, con contexto limpio** — no en la
 sesión que generó el roadmap. La propia skill te lo va a advertir. En una sesión nueva **el prompt
 mismo es el canal**: tu skill de build vuelve a derivar lo que necesita de las rutas de ese prompt y
 de los archivos del roadmap en disco. `.specs/STATE.md` se lee en un `resume work` posterior — para
@@ -273,19 +310,20 @@ con el presupuesto de contexto ya gastado.
 
 Ese prompt es lo último que hace esta skill. De ahí en adelante, todo el ciclo de build — spec,
 diseño, tareas, implementación, verificación — pertenece por completo a tu skill de build
-(`tlc-spec-driven` por defecto). Incluso en modo loop, quien conduce esa skill es tu CLI; esta ya se
+(`tlc-spec-lean` por defecto). Incluso en modo loop, quien conduce esa skill es tu CLI; esta ya se
 detuvo. No vuelve a intervenir hasta que le pidas generar o actualizar un roadmap.
 
 ## Cómo sabe qué ya está construido
 
 Nunca se fía de la palabra de nadie, y que un archivo exista no prueba nada. Para cada nombre del
-orden de construcción lee `.specs/features/<name>/validation.md`, ejecutando el script de gate de tu
-skill de build si esa skill realmente trae uno **en disco** — mira el disco, no la documentación,
+orden de construcción lee el reporte de esa feature — `verification.md` para `tlc-spec-lean`,
+`validation.md` para `tlc-spec-driven` —, ejecutando el script de gate de tu
+skill de build si esa skill realmente trae uno **en disco** (un gate que no encuentra nada que comprobar nunca se lee como un pase) — mira el disco, no la documentación,
 porque el conjunto de scripts de una skill cambia entre releases y una instalación se queda atrás — y
 si no, leyendo el reporte exactamente con las mismas reglas. Un **PASS sin ninguna cita de evidencia
 `path.ext:NN` cuenta como no hecho**, igual que una plantilla `[PASS | FAIL]` sin rellenar. Las
 features que son solo pregunta son la única excepción: como no producen código, se dan por saldadas
-cuando su pregunta queda respondida — o cuando existe un `context.md` para ellas. Y cuando hay
+cuando su pregunta queda respondida — o, con `tlc-spec-driven`, cuando existe un `context.md` para ellas. Y cuando hay
 trabajo real en curso — algo completado o en progreso en el Handoff, o la feature nombrada en el
 Handoff tiene un `spec.md` en disco y ningún PASS de verdad — **no reescribe `.specs/STATE.md` en
 absoluto**: refresca su propio bloque de Status, nombra la feature en curso, y ahí se detiene. Nada
@@ -301,7 +339,9 @@ pausada no es trabajo en curso.
   elección de objetivo, y la lista de omisiones del prompt de loop.
 - **Un bloque de Status arriba de tu roadmap** (o del índice, en modo multi-sección): conteos, el
   orden de construcción restante, la siguiente feature, y si el handoff se escribió — o por qué no.
-  Se regenera en cada siembra, así que nunca lo edites a mano.
+  Se regenera en cada siembra, así que nunca lo edites a mano; lo que hubiera antes pasa a
+  `docs/roadmap-history.md`. Una ejecución de loop agrega una línea `**Last run**:` y deja su relato
+  completo en ese historial, nunca en el bloque — cada agente apuntado al bloque pagaría por ello.
 - **Inglés dentro de un roadmap que no está en inglés.** La prosa sale en el idioma en que estás
   trabajando, pero los nombres de features, prefijos, slugs, nombres de archivo y **todo encabezado
   generado** siguen en inglés: son claves de lectura por máquina, componentes de ruta y nombres de
@@ -330,6 +370,20 @@ adivinar, porque una falsa alarma sobre un backlog real cuesta más que una omis
 Lo que no puede comprobar es la parte que necesita a una persona: si una pregunta abierta está
 formulada lo bastante bien como para responderse, si una feature es de verdad un corte vertical, y si
 una disposición de la tabla de cobertura es honesta. Eso sigue siendo lectura.
+
+## Medir lo que cuestan los agentes, y actualizar un proyecto
+
+Pide *"measure my agent cost"* y la skill lee las transcripciones de Claude Code de tu propio proyecto
+y muestra adónde fueron los tokens: por rol, por reintento, por el modelo y el esfuerzo con que corrió
+cada rol, y cuánto de cada conversación fue contexto acumulándose turno tras turno. No edita nada.
+Guarda una línea base antes de cambiar cómo corren los agentes y compara después; un ahorro que nadie
+midió es una suposición.
+
+Un proyecto que planificó una versión anterior recibe el comportamiento nuevo pidiendo *"upgrade this
+project"* tras instalar allí la nueva versión: guarda esa línea base, revisa el roadmap con el linter,
+vuelve a ejecutar la siembra — que vacía el bloque de Status viejo hacia `docs/roadmap-history.md` —,
+ofrece reemplazar las líneas puente antiguas en tu `CLAUDE.md` y pregunta cómo quieres construir.
+Nunca regenera el roadmap.
 
 ## Lo que deliberadamente *no* hace
 
@@ -382,13 +436,13 @@ procedimiento exacto es `Converting a single-section project to multi-section`, 
 `references/index-phase.md`. La conversión la hace un pequeño script de Python 3 que viene con la
 skill, así que una máquina sin `python3` no puede ejecutarla.
 
-Por qué importa la elección: un roadmap solo te cuesta lo que se carga, y en modo loop ese único
-archivo queda nombrado como spec source de **cada** feature que el loop construye — así que uno que
-crece ola tras ola se relee hacia el contexto de todo el trabajo futuro, incluidas las olas que
-cerraron hace meses. Una sección terminada nunca se vuelve a cargar entera: el progreso se cuenta
-desde su `.txt` y desde el `validation.md` de cada feature, mientras que las lecturas puntuales en su
-cuerpo — el test de `discharge:`, el roll-up de `## Open Questions` — siguen ocurriendo. Lo que nunca
-ocurre es que ese cuerpo entero caiga en el contexto de cada feature que el loop construye. En
+Por qué importa la elección: un roadmap solo te cuesta lo que se carga. Los constructores ya no lo
+cargan — leen la porción de su feature mediante `feature-brief.py` —, pero cada ejecución de
+planificación y cada siembra sigue leyendo el roadmap con el que trabaja, así que uno que crece ola
+tras ola se arrastra a través de todas ellas. Una sección terminada nunca se vuelve a cargar entera:
+el progreso se cuenta desde su `.txt` y desde el reporte de cada feature, mientras que las lecturas
+puntuales en su cuerpo — el test de `discharge:`, el roll-up de `## Open Questions` — siguen
+ocurriendo. En
 números: cada feature cuesta unos 200-250 tokens del roadmap, así que la skill avisa cerca de 2.000
 — diciendo cuántas features caben aún antes de dividir — y vuelve a plantear la pregunta de
 uno-o-varios pasados unos 3.000, unas 12-15 features. Convertir renombra **archivos, no features**,

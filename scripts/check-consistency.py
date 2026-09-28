@@ -489,6 +489,42 @@ def check_tier_rule(root):
            else "not named in the prose: " + ", ".join(missing)))
 
 
+def check_docs_follow_the_skill(root):
+    """Two facts the human docs kept stating after they stopped being true.
+
+    Between 3.22.0 and 3.28.0 seven scripts started shipping while CONTRIBUTING.md
+    still said two did, and the README kept showing an option-A prompt the skill
+    no longer emits — found by an audit, not by this file. A reader who copies the
+    README's prompt gets the old behaviour; a contributor who trusts CONTRIBUTING's
+    list misses what a release must keep working."""
+    sh = read(root, "install.sh") or ""
+    m = re.search(r"REQUIRED_SCRIPTS=\(([^)]*)\)", sh)
+    shipped = m.group(1).split() if m else []
+    missing = []
+    for doc in ("CONTRIBUTING.md", "CLAUDE.md"):
+        text = read(root, doc) or ""
+        missing += ["%s does not name %s" % (doc, scr) for scr in shipped if scr not in text]
+    check("CONTRIBUTING.md and CLAUDE.md name every shipped script",
+          bool(shipped) and not missing, "\n".join(missing) or "read no REQUIRED_SCRIPTS from install.sh")
+
+    hp = read(root, "references", "handover-prompt.md") or ""
+    blocks = re.findall(r"^```\n(specify feature <target>.*?)^```", hp, re.M | re.S)
+    lean = next((b for b in blocks if b.lstrip().splitlines()[1].startswith("Plan source")), None)
+    readme = read(root, "README.md") or ""
+    shown = re.search(r"^\s*```\n(\s*specify feature <name>.*?)^\s*```", readme, re.M | re.S)
+    norm = lambda t: " ".join(t.split())
+    want = None
+    if lean:
+        want = lean
+        for ph, v in (("<target>", "<name>"), ("<ROADMAP-SKILL-DIR>", ".claude/skills/spec-driven-roadmap"),
+                      ("<ROADMAP-PATH>", "docs/ROADMAP.md"), ("<STATUS-PATH>", "docs/ROADMAP.md")):
+            want = want.replace(ph, v)
+    check("README's option-A prompt is the one the skill emits (lean, single-section)",
+          bool(want) and bool(shown) and norm(shown.group(1)) == norm(want),
+          "no lean Option A template found" if not want else "README shows a different prompt" if shown
+          else "README shows no option-A prompt")
+
+
 def check_loop_templates(root):
     """The two `/loop` templates in handover-prompt.md share clauses on purpose.
 
@@ -545,6 +581,7 @@ def main():
     print("benchmark"); check_benchmark(root)
     print("loop templates"); check_loop_templates(root)
     print("risk tier"); check_tier_rule(root)
+    print("human docs"); check_docs_follow_the_skill(root)
     print("changelog"); check_changelog(root)
 
     print("\n%d checks, %d failed" % (checks_run, len(failures)))

@@ -13,7 +13,7 @@ Other languages: [Português](HOW-IT-WORKS.pt-BR.md) · [Español](HOW-IT-WORKS.
 
 This skill figures out **what to build and in what order** — it never writes code, specs, or
 tests. Think of it as the step that happens *before* you hand a feature to your build skill
-(`tlc-spec-driven` by default): it turns whatever you have — a document, an idea, or an existing
+(`tlc-spec-lean` by default, `tlc-spec-driven` also supported): it turns whatever you have — a document, an idea, or an existing
 codebase — into an ordered backlog, then gets out of the way.
 
 ## How to trigger it
@@ -65,6 +65,10 @@ from** — so not every run asks all six, and it skips anything you already answ
 conversation. Brief answers are fine; this document is allowed to be thin. It writes your answers
 into `docs/PROJECT.md` for you — you never write this file by hand — then decomposes it, same as A.
 
+**If `tlc-discover` is installed, it runs this interview instead** — it goes deeper, and ends with a
+verdict on whether to build at all. A design it confirmed becomes the source, exactly as in A; one you
+declined stops the run, because there is nothing to decompose; a draft is never decomposed.
+
 ### C — "I have code, but nothing describing what it does"
 
 Say *"map this codebase into a roadmap source"*. The skill checks whether your build skill (or the
@@ -100,11 +104,16 @@ contradiction — the run stops and asks you which one is authoritative.
 | `docs/PROJECT.md` | Only if you went through the interview (path B) |
 | `docs/CODEBASE-SUMMARY.md` | Only if it mapped your codebase (path C) |
 | `.specs/STATE.md` (`## Handoff` body rewritten) | Only with something to seed *and* a confirmed build skill whose schema is readable — four skip cases, below |
+| `docs/roadmap-history.md` | Whenever the seed rewrites the Status block: the old block goes here, verbatim. A log for people; no agent is ever pointed at it |
+| `.claude/agents/roadmap-*.md` | Only if you choose option B and your session can spawn sub-agents |
+| `docs/process/pipeline.json` | Only if you choose option C (the pipeline), with the gate command you confirmed |
+| `docs/process/cost-baseline.json` | Only when you upgrade a project, or ask it to save a cost baseline |
 
 The roadmap file itself contains, per feature: an objective, what it depends on, an honest task
 estimate (≤8 tasks — if a feature needs more, it gets split), which "tricky" dimensions are
-present (auth, persistence, external calls, etc.), and any open question it couldn't answer for
-you. It closes with a coverage table proving nothing was missed.
+present (auth, persistence, external calls, etc.), a **risk tier** — A, B or C, derived from its size
+and those dimensions, which sets how much verification and how many attempts it gets later — and any
+open question it couldn't answer for you. It closes with a coverage table proving nothing was missed.
 
 **Decomposition is lazy.** In multi-section mode only the section you asked for gets its
 `.md`/`.txt` pair; the others sit in the index as `NOT YET DECOMPOSED`, and the skill just reports
@@ -204,16 +213,23 @@ the Status block, so a later run can tell "never seeded" from "seeded and since 
 Install the skill, ask for the seed again, and the chain completes **without re-running Phase 2**.
 
 When there is a target and a confirmed skill, it says the planning work is finished and asks **how
-you want to build it**. Two options:
+you want to build it**. Two options — three in Claude Code:
 
 **A — one feature at a time.** You get the command for the next feature only, run it, and come back
 when it passes:
 
 ```
 specify feature tt-create-task — create it at `.specs/features/tt-create-task/` using that exact
-directory name. Spec source: docs/ROADMAP.md. Read docs/ROADMAP.md `## Cross-Cutting Decisions`
-before Discuss and treat it as settled — do not re-decide what it answers.
+directory name. Plan source: run `python3 .claude/skills/spec-driven-roadmap/scripts/feature-brief.py
+tt-create-task` — it prints the entry from docs/ROADMAP.md, its risk tier and what that tier sets
+(follow it), the questions naming it and docs/ROADMAP.md `## Cross-Cutting Decisions`, which are
+settled before planning: do not re-decide what they answer. Do not open docs/ROADMAP.md whole.
 ```
+
+That is the `tlc-spec-lean` form; with `tlc-spec-driven` it says *spec* and *Discuss* instead. The
+builder reads only its own feature's slice of the roadmap — on two real projects a median of about a
+tenth of the files it would otherwise open — because every turn an agent takes re-reads everything
+it has read.
 
 **B — a whole roadmap in one loop.** You get a prompt that starts with `/loop` (your CLI's own loop
 command — Claude Code, Cursor and OpenCode all have one) and doesn't stop until every feature in that
@@ -224,14 +240,23 @@ files from disk to confirm nothing is left open. Only then does it hand you the 
 answers stay in the file for good, as the record of what was decided and why — worth having, and
 also the single biggest reason a roadmap grows from one wave to the next.
 
+**The loop's own session only coordinates.** If the session you run it in can spawn sub-agents (the
+skill asks), each feature is built by a fresh sub-agent and then verified by another — never the
+builder's own child — and only one line per feature stays in the loop's conversation. That matters
+because a conversation re-reads everything in it on every turn: on a real multi-agent build,
+re-reading context was about three quarters of the cost. The skill writes the sub-agent definitions
+into `.claude/agents/` so each role runs at its own effort; the model stays yours to choose. Without
+sub-agents, the whole build happens in the one conversation, and the skill tells you plainly that
+option A in a fresh session per feature is then the cheaper path.
+
 **What option B trades away is not "no questions left".** The loop doesn't eliminate the gray areas
 the skill deliberately left to your build skill — it decides each one with the default and **writes
-it down**, with the rationale, in that feature's `.specs/features/<name>/spec.md`, under its
-assumptions and open questions section; reviewing those sections afterwards is the expected step,
+it down**, with the rationale, in that feature's spec (`tlc-spec-driven`, under Assumptions & Open
+Questions) or plan (`tlc-spec-lean`, under `## Assumptions`); reviewing those sections afterwards is the expected step,
 not extra work. The count in that roadmap's `## Expected Gray Areas` block sizes the trade up front,
 and it's a **floor, not a ceiling** — it holds only what the planning sweep turned up, while each
 feature's own discussion generates more on top of it. Nor is this a workaround: routing a declined
-gray area into the spec with the agent's default and rationale is `tlc-spec-driven`'s own
+gray area into the spec or plan with the agent's default and rationale is each skill's own
 documented fallback.
 
 **Two things the loop will not do, and one place it stops.** It never edits, weakens, skips or
@@ -249,6 +274,15 @@ provisional until that section is actually built, so the gap between two section
 meets what shipped. It's a checkpoint worth keeping a human in. When a section finishes, you come
 back, the skill re-seeds, and the next section gets its own loop.
 
+**C — a pipeline run, Claude Code only.** The same one roadmap, built by a Workflow script the skill
+ships: per feature a builder, a fresh prover that runs your full gate once and writes a receipt, your
+build skill's verifier — which reuses that receipt instead of re-running the suite — a reviewer for
+risk-tier A features, and a merger that runs the gate on the exact tree before merging. Attempts are
+capped by tier, and the third is told to name the invariant its predecessors kept missing before it
+writes code. The skill asks you once for the command that runs your whole gate, because every PASS the
+pipeline records rests on it, and can time that command for you. Same precondition as B: zero open
+questions.
+
 ⚠️ **Either way, run that prompt in a new chat session, with clean context** — not in the session
 that generated the roadmap. The skill will tell you this too. In a fresh session **the prompt itself
 is the channel**: your build skill re-derives what it needs from the paths in that prompt and the
@@ -258,20 +292,21 @@ all. Reusing the planning session just risks the agent working from remembered c
 of the written artifacts, and starts the build with the context budget already spent.
 
 That prompt is the last thing this skill does. From there, the whole build cycle — spec, design,
-tasks, implementation, verification — belongs entirely to your build skill (`tlc-spec-driven` by
+tasks, implementation, verification — belongs entirely to your build skill (`tlc-spec-lean` by
 default). Even in loop mode, it's your CLI driving that skill; this one has already stopped. It
 won't intervene again until you ask it to generate or refresh a roadmap.
 
 ## How it knows what's already built
 
 It never takes anyone's word for it, and the presence of a file proves nothing. For each name in the
-build order it reads `.specs/features/<name>/validation.md`, running your build skill's gate script
-if that skill actually ships one **on disk** — it checks the disk, not the documentation, because a
+build order it reads that feature's report — `verification.md` for `tlc-spec-lean`,
+`validation.md` for `tlc-spec-driven` — running your build skill's gate script if that skill
+actually ships one **on disk** (a gate that finds nothing to check is never read as a pass) — it checks the disk, not the documentation, because a
 skill's script set changes between releases and an install lags them — and otherwise reading the
 report by exactly the same rules. A **PASS with no `path.ext:NN` evidence citation counts as not
 done**, as does an unfilled `[PASS | FAIL]` template. Question-only features are the one exception:
-producing no code, they're discharged by their question being answered — or by a `context.md`
-existing for them. And when real work is in flight — something completed or in progress in the
+producing no code, they're discharged by their question being answered — or, with `tlc-spec-driven`,
+by a `context.md` existing for them. And when real work is in flight — something completed or in progress in the
 Handoff, or the feature named in the Handoff has a `spec.md` on disk and no real PASS — it **does
 not rewrite `.specs/STATE.md` at all**: it refreshes its own Status block, names the feature in
 flight, and stops there. None of that fires once the feature the Handoff names has a real PASS —
@@ -285,7 +320,9 @@ finished and then paused is not work in flight.
   consumers key off it: the seed's done-test, its target pick, and the loop prompt's skip list.
 - **A Status block at the top of your roadmap** (or of the index, in multi-section mode): counts,
   the remaining build order, the next feature, and whether the handoff was written — or why not.
-  Regenerated on every seed, so never hand-edit it.
+  Regenerated on every seed, so never hand-edit it; whatever was in it before moves to
+  `docs/roadmap-history.md`. A loop run adds one `**Last run**:` line and puts its full account in
+  that history, never in the block — every agent pointed at the block would pay for it.
 - **English inside a non-English roadmap.** Prose comes out in the language you're working in, but
   feature names, prefixes, slugs, filenames and **every generated heading** stay English: they're
   machine-read keys, path components and directory names, and translating one breaks the handoff,
@@ -312,6 +349,18 @@ something rather than guessing, because a false alarm on a real backlog costs mo
 What it cannot check is the part that needs a human: whether an open question is phrased well enough
 to answer, whether a feature is genuinely a vertical slice, and whether a coverage disposition is
 honest. Those stay a read.
+
+## Measuring what the agents cost, and upgrading a project
+
+Ask *"measure my agent cost"* and the skill reads your project's own Claude Code transcripts and shows
+where the tokens went: by role, by retry, by the model and effort each role ran at, and how much of
+each conversation was context piling up turn after turn. It edits nothing. Save a baseline before you
+change how agents run and compare after; a saving nobody measured is a guess.
+
+A project an earlier version planned gets the new behaviour by asking *"upgrade this project"* after
+installing the new version there: it saves that baseline, lints the roadmap, re-runs the seed — which
+empties the old Status block into `docs/roadmap-history.md` — offers to replace old bridge lines in
+your `CLAUDE.md`, and asks how you want to build. It never regenerates the roadmap.
 
 ## What it deliberately does *not* do
 
@@ -360,13 +409,12 @@ wave becomes the next, and an index orders them. The exact procedure is
 conversion is done by a small Python 3 script that ships with the skill, so a machine with no
 `python3` cannot run it.
 
-Why the choice matters: a roadmap only costs you what gets loaded, and in loop mode that one file is
-named as the spec source for **every** feature the loop builds — so one that grows wave after wave is
-read back into the context of all future work, waves that closed months ago included. A finished
-section is never loaded whole again: progress is counted from its `.txt` and each feature's
-`validation.md`, while pinpoint reads into its body — the `discharge:` test, the `## Open Questions`
-roll-up — still happen. What never happens is the whole body landing in the context of every feature
-the loop builds. Concretely: one feature costs the roadmap roughly 200-250 tokens, so the skill
+Why the choice matters: a roadmap only costs you what gets loaded. Builders no longer load it — they
+read their feature's slice through `feature-brief.py` — but every planning run and every seed still
+reads the roadmap it works on, so one that grows wave after wave is carried through all of them. A
+finished section is never loaded whole again: progress is counted from its `.txt` and each feature's
+report, while pinpoint reads into its body — the `discharge:` test, the `## Open Questions` roll-up —
+still happen. Concretely: one feature costs the roadmap roughly 200-250 tokens, so the skill
 flags the size at around 2,000 — naming how many features are left before a split is needed — and
 re-raises the one-or-several question past roughly 3,000, about 12-15 features. Converting renames
 **files, not features**, so nothing already built is affected — with one caveat: the handoff pointer

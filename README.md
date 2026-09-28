@@ -75,8 +75,8 @@ including a roadmap that has grown across several waves. It reports what failed,
 and what it could not judge; nothing is edited.
 
 It covers forward dependencies, duplicate names, the eight-task budget, the two-way agreement between
-each feature's open questions and the roll-up, one ledger row per theme, `uncovered: none`, the
-build-order `.txt` agreeing with the roadmap, size thresholds, and name uniqueness against every other
+each feature's open questions and the roll-up, one ledger row per theme, `uncovered: none`, every
+feature's risk tier at or above its floor, the build-order `.txt` agreeing with the roadmap, size thresholds, and name uniqueness against every other
 roadmap and every `.specs/features/` directory — including a built feature no roadmap names any more.
 A failure is a question for you, not a verdict.
 
@@ -169,22 +169,58 @@ Three entry points, depending on what you already have:
 | An existing codebase, no scope doc | `map this codebase into a roadmap source` | `docs/CODEBASE-SUMMARY.md`, then the roadmap |
 
 Output lands in `docs/` — a `ROADMAP.md` plus a machine-readable `roadmap.txt` build order (or a
-`ROADMAP-INDEX.md` with one roadmap per section, if you pick multi-section mode). Backlog position
-lives in a `## Status` block that gets refreshed on every run.
+`ROADMAP-INDEX.md` with one roadmap per section, if you pick multi-section mode). Every feature carries
+a risk tier — A, B or C, derived from its size and what it touches — that sets how much verification
+and how many attempts it gets. Backlog position lives in a `## Status` block the skill rewrites on
+every seed and keeps small: whatever earlier runs wrote into it moves, verbatim, to
+`docs/roadmap-history.md`.
 
-When the run finishes, the skill hands you this prompt with the feature name and paths already
-resolved — paste it into a fresh session to start feature one:
+When the run finishes, the skill asks how you want to build and hands you a prompt with the names and
+paths already resolved. Paste it into a fresh session.
 
-```
-specify feature <name> — create it at `.specs/features/<name>/` using that exact directory name.
-Spec source: docs/ROADMAP.md. Read docs/ROADMAP.md `## Cross-Cutting Decisions` before Discuss and
-treat it as settled — do not re-decide what it answers.
-```
+- **A — one feature at a time.** With `tlc-spec-lean` it reads:
 
-That is option A, one feature at a time. Option B is a single `/loop` prompt that builds the whole
-roadmap unattended. It is always offered; what it needs first is a roadmap with no open
-questions, which the skill closes with you before handing the prompt over — the guide explains
-what it trades away.
+  ```
+  specify feature <name> — create it at `.specs/features/<name>/` using that exact directory name.
+  Plan source: run `python3 .claude/skills/spec-driven-roadmap/scripts/feature-brief.py <name>` — it prints the
+  entry from docs/ROADMAP.md, its risk tier and what that tier sets (follow it), the questions naming it and docs/ROADMAP.md `## Cross-Cutting Decisions`,
+  which are settled before planning: do not re-decide what they answer. Do not open docs/ROADMAP.md whole;
+  if the script cannot run, read only its `### <name>` entry and the lines naming <name>.
+  ```
+
+  The builder reads only its feature's slice of the roadmap, never the whole file: every turn of an
+  agent re-reads what it has already read.
+- **B — one `/loop` over one roadmap**, unattended. The loop's own session only coordinates: each
+  feature is built by a fresh sub-agent and verified by another, and the skill writes
+  `.claude/agents/roadmap-*.md` so each role runs at its own effort. Every open question in that
+  roadmap is closed with you first, because nobody is there to answer later.
+- **C — a pipeline run, Claude Code only.** A Workflow script the skill ships builds the roadmap with a
+  fresh agent per role — builder, a prover that runs your full gate once, the verifier, a reviewer for
+  risk tier A, a merger — and returns one line per feature. You confirm the full gate command once;
+  `bench-gate.py` can time it for you.
+
+The [guide](guide/HOW-IT-WORKS.md) explains what each option trades away.
+
+## Upgrading a project that already uses the skill
+
+New projects need nothing here. A project an earlier version planned gets the new behaviour in one
+run:
+
+1. Install the new version in that project — re-run the installer, or `/plugin update` for a plugin.
+2. In that project, ask *"upgrade this project"* (or type `/spec-driven-roadmap upgrade this project`).
+
+The skill then saves a cost baseline from the project's own transcripts
+(`docs/process/cost-baseline.json`), lints the roadmap, re-runs its seed — which moves the old
+`## Status` into `docs/roadmap-history.md` and rewrites the handoff — offers to replace old bridge lines
+in your `CLAUDE.md` (only on your yes), and asks how you want to build. It never regenerates the
+roadmap or renames a feature. You can ask Claude Code for both steps in one sentence: *"reinstall
+spec-driven-roadmap in this project, then upgrade this project"*. Once a few features are built, ask
+*"measure my agent cost"* again: the comparison with that baseline is the only proof the upgrade saved
+anything.
+
+Two things to know. Sub-agent types in `.claude/agents/` load when a session starts in the project,
+so start a new session after option B writes them. And a `CLAUDE_CODE_EFFORT_LEVEL` set in your
+environment overrides the effort each of them sets.
 
 ## Working on the skill itself
 
@@ -192,14 +228,17 @@ what it trades away.
 get. [`CLAUDE.md`](CLAUDE.md) — the operating rules an agent follows here. [`benchmark/`](benchmark/)
 — a frozen fixture with seven planted ambiguities, an answer key, and a scoreboard per version.
 
-## How it fits with tlc-spec-driven
+## How it fits with the TLC skills
 
-The two skills own different files and never collide:
+The two own different files and never collide:
 
-- **This skill** owns `docs/` — the roadmap, the build order, the backlog status.
-- **tlc-spec-driven** owns `.specs/` — specs, designs, tasks, validation reports, decisions.
+- **This skill** owns `docs/` — the roadmaps, the build order, the backlog status, its history
+  (`docs/roadmap-history.md`) and the pipeline's config (`docs/process/pipeline.json`, option C). With
+  option B and sub-agents it also writes `.claude/agents/roadmap-*.md`.
+- **The downstream skill** — `tlc-spec-lean` by default, `tlc-spec-driven` also supported — owns
+  `.specs/`: plans or specs, checks or tasks, verification reports, decisions.
 
-The only shared surface is one write to `.specs/STATE.md`'s `## Handoff`, in that skill's own field
-schema, pointing back at the roadmap. Feature completion is read from
-`.specs/features/<name>/validation.md`, never tracked by hand — so the two never disagree about
-what's done.
+The only write into `.specs/` is `.specs/STATE.md`'s `## Handoff`, in that skill's own field schema,
+pointing back at the roadmap. Feature completion is read from each feature's report
+(`verification.md` for `tlc-spec-lean`, `validation.md` for `tlc-spec-driven`) and that skill's own
+completion gate, never tracked by hand — so the two never disagree about what's done.

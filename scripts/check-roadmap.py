@@ -568,7 +568,9 @@ def check_context_flag(rm, feats):
         flagv = field(fields, "needs pre-written context", "needs context")
         if flagv is None:
             continue
-        dims = (field(fields, "implicit dimension") or "none").lower()
+        # The same label spellings derive_tier() reads: a check that reads fewer failed a
+        # correct roadmap whose entries said `flagged dimensions` (found in 3.29.0's run).
+        dims = (field(fields, "implicit dimension", "flagged dimension") or "none").lower()
         oq = (field(fields, "open question") or "none").lower()
         expect = ("none" not in dims and dims.strip() not in ("", "—", "-")) \
             or re.search(r"status\s*:\s*open", oq) is not None

@@ -1,10 +1,10 @@
 ---
 name: spec-driven-roadmap
-description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a machine-readable build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) and seeds the downstream spec-driven skill so it can start building feature one. Sources the scope from an existing PRD, architecture doc or flowchart export, from an interview when the user has no document, or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "turn this PRD into a backlog", or "I do not know what to build yet" - and also to CHECK a roadmap this skill already produced: "check my roadmap", "validate my roadmap", "is my roadmap sound", "lint the roadmap" - and to MEASURE agent cost: "measure my agent cost", "where did my quota go". Do NOT use for writing a feature's spec, design, tasks or code, for driving construction, or for "resume work" - those belong to the downstream spec-driven skill.
+description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) and seeds the downstream spec-driven skill so it can start building feature one. Sources the scope from a PRD, architecture doc or flowchart export, from an interview when there is no document, or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "turn this PRD into a backlog", or "I do not know what to build yet"; to CHECK a roadmap it produced: "check my roadmap", "lint the roadmap"; to MEASURE agent cost: "measure my agent cost", "where did my quota go"; and to UPGRADE a project that already uses it: "upgrade this project". Do NOT use for a feature's spec, design, tasks or code, for driving construction, or for "resume work" - those belong to the downstream spec-driven skill.
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.28.0"
+  version: "3.29.0"
 ---
 
 # Spec-Driven Roadmap
@@ -31,6 +31,7 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 | 1 | [references/index-phase.md](references/index-phase.md) | Multi-section mode only: section map, dependency graph, boundary contracts. |
 | 2 | [references/decompose-phase.md](references/decompose-phase.md) | Slice into vertical features with full coverage, open questions, and a build order. Then pre-empt the cross-cutting gray areas, and record the ones left to the downstream skill. |
 | Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`. Steps 1-7 only; it ends there whenever nothing was seeded. |
+| Upgrade | [references/upgrade-project.md](references/upgrade-project.md) | Its own entry, for a project a previous version already planned: baseline the cost, lint, re-run the seed (which empties `## Status` into `docs/roadmap-history.md`), offer the current bridge lines, then Steps 8-10 as usual. Never regenerates the roadmap; never installs the skill itself. |
 | Handover | [references/handover-prompt.md](references/handover-prompt.md) | Reached only from the seed's Step 7. Asks which implementation prompt the user wants — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed) — and emits it. The `/loop` template for the confirmed profile is in [loop-tlc-spec-lean.md](references/loop-tlc-spec-lean.md) or [loop-tlc-spec-driven.md](references/loop-tlc-spec-driven.md); read only that one, and only for a loop. |
 
 ## Version and model

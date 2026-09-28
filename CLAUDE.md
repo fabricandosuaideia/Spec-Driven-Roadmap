@@ -34,7 +34,16 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 | `scripts/check-conversion-guards.py` | Every path on which the conversion must refuse. Builds and deletes its own trees. Called by the release gate, and by the hook when the conversion or its fixture changes. |
 | `scripts/run-benchmark.py` | Sets up an isolated run and scores it. See [`benchmark/`](benchmark/). |
 | `scripts/convert-to-multi.py` | Shipped to users. The single→multi conversion. |
-| `scripts/measure-agents.py` | Shipped to users. Reads a project's Claude Code transcripts and decomposes token cost by class, role, retry and orchestrator. Read-only. `--selftest` runs in the release gate. |
+| `scripts/measure-agents.py` | Shipped to users. Reads a project's Claude Code transcripts and decomposes token cost by class, role, retry, model/effort and orchestrator. Read-only. |
+| `scripts/feature-brief.py` | Shipped to users. Prints one feature's slice of the roadmap for its builder (entry, questions, contracts, ledger, risk tier). Read-only. |
+| `scripts/status-block.py` | Shipped to users. The only writer of `## Status`; archives the old body to `docs/roadmap-history.md`. |
+| `scripts/write-agents.py` | Shipped to users. Writes `.claude/agents/roadmap-*.md` (option B); never overwrites a changed file. |
+| `scripts/plan-pipeline.py` | Shipped to users. Prints the pipeline's args; refuses until `docs/process/pipeline.json`'s gate is confirmed by the user. |
+| `scripts/roadmap-pipeline.js` | Shipped to users. The option C Workflow script. |
+| `scripts/bench-gate.py` | Shipped to users. Times the project's full gate; writes nothing. |
+| `scripts/check-pipeline.mjs` | Maintainer. The pipeline's control flow on stubbed agents, plus planted defects. Release gate, when `node` exists. |
+
+Every shipped script with a `--selftest` has it run by the release gate; the gate fails if one is missing.
 | `scripts/hooks/pre-commit` | Runs the consistency check before a commit that touches an invariant. Install once: `bash scripts/hooks/install.sh`. |
 | `scripts/bump-version.sh` | Writes all three version declarations **and runs the consistency check**, refusing the release when it fails. |
 
@@ -78,15 +87,19 @@ lesson 9 below, and being a lesson was not enough — which is why it is a rule 
 none of it is yours to decide unprompted.
 
 **Never edit by hand:** `benchmark/RESULTS.md` (the runner appends it), and the three version
-declarations (`bump-version.sh` writes them together, and refuses when they already disagree).
+declarations (`bump-version.sh` writes them together, and refuses when they already disagree). In a
+user's project the skill's own equivalents: `## Status` and `docs/roadmap-history.md` are
+`status-block.py`'s, and `docs/process/pipeline.json`'s `"confirmed"` is the user's alone.
 
-**What is never touched without saying so:** the 13 non-negotiable rules in `SKILL.md`, the three
-prompt templates in `references/handover-prompt.md` Step 10, and the eight-field Handoff schema in
-`handoff-seed.md` Step 6. Two rule changes have happened in this repository's history; both are named
+**What is never touched without saying so:** the 13 non-negotiable rules in `SKILL.md`, the prompt
+templates Step 10 emits — options A and C in `references/handover-prompt.md`, the two `/loop` templates
+in `references/loop-tlc-spec-*.md` — and the Handoff schemas in `handoff-seed.md` Step 6 (eight fields
+for `tlc-spec-driven`, seven for `tlc-spec-lean`). Two rule changes have happened in this repository's history; both are named
 in the `CHANGELOG.md` entry that made them.
 
-**Reading the downstream skill.** `references/handoff-seed.md` requires reading `tlc-spec-driven`'s
-real schema from disk, never from memory. It is vendored under `.claude/skills/` and **gitignored**,
+**Reading the downstream skill.** `references/handoff-seed.md` requires reading the downstream skill's
+real schema from disk, never from memory — `tlc-spec-lean` by default, `tlc-spec-driven` also
+supported ("Downstream profiles"). It is vendored under `.claude/skills/` and **gitignored**,
 so a fresh clone does not have it — see [`CONTRIBUTING.md`](CONTRIBUTING.md) before concluding that
 no downstream skill is installed.
 
