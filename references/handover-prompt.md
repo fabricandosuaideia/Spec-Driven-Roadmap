@@ -567,7 +567,11 @@ them for an unattended run:
    Show the user the guess and ask for the command that runs **everything** their merges must pass —
    typecheck, lint and the whole suite. Write their answer and `"confirmed": true` into the file.
    Never confirm it yourself: `plan-pipeline.py` refuses an unconfirmed config because every PASS the
-   pipeline records is that command's verdict.
+   pipeline records is that command's verdict. Then offer, once, to time it:
+   `python3 <this-skill-dir>/scripts/bench-gate.py --root <project-root>` runs the confirmed gate as
+   written and, when it is `a && b && c`, with its parts at once, alternating the order, recording the
+   machine's load and refusing to compare a run that failed. The gate runs twice per feature, so its
+   duration is paid on every feature; the script changes nothing — adopting a faster form is theirs.
 2. If the session can spawn sub-agents at all, nothing else is needed; the pipeline sets each role's
    effort itself (`effort` in `pipeline.json`, per role and tier) and does not use the agent files.
 

@@ -9,6 +9,36 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.28.0 — 2026-09-28
+
+**Step 6, the last of the build kit: time the project's own full gate instead of adopting someone
+else's number.** The pipeline runs the full gate twice per feature (prover and merger), so its duration
+is paid on every feature. On the project behind the user's guide, running typecheck, lint and tests at
+once took 47-48 s against ~112 s in series — one project's number, and the same guide records three ways
+its own timings lied: a failed command timed as if it had worked, one run in a busy minute taken as the
+truth, the order of runs never alternated.
+
+- **`scripts/bench-gate.py`** (shipped, writes nothing) runs the confirmed gate as written and, when it
+  is `a && b && c`, its parts at once; alternates the order across rounds; records the machine's load
+  before and after each run and says when it exceeded the CPU count; **refuses to compare any run that
+  failed**; and calls a gain real only when it beats the runs' own spread — no fixed threshold, which
+  would be one more unmeasured number. It never edits `pipeline.json`: adopting a concurrent form is the
+  user's to write and confirm. Worker counts are deliberately not measured: they are a flag of each test
+  runner, and on the guide's project the runner's own default was the best or tied every time.
+- Step 10, option C, offers it once, right after the gate command is confirmed.
+- The self-test plants a slow two-part gate, a failing part, a one-command gate and a noisy pair; three
+  injected defects (failures compared, no alternation, a "parallel" run that is really serial) were all
+  caught. Run for real on the loop fixture: it compared a passing two-part gate, and refused to compare
+  when one part failed.
+
+**The build kit, as shipped across 3.22.0 → 3.28.0:** measure (`measure-agents.py`), bounded artifacts
+(`status-block.py`, `feature-brief.py`), risk tiers, per-profile loop templates, a loop that coordinates
+with fresh builder and verifier sub-agents (`write-agents.py` for their effort), the pipeline
+(`roadmap-pipeline.js`, `plan-pipeline.py`), and this. What none of it has had yet is a real run on a
+real project with `measure-agents.py`'s before and after — the step the user planned for last.
+
+---
+
 ## 3.27.0 — 2026-09-28
 
 **Step 4 of the build kit: a pipeline the skill ships, not one each project has to invent.** A third
