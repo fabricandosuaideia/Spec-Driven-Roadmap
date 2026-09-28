@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.25.0"
+  version: "3.26.0"
 ---
 
 # Spec-Driven Roadmap
@@ -186,6 +186,9 @@ nothing was measured (no transcripts, or none in the window) — say that, never
   `## Open Questions` and `## Expected Gray Areas` roll-ups. In single-section mode `ROADMAP.md` also
   carries `## Status` and `## Cross-Cutting Decisions` — exactly one of each exists per project.
 - `docs/roadmap.txt` / `docs/roadmap-<slug>.txt` — build order, one feature name per line.
+- `.claude/agents/roadmap-builder-a.md`, `roadmap-builder.md`, `roadmap-verifier.md` — Step 10, option
+  B with sub-agents only, through `scripts/write-agents.py`: the agent types a loop dispatches, with
+  their effort and context budget. Never overwrites a file the user changed.
 - `docs/roadmap-history.md` — append-only, through `scripts/status-block.py`: every `## Status` body
   the seed replaces, and each loop run's account. A log for people; no prompt points an agent at it.
   That is what keeps `## Status` small, and `## Status` is what every handoff points agents at.

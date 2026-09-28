@@ -133,6 +133,7 @@ def scan(path, since, until):
     totals = collections.Counter()
     ctx = []
     notifications = 0
+    mix = collections.Counter()
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             if NOTIFICATION_MARK in line and '"type":"user"' in line.replace(" ", ""):
@@ -163,7 +164,13 @@ def scan(path, since, until):
             out = usage.get("output_tokens") or 0
             totals.update(inp=inp, cw=cw, cr=cr, out=out)
             ctx.append(inp + cw + cr)
-    return ctx, totals, notifications
+            mix["%s/%s" % (short_model(msg.get("model")), d.get("effort") or "?")] += 1
+    return ctx, totals, notifications, mix
+
+
+def short_model(m):
+    """`claude-sonnet-5-5` -> `sonnet-5-5`; the vendor prefix is noise in a column."""
+    return (m or "?").replace("claude-", "")
 
 
 def in_window(ts, since, until):
@@ -184,7 +191,7 @@ def cost_of(totals, weights):
 def measure(dirs, since, until, weights):
     roles = collections.defaultdict(lambda: {
         "kind": None, "agents": 0, "turns": [], "first_ctx": [], "ctx_sum": 0,
-        "growth_sum": 0, "totals": collections.Counter()})
+        "growth_sum": 0, "totals": collections.Counter(), "mix": collections.Counter()})
     attempts = collections.Counter()
     features = collections.defaultdict(lambda: {"cost": 0.0, "max_attempt": 0})
     classes = collections.Counter()
@@ -197,7 +204,7 @@ def measure(dirs, since, until, weights):
                     continue
                 path = os.path.join(dp, f)
                 kind, role, feature, attempt = classify(path, root)
-                ctx, totals, notes = scan(path, since, until)
+                ctx, totals, notes, mix = scan(path, since, until)
                 if kind == "main-session":
                     notifications += notes
                 if not ctx:
@@ -211,6 +218,7 @@ def measure(dirs, since, until, weights):
                 r["ctx_sum"] += sum(ctx)
                 r["growth_sum"] += sum(c - ctx[0] for c in ctx if c > ctx[0])
                 r["totals"].update(totals)
+                r["mix"].update(mix)
                 classes.update(totals)
                 c = cost_of(totals, weights)
                 if attempt is not None:
@@ -243,7 +251,8 @@ def summarise(m, weights):
             "first_ctx": statistics.median(r["first_ctx"]),
             "avg_ctx": r["ctx_sum"] / max(turns, 1),
             "growth_share": r["growth_sum"] / max(r["ctx_sum"], 1),
-            "share": c / total}
+            "share": c / total,
+            "model_effort": dict(r["mix"].most_common(3))}
     out["kind_share"] = {k: v / total for k, v in kinds.items()}
     att_total = sum(m["attempts"].values())
     if att_total:
@@ -274,13 +283,15 @@ def report(s, top, base=None):
     print("by kind:       " + "  ".join(
         "%s %s" % (k, pct(v).strip()) for k, v in sorted(s["kind_share"].items(), key=lambda kv: -kv[1])))
     print("")
-    print("%-24s %6s %8s %6s %7s %7s %7s %7s" % (
-        "role", "agents", "turns", "med.t", "ctx@1", "avg.ctx", "growth", "cost"))
+    print("%-24s %6s %8s %6s %7s %7s %7s %7s  %s" % (
+        "role", "agents", "turns", "med.t", "ctx@1", "avg.ctx", "growth", "cost", "model/effort (share of turns)"))
     ranked = sorted(s["roles"].items(), key=lambda kv: -kv[1]["share"])
     for name, r in ranked[:top]:
-        line = "%-24s %6d %8d %6d %7s %7s %7s %7s" % (
+        me = r.get("model_effort") or {}
+        me_txt = ", ".join("%s %d%%" % (k, round(100 * v / max(r["turns"], 1))) for k, v in me.items())
+        line = "%-24s %6d %8d %6d %7s %7s %7s %7s  %s" % (
             name[:24], r["agents"], r["turns"], r["median_turns"], kilo(r["first_ctx"]),
-            kilo(r["avg_ctx"]), pct(r["growth_share"]).strip(), pct(r["share"]).strip())
+            kilo(r["avg_ctx"]), pct(r["growth_share"]).strip(), pct(r["share"]).strip(), me_txt)
         if base and name in base.get("roles", {}):
             line += "   was %s" % pct(base["roles"][name]["share"]).strip()
         print(line)
@@ -318,8 +329,8 @@ def _write(path, lines):
             fh.write(json.dumps(d) + "\n")
 
 
-def _turn(mid, ts, inp, cw, cr, out):
-    return {"type": "assistant", "timestamp": ts, "message": {"id": mid, "usage": {
+def _turn(mid, ts, inp, cw, cr, out, model="claude-sonnet-5-5", effort="high"):
+    return {"type": "assistant", "timestamp": ts, "effort": effort, "message": {"id": mid, "model": model, "usage": {
         "input_tokens": inp, "cache_creation_input_tokens": cw,
         "cache_read_input_tokens": cr, "output_tokens": out}}}
 
@@ -378,6 +389,8 @@ def selftest():
         expect("class shares sum to 1", abs(sum(s["class_share"].values()) - 1) < 1e-9)
         empty = summarise(measure([root], "2030-01-01", None, w), w)
         expect("an empty window measures nothing", empty["files"] == 0 and not empty["total_units"])
+        expect("the model and effort each role ran at are recorded",
+               s["roles"]["build"]["model_effort"] == {"sonnet-5-5/high": 4})
         expect("the project path is encoded the way Claude Code stores it",
                encode_project("/root/.claude/x_y") == "-root--claude-x-y")
     finally:

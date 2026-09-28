@@ -9,6 +9,66 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.26.0 — 2026-09-28
+
+**Step 5 of the build kit: a loop session coordinates and never builds — each feature is built by one
+fresh sub-agent and verified by another — and the skill now writes the sub-agent definitions that carry
+their effort and context budget.** Both loop templates change (Step 10, said here as this repository
+requires), and a new write surface opens: `.claude/agents/roadmap-*.md`, option B with sub-agents only.
+
+**Why.** A loop is one conversation, and every turn re-reads everything in it; on the measured multi-agent
+build, re-reading context was about three quarters of the cost, and MakeContent's surviving sessions —
+the one-long-session pattern — averaged 423k tokens of context per turn. A loop that builds feature
+after feature in one conversation pays for feature one's work on every turn of feature ten.
+
+- **`<SUBAGENT-DISPOSITION>` now resolves to a paragraph**, defined in each profile's loop file beside
+  the template. Told the session can spawn sub-agents: for each feature, dispatch a BUILDER (handed the
+  start command and the worker half of the prompt, replying with one line), then a VERIFIER that is never
+  the builder's child (which both downstream skills require), judge the verdict with the gate's exit code
+  and a grep — never by opening the report — and dispatch a second builder only when the report names a
+  fix the prompt allows. Told it cannot: keep what enters the one conversation small, and Step 8 now says
+  plainly that option A in a fresh session per feature is cheaper than a loop without sub-agents.
+- **`scripts/write-agents.py`** (shipped) writes `roadmap-builder-a` (effort `xhigh`), `roadmap-builder`
+  (`high`) and `roadmap-verifier` (`high`), all `model: inherit`, each carrying the context budget in its
+  body. Claude Code reads a sub-agent's effort only from that frontmatter — documented, and there is no
+  per-call effort — and `CLAUDE_CODE_EFFORT_LEVEL` in the environment overrides it; Step 10 says both.
+  `high` is what the measured build ran its builders at (Sonnet 5, 99% of build turns); `xhigh` for tier
+  A and `high` for the verifier are starting points, not measurements. It never overwrites a changed file.
+- **The model stays the user's.** On the current price list cache reads cost the same on Opus 5.5 and
+  Sonnet 5.5 ($0.20/MTok), and they were most of the measured cost, so a cheaper model shrinks everything
+  but the largest part; Step 10 says so instead of choosing.
+- `measure-agents.py` now shows, per role, the model and effort its turns ran at — on the WordPress build:
+  build 99% `sonnet-5/high`, verify 78% `sonnet-5/high` and 22% `opus-5/high`, merge `sonnet-5/medium`.
+
+**Executed.** Round 1 (Opus 5.5, `xhigh`, on `loop-build`): the coordinator dispatched builder, verifier,
+builder, verifier — none a child of another — stopped on the two-strikes rule, left `tests/` byte-identical
+and recorded one `**Last run**:` line. Measured: the coordinator grew 41k → 88k tokens over 25 turns while
+the four workers grew and ended in their own contexts; context read over all five, 9.45M tokens. Had the
+same 112 turns run in one conversation, context would have reached roughly 380k and the total roughly 24M
+— an estimate from a linear model, not a measurement. It also showed the coordinator grew 47k for one
+feature, not "one line": workers replied in paragraphs, the coordinator opened files to judge, the verifier
+had no instructions of its own, `/loop` was handed on, and nobody owned the outcome record. All fixed in
+the paragraph above.
+
+Round 2 on the fixed text (Sonnet 5.5, a fresh copy, `.claude/agents/` written by `write-agents.py`):
+builder and verifier replied in a line or two, the coordinator judged with two commands without opening
+the report, **did not dispatch a second builder** because every fix the report named was forbidden, left
+`tests/` untouched and recorded the outcome once. The coordinator grew 40k → 55k over 12 turns; all
+three agents together read 1.15M tokens of context. **That is not a clean before/after**: the model and
+effort changed with the text, and round 1 ran two attempts. Four frictions were fixed afterwards and
+**not re-run**: the harness did not know the agent types (they are registered when a session starts in
+the project, which a test sub-agent is not) — the coordinator now falls back to a general sub-agent with
+the agent file's body first; the half of the prompt handed to workers now stops before the
+coordinator-only paragraphs; the gate's exit code is read without a pipe; and the deadlock rule ends the
+run itself instead of waiting for a second verification of an unchanged tree.
+
+A finding about the fixture, not the change: `loop-build`'s test says "b was proposed before a" while
+proposal order appears nowhere in the votes, and both rounds this time chose "first appearance" as the
+gray-area default, which makes the test read as wrong. Both stopped without bending it, which is what
+the fixture scores; earlier rounds had implemented a proposal order instead.
+
+---
+
 ## 3.25.0 — 2026-09-28
 
 **Step 7 of the build kit, scaled down by measuring it — and three defects the execution found in what

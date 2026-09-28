@@ -16,21 +16,9 @@ the numbering is continuous across the two files because it is one procedure. A 
 (`index-phase Step 4`, `decompose-phase Step 7`). Nothing is renumbered by the split.
 
 Step 6's placeholder table is the authority on `<ROADMAP-PATH>`, `<STATUS-PATH>` and
-`<BUILD-ORDER-TXT>`; Step 10 resolves all three against it. `<SUBAGENT-DISPOSITION>` is Step 8's, and
-Step 10 resolves it to one of exactly two sentences, **chosen by the downstream profile Phase 0
-confirmed** (handoff-seed.md, "Downstream profiles"). For `tlc-spec-driven`:
-
-- **the session can spawn sub-agents** → `Accept it: let that skill batch the feature's phases into
-  workers by its own rule, and keep the orchestrator on summaries rather than task detail.`
-- **it cannot** → `Decline it and execute inline in this window. Do not attempt to spawn anything.`
-
-For `tlc-spec-lean`, whose sub-agent questions are different — a size gate that fires only when its
-estimate exceeds its `budget`, and a Verifier that must be a fresh sub-agent:
-
-- **the session can spawn sub-agents** → `Dispatch a fresh sub-agent as the Verifier for every feature, exactly as that skill's verify reference prescribes, and at its size gate choose "handoff".`
-- **it cannot** → `You cannot spawn sub-agents: at its size gate choose "one builder", and write the verification through that skill's degraded path, "Verifier: self-verified (degraded - no sub-agent)". Do not attempt to spawn anything.`
-
-Never emit the placeholder itself, and never emit both.
+`<BUILD-ORDER-TXT>`; Step 10 resolves all three against it. `<SUBAGENT-DISPOSITION>` is Step 8's
+answer, and the paragraph it resolves to is in the loop file for the confirmed profile, beside the
+template it goes into — a run that emits no loop never needs it.
 
 ## Contents
 
@@ -103,27 +91,27 @@ question is answered, and option B's sweep is what answers it.
 
 **Option B only — one more question, and it is about capability, not preference:** *can the session
 they will run this in spawn sub-agents?* Claude Code can; other CLIs vary, and the same CLI varies
-with how it was started. It matters because the downstream skill **offers** phase-batch workers above
-a task threshold and then waits for an answer, and an unattended run has nobody to answer. Told yes,
-the prompt disposes of that offer by accepting it; told no, by declining it and executing inline.
-Left unasked, the run improvises, and both improvisations are wrong half the time.
+with how it was started. The answer decides how the loop spends the user's quota, so it is asked, never
+assumed, and Step 10 emits the matching paragraph from the loop file.
 
-**Under `tlc-spec-lean` the same question carries more weight, for a different reason.** That skill
-does not offer phase batches; it has a size gate that fires only over its `budget`, and — always — a
-Verifier that must be a fresh sub-agent, never the builder. A session that cannot spawn one cannot
-verify independently: the run then writes the report through that skill's own degraded path and its
-gate prints a warning on every feature. Say that in the same breath, so a "no" is chosen knowing that
-it buys a loop whose every PASS is a self-read.
+**Say what the answer buys, in numbers the user can check.** A loop is one conversation, and every turn
+of a conversation re-reads everything already in it: on a real multi-agent build, re-reading context
+was about three quarters of the cost, and every agent's context grew by roughly 2.5k tokens a turn.
+A loop that builds feature after feature in that one conversation therefore pays for feature one's
+work again on every turn of feature ten. Told **yes**, the prompt makes this session a coordinator:
+each feature is built by a fresh sub-agent and verified by another fresh one — never the builder's
+child, which is also what both downstream skills require of a verifier — and only one verdict line per
+feature stays here. Told **no**, the work stays in the one conversation under a strict budget on what
+enters it; say plainly that on a long roadmap this is the expensive path, and that option A — each
+feature in its own fresh session — costs less than a sub-agent-less loop, at the price of starting
+each one by hand. Neither answer makes the loop faster: features are still built one at a time, and
+the next never starts before this one has a verified PASS — that ordering is the dependency
+guarantee, not a scheduling choice.
 
-**Say what it buys, so the answer is informed — and it is not a faster loop.** Features are still
-built one at a time and the next never starts before this one has a verified PASS; that ordering is
-the dependency guarantee, not a scheduling choice. What batching buys is a **leaner main window**:
-that skill packs whole phases into workers of roughly seven tasks each, each reporting a compact
-summary, so the orchestrator's context does not accumulate every task's detail. On a long roadmap
-that is the difference between a loop still coherent at the end and one that has degraded. Say that
-plainly rather than promising a parallelism the loop cannot have. (Under `tlc-spec-lean` the honest
-answer is different: batching only appears over the size gate, and what spawning reliably buys is the
-**independence of the Verifier** — an author is the worst reader of their own work.)
+**Under `tlc-spec-lean` a "no" also costs independence.** Its Verifier must be a fresh sub-agent, never
+the builder; without one the run writes the report through that skill's degraded path and its gate
+warns on every feature. Say that in the same breath, so a "no" is chosen knowing that every PASS will
+be a self-read.
 
 Option A → skip to Step 10. Option B → Step 9.
 
@@ -358,11 +346,11 @@ same error in two files. Do not fall back to option A either; it has no target f
 
 Give the prompt **verbatim, in one copy-paste block** — the downstream skill is entered by the user
 typing its trigger, so a paraphrase is a broken handoff. Resolve the placeholders exactly as the
-table below prescribes — Step 6's table defines only four of the nine, and one of the nine must
+table below prescribes — Step 6's table defines only four of the ten, and one of the ten must
 not be resolved at all. Write the prose in the confirmed output language, but keep trigger phrases,
 feature names and file paths exactly as they are on disk.
 
-**Placeholders — resolve eight, leave the ninth exactly as written.** Capitalised run-time words in
+**Placeholders — resolve nine, leave the tenth exactly as written.** Capitalised run-time words in
 the templates (`DATE`, `FEATURE`, `ACCOUNT-FILE`) are not placeholders: the run fills them, and they
 stay as written. The two templates use one kind
 of placeholder they do not share, and mixing them up is the one way to emit a prompt that looks right
@@ -377,6 +365,7 @@ and cannot work:
 | `<ROADMAP-SKILL-DIR>` | substituted | Step 6's table — where this skill lives on the builder's disk, for the brief and status scripts |
 | `<downstream-skill>` | substituted | the skill confirmed at Phase 0 — its **name**, not its trigger phrase; both appear in the prompt and they are different strings |
 | `<DISCHARGED-LIST>` | substituted | resolved below; `none` when there are none |
+| `<SUBAGENT-DISPOSITION>` | substituted | the loop file's paragraph for Step 8's answer — option B only |
 | `<PROJECT-ROOT>` | substituted | the project root's absolute path — the lean gate runs from its own skill directory, so a relative root would point at the wrong tree |
 | `<current-feature>` | **literal — type the angle brackets** | nothing. It is the loop run's own per-iteration variable, defined inside the prompt itself |
 
@@ -437,7 +426,25 @@ the build, and a prompt that sends the builder to the roadmap file instead hands
 to carry on every turn to use one entry of it.
 
 **Option B — one roadmap in one loop.** *(One template per profile, each in its own file — see
-"Where the templates are" below. Emit exactly one.)* Tell the user first that `/loop` must be the literal first
+"Where the templates are" below. Emit exactly one.)*
+
+**When Step 8's answer was that the session can spawn sub-agents, write their definitions first:**
+
+```
+python3 <this-skill-dir>/scripts/write-agents.py --root <project-root>
+```
+
+It writes `.claude/agents/roadmap-builder-a.md`, `roadmap-builder.md` and `roadmap-verifier.md` —
+the agent types the loop's coordinator dispatches — each with `model: inherit`, an effort of its own
+(`xhigh` for a tier-A builder, `high` for the rest) and the context budget in its body. Claude Code
+reads a sub-agent's effort only from that frontmatter; a prompt cannot set it. It never overwrites a
+file that differs from its template. Tell the user it wrote them, and three things beside the
+prompt: that the loop's own session only coordinates, so `/effort medium` before pasting is enough
+for it; that a `CLAUDE_CODE_EFFORT_LEVEL` set in their environment overrides these efforts; and that
+the model stays theirs to choose — a cheaper one shrinks everything but cache reads, which on the
+current price list cost the same on Opus 5.5 and Sonnet 5.5 and were most of a measured build's cost.
+Harnesses that do not read `.claude/agents/` ignore the files; the loop then dispatches general
+sub-agents. Tell the user first that `/loop` must be the literal first
 thing in the message — it is their CLI's own loop command (Claude Code, Cursor, OpenCode all have
 one), and it is already baked into the front of the template, so it must be pasted as-is, not
 retyped after a greeting. This skill never runs that loop itself; it only writes the prompt.
