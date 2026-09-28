@@ -244,7 +244,7 @@ release_gate() {
     # feature whose name prefixes another's). A self-test nobody runs is a
     # decoration, so every release runs them; a missing script fails the gate.
     local scr
-    for scr in measure-agents.py feature-brief.py status-block.py write-agents.py; do
+    for scr in measure-agents.py feature-brief.py status-block.py write-agents.py plan-pipeline.py; do
         if [[ -f "$REPO_ROOT/scripts/$scr" ]]; then
             printf '\n%s\n' "Running the $scr self-test..."
             python3 "$REPO_ROOT/scripts/$scr" --selftest || ok=1
@@ -253,6 +253,15 @@ release_gate() {
             ok=1
         fi
     done
+
+    # The pipeline's control flow, against stubbed agents: free to run, and the only way
+    # to prove who runs after whom before a run spends the owner's quota for hours.
+    if command -v node >/dev/null 2>&1; then
+        printf '\n%s\n' "Running the pipeline control-flow check..."
+        node "$REPO_ROOT/scripts/check-pipeline.mjs" || ok=1
+    else
+        printf '\n! %s\n' "node not found — the pipeline control-flow check did not run." >&2
+    fi
 
     if [[ $ok -eq 0 ]]; then
         return 0

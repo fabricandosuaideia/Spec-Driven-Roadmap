@@ -9,6 +9,52 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.27.0 — 2026-09-28
+
+**Step 4 of the build kit: a pipeline the skill ships, not one each project has to invent.** A third
+handover option, C, Claude Code only: a Workflow script that builds one roadmap with a fresh agent per
+role, generalised from the WordPress AI Agent Manager pipeline whose costs this whole kit was measured
+on (v3.3 there), and driving the downstream TLC skill instead of hand-written specs.
+
+- **`scripts/roadmap-pipeline.js`** (shipped). Per feature: a BUILDER runs the downstream cycle through its
+  last commit with targeted tests only; a fresh PROVER rebases, runs the full gate once and commits a
+  `gate-receipt.json` with a code hash; the downstream skill's VERIFIER reuses that receipt instead of
+  re-running the suite and must report the completion gate's exit code, which the script — not the
+  verifier's word — requires to be 0; tier A adds an independent REVIEWER in parallel; a serialized
+  MERGER runs the gate on the exact tree and fast-forwards the main branch, pushing only when configured.
+  Attempts 5/4/3 by tier, the third told to write the shared invariant before any code; effort per role
+  and tier; lanes in git worktrees optional (parallelism buys time, not quota); one Last run line and
+  one line per feature back to the calling session, which is told not to monitor events.
+- **`scripts/plan-pipeline.py`** (shipped) prints the args: pending features decided by the downstream
+  skill's own completion gate, never by a report existing; question-only features never built; tiers by
+  `check-roadmap.py`'s rule; dependencies inside the one roadmap; the full gate command from
+  `docs/process/pipeline.json`, which it refuses until a person has set `"confirmed": true` — every PASS
+  the pipeline records is that command's verdict. Run over a copy of the WordPress project's docs and
+  `.specs` (never in the project itself): **24 features pending, exactly the 24 its own records list**.
+- **`scripts/check-pipeline.mjs`** (maintainer, in the release gate when `node` exists) runs the
+  pipeline against stubbed agents — no quota: 14 scenarios (order of roles, retries to the tier ceiling,
+  the invariant at attempt 3, dependants of a blocked feature skipped, the reviewer for tier A only,
+  efforts by role and tier, merges never overlapping across lanes, a cycle refused, a verifier claiming
+  pass over a failing gate refused), and 4 deliberate defects in the script, all caught.
+- Step 8 offers C with what it costs to set up; Step 9 closes every question for C as for B; Step 10 runs
+  `--init`, asks the user the one question that is theirs — the full gate command — and hands over a
+  prompt that asks for the workflow in the user's own words.
+
+**Not executed with real agents.** Running the Workflow tool needs the user's explicit request and spends
+their quota; this release proves the control flow on stubs and the planner on real data, and leaves the
+first real run — and `measure-agents.py`'s before/after on it — to the user's own projects.
+
+**Executed: the handover for option C**, by a blind agent (Sonnet 5.5) on `state-lean`: it ran `--init`,
+wrote the user's gate command with `"confirmed": true`, and emitted the prompt with every placeholder
+resolved. It found two defects, fixed and checked on that same tree: `--init` wrote `mainBranch: "main"`
+into a repository whose branch is `master`, so every merge would have failed — it now detects the real
+branch, and planning refuses a main branch that does not exist; and the Workflow `scriptPath` was
+relative — the planner's summary line now names the absolute path and the prompt uses it. The planner's
+real output for that tree then ran through the pipeline on stubs: every role in order, each prompt
+2.3-2.7k characters, since the long rules live in files the roles point at rather than in the prompt.
+
+---
+
 ## 3.26.0 — 2026-09-28
 
 **Step 5 of the build kit: a loop session coordinates and never builds — each feature is built by one

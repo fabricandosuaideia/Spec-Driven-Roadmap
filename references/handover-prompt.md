@@ -31,8 +31,8 @@ template it goes into — a run that emits no loop never needs it.
 ## Step 8 — Ask which implementation prompt to hand over
 
 The roadmap is done and the user now has to actually build from it. There are two legitimate ways to
-drive that, and **which one is the user's call — never pick for them, and never default to the loop
-because it looks faster.** Ask, in the confirmed output language:
+drive that — three in Claude Code — and **which one is the user's call — never pick for them, and never
+default to the loop because it looks faster.** Ask, in the confirmed output language:
 
 - **Option A — one feature at a time.** They get the prompt for `<target>` only, run it, and come
   back for the next feature when it passes. Full control, a checkpoint per feature.
@@ -54,6 +54,18 @@ because it looks faster.** Ask, in the confirmed output language:
   default** — every feature that consumes one would be built unattended against names that can still
   move. Option A is unaffected, because a human is present. The user may still choose B; then Step 10
   names the provisional producers beside the prompt, in the surrounding message.
+
+- **Option C — a pipeline run, Claude Code only.** The same one roadmap, built by a Workflow script
+  this skill ships (`scripts/roadmap-pipeline.js`) instead of one long conversation: per feature a
+  builder, a fresh prover that runs the full gate once and writes a receipt, the downstream skill's
+  verifier — plus an independent reviewer for risk tier A — and a serialized merge; efforts set per
+  role and tier; up to 5/4/3 attempts by tier, the third told to write the invariant first. Offer it
+  only when the session is Claude Code (the Workflow tool exists nowhere else) and name what it
+  costs to set up: the project's full gate command has to be confirmed once, because every PASS the
+  pipeline records rests on it. Same precondition as B — zero open questions — and the same scope,
+  one roadmap. Say why it spends less than a loop without sub-agents: every role is a short fresh
+  conversation, the verifier reuses the prover's receipt instead of re-running the suite, and this
+  session only receives one line per feature at the end.
 
 Everywhere below, **"the roadmap"** means that one file and its build order — `<ROADMAP-PATH>` and
 `<BUILD-ORDER-TXT>` exactly as Step 6's table resolves them for the target section.
@@ -113,11 +125,11 @@ the builder; without one the run writes the report through that skill's degraded
 warns on every feature. Say that in the same breath, so a "no" is chosen knowing that every PASS will
 be a self-read.
 
-Option A → skip to Step 10. Option B → Step 9.
+Option A → skip to Step 10. Option B or C → Step 9.
 
 ## Step 9 — Loop option only: close every open question first
 
-*Only when the user chose option B.*
+*Only when the user chose option B or C* — both run unattended, so both need every question closed.
 
 A loop runs unattended. Every ambiguity rule 1 refused to guess is a place the run would either stall
 or silently guess — so all of them get closed **before** the prompt exists. Announce that first: say
@@ -542,7 +554,42 @@ where every call made on the user's behalf comes back, each with the reason it w
 here only — the prompt already carries the instruction that writes them, and reviewing them is the
 user's job after the run, not an instruction the run can act on.
 
-**Then the session warning — both options, every time, unconditionally.** Do not omit it because the
+**Option C — the pipeline.** Two things happen here before the prompt, because the prompt cannot do
+them for an unattended run:
+
+1. Write the config, then ask the one question that is the user's:
+
+   ```
+   python3 <this-skill-dir>/scripts/plan-pipeline.py --root <project-root> --init
+   ```
+
+   It writes `docs/process/pipeline.json` with a guessed full gate command and `"confirmed": false`.
+   Show the user the guess and ask for the command that runs **everything** their merges must pass —
+   typecheck, lint and the whole suite. Write their answer and `"confirmed": true` into the file.
+   Never confirm it yourself: `plan-pipeline.py` refuses an unconfirmed config because every PASS the
+   pipeline records is that command's verdict.
+2. If the session can spawn sub-agents at all, nothing else is needed; the pipeline sets each role's
+   effort itself (`effort` in `pipeline.json`, per role and tier) and does not use the agent files.
+
+Then hand over this prompt, placeholders resolved from the table above:
+
+```
+Run the roadmap pipeline for <ROADMAP-PATH>. First run
+`python3 <ROADMAP-SKILL-DIR>/scripts/plan-pipeline.py --root <PROJECT-ROOT> --roadmap <ROADMAP-PATH>`
+and read only the one line it prints to stderr; if it exits non-zero, report that line and stop.
+Otherwise launch the Workflow tool with the absolute scriptPath that line names and the JSON the
+command printed as args. I am asking you to
+run this workflow. Do not arm a monitor on its events and do not comment on them while it runs — each
+notification you answer re-reads this whole conversation. When it returns, report its lines, and
+for every blocked feature name the issue it was blocked on.
+```
+
+Say, beside it: the pipeline merges into the main branch locally and pushes only if `pipeline.json`
+says `"push": true`; blocked features and their last issues land in `docs/roadmap-history.md` through
+the Last run line; and `scripts/measure-agents.py` afterwards shows what it cost, by role — the
+before/after that tells them whether the levers worked on their project.
+
+**Then the session warning — every option, every time, unconditionally.** Do not omit it because the
 option looked simple or the session felt short. Render it prominently, in the confirmed output
 language:
 

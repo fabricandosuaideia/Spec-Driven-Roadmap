@@ -905,16 +905,16 @@ this procedure ends here:
 - **Nothing was seeded** (work in flight, or every feature already done). There is no target to
   build; offering a prompt would point at nothing. When the cause is work in flight, add that this is
   a pause rather than the end of the line: once that feature closes and this seed runs again, the
-  user gets a choice between a command that builds one feature and a single `/loop` run across a
-  whole roadmap. Say only that the choice will be there — no command, no trigger phrase and no
+  user gets a choice between a command that builds one feature, a single `/loop` run across a
+  whole roadmap, and — in Claude Code — a pipeline run over that roadmap. Say only that the choice will be there — no command, no trigger phrase and no
   template is handed over at this exit, because the prompt is Step 10's to emit and only after Step 8
   has asked which one the user wants.
 - **Step 6 was skipped** — no downstream skill, or a confirmed one whose schema you could not read.
   Say the roadmap is complete and usable as it stands, name the target feature and point at Step 5's
   `## Status` for the backlog position, name what to install, and say that re-running this skill's
   seed afterwards completes the chain without re-running Phase 2. Add that the same choice waits on
-  the other side of that install — one feature at a time, or one `/loop` run across a whole
-  roadmap — and that it is conditional on installing the skill, since neither shape exists without
+  the other side of that install — one feature at a time, one `/loop` run across a whole
+  roadmap, or, in Claude Code, a pipeline run — and that it is conditional on installing the skill, since neither shape exists without
   one. Name only the existence of that choice. There is no confirmed trigger phrase, so there is no
   prompt to hand over — never improvise one from `tlc-spec-driven`'s, and that same prohibition is
   why the sentence above carries no command with it.

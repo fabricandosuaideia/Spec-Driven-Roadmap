@@ -237,9 +237,9 @@ def check_installer_payload(root):
         r"REQUIRED_REFS=\(([^)]*)\)", sh).group(1))) if "REQUIRED_REFS=(" in sh else set()
     ps_refs = set(re.findall(r"'([\w.-]+\.md)'", re.search(
         r"\$RequiredRefs = @\((.*?)\)", ps, re.S).group(1))) if "$RequiredRefs = @(" in ps else set()
-    sh_scr = set(re.findall(r"[\w-]+\.py", re.search(
+    sh_scr = set(re.findall(r"[\w-]+\.(?:py|js)", re.search(
         r"REQUIRED_SCRIPTS=\(([^)]*)\)", sh).group(1))) if "REQUIRED_SCRIPTS=(" in sh else set()
-    ps_scr = set(re.findall(r"'([\w.-]+\.py)'", re.search(
+    ps_scr = set(re.findall(r"'([\w.-]+\.(?:py|js))'", re.search(
         r"\$RequiredScripts = @\((.*?)\)", ps, re.S).group(1))) if "$RequiredScripts = @(" in ps else set()
 
     check("both installers require the same references",
