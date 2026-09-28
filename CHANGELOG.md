@@ -9,6 +9,76 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.23.0 — 2026-09-28
+
+**Step 2 of the build kit: the roadmap files agents are pointed at stop growing, and a builder reads
+one feature's slice instead of the whole backlog.** Step 10's templates are touched (said here, as
+this repository requires) and so is Step 6's **Next step** text; the eight-field and seven-field
+Handoff schemas are not.
+
+**What the two real projects showed.** MakeContent's `docs/ROADMAP-INDEX.md` was 192 KB, 120 KB of it
+`## Status` — twelve paragraphs of `/loop` narrative and ten `### Encerramento` sub-headings written by
+unattended runs. The seed could not shrink it: Step 5 replaced the body only up to the next heading of
+**any** level, on the stated premise that the block never contains one, so it stopped at the first
+`###` a run had added and every narrative survived every re-seed. WordPress AI Agent Manager's section
+roadmaps are 80-115 KB each. Every Handoff and loop prompt pointed agents at these files, and an agent
+pays for what it reads on every later turn.
+
+- **`scripts/status-block.py`** (shipped). `--body` is the seed's rewrite: the block ends at the next
+  `#`/`##` heading or at a `### <name>` that is a feature in a `docs/roadmap*.txt`, fence-aware; the old
+  body goes verbatim to **`docs/roadmap-history.md`** first; the `**Last run**:` line is carried over; a
+  body carrying a heading is refused with nothing written. `--last-run` is a loop run's outcome: one
+  line in the block, the full account in the history. The history file is a log for people and nothing
+  points an agent at it. On a copy of MakeContent's index: **197,848 → 75,940 bytes**, the 124 KB moved
+  to the history, every other byte of the file identical.
+- **`scripts/feature-brief.py <feature>`** (shipped): the feature's entry verbatim, the open questions
+  and gray areas naming it (word-bounded, so a name that prefixes another does not steal its lines),
+  cross-cutting questions whose `affects:` reaches it, the contracts it consumes, and `## Cross-Cutting
+  Decisions` whole. It reuses `check-roadmap.py`'s parsers rather than keeping a second copy. Measured
+  over every feature of both projects (168 and 200, zero failures): the brief is a **median 10.8% and
+  9.0%** of the roadmap-plus-status files it replaces. That is bytes, not cost: on WordPress the
+  pipeline's builders mostly grepped the entry instead of opening the whole file (32 whole-file reads in
+  490 builders), so the saving there is smaller than the ratio; the ratio is what an agent that follows
+  the old pointer literally would have loaded.
+- **Step 5** writes the block with the script (the same rule by hand when no code tool exists) and gains
+  the `**Last run**:` line. **Step 6**'s Next step, **Step 10**'s Option A and both loop templates, and
+  the `CLAUDE.md` bridge lines send the builder to the brief and say never to open the roadmap whole;
+  the loop records its outcome with `--last-run` instead of writing into `## Status`. A new placeholder,
+  `<ROADMAP-SKILL-DIR>`, says where this skill lives on the builder's disk.
+- `run-benchmark.py` now installs the runtime scripts from `install.sh`'s own list: its hand-kept copy
+  had fallen two scripts behind. The release gate runs all three shipped self-tests. The self-tests
+  were checked by injecting defects: 7 of 7 caught in each script — after a first pass whose copies ran
+  from the wrong directory and "caught" everything for the wrong reason, which is why every mutant
+  report now shows the failing assertion.
+
+**Executed.** The `state-lean` scenario's `## Status` now carries a loop narrative, a `### Encerramento`
+and a `**Last run**:` line, and three new assertions (bounded, archived, last-run kept once). An
+untouched tree fails 4 of 14. Two blind agents, one copy each: **14/14 and 14/14**. Their friction was
+the same and was fixed: `feature-brief.py` left a `__pycache__` in the builder's project; the Status
+stamp and one other line named `validation.md` in a lean project; "Two surfaces" still called
+`tlc-spec-driven` the default; a carried `**Last run**:` can contradict the counts (the counts win, and
+it is said); the "needs fixes" Next step kept `create it at` beside "already exists" (now replaced).
+Four older gaps both agents hit were closed too: a seed run without Phase 0 now says where the skill and
+trigger come from; `Uncommitted` is sampled before the seed writes and excludes the seed's own files;
+single-section Status uses the same labels; a directory that is itself another entry is never name
+drift.
+
+**A second round on the fixed text** (fresh agent, fresh copy): **14/14**, no `__pycache__`, `Uncommitted`
+sampled before the seed's writes, and the skill reported as detected rather than confirmed. Three
+small points it raised were fixed afterwards **and not re-run**: the `git status` sample is now told
+at the top of Step 1, where an in-order reader meets it; the sub-bullet allowance names all three
+facts that earn one; and a lean `Where` leads with the refused check's id, as that skill's schema
+prescribes. Still open, noted by all three agents: `specify feature` is lean's entry into Plan, and
+lean has no separate trigger for "fix and re-verify", so a needs-fixes Next step relies on its own
+sentence to steer the builder.
+
+**Not done here.** `convert-to-multi.py` still moves `## Status` with the old any-heading cut; a project
+converted while its block is bloated leaves the narrative behind in the renamed roadmap. Rewriting the
+block with the seed before converting avoids it. No builder was run following the brief, so whether a
+real builder obeys "do not open the roadmap whole" is not measured.
+
+---
+
 ## 3.22.0 — 2026-09-28
 
 **The skill can now measure what agent runs cost — step 1 of making every project it plans cheaper

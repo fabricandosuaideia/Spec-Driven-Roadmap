@@ -42,8 +42,8 @@ skill's normal flow, driven by the user or the general agent.
 
 ## Two surfaces, two lifetimes
 
-**Do not put the backlog picture in `## Handoff`.** For `tlc-spec-driven` (the default downstream
-assumption), `references/memory.md` defines that section as a *"pause snapshot (~500 tokens,
+**Do not put the backlog picture in `## Handoff`.** For `tlc-spec-driven` (the older of the two
+downstream skills; `tlc-spec-lean`'s handoff is overwritten the same way), `references/memory.md` defines that section as a *"pause snapshot (~500 tokens,
 overwritten each pause)"*, with this row in its read/write trigger table:
 
     | Pause work / end of session | ## Handoff | Replace - overwrite Handoff section only |
@@ -102,7 +102,9 @@ handover-prompt.md read their column from here instead of restating it.
 | Does it stop for a human? | yes: at the end of Plan (the plan is reviewed), and at the size gate when the estimate exceeds its `budget` | yes: Discuss is interactive; task-batch sub-agents are offered and wait |
 
 **Detect which is installed by reading the disk**, in Step 2's search order, and say which path
-answered. **When both are found**, the project's choice decides: a `.specs/` tree already holding
+answered. **A seed run on its own** — no Phase 0 in this session, which is normal for a re-seed — takes
+the two things Phase 0 would have confirmed from here: the skill from this detection, and its trigger
+from the table. Say in Step 7 that they were detected rather than confirmed. **When both are found**, the project's choice decides: a `.specs/` tree already holding
 `plan.md`/`checks.md` is a lean project, one holding `spec.md`/`tasks.md` is a driven one; when the
 tree says nothing, ask (scope-phase.md, Preamble) rather than picking. A tree holding **both** is a
 project mid-migration: Step 2 judges each feature by the artifacts it actually has, and Step 6 writes
@@ -144,10 +146,13 @@ step never does is resume the work itself; that belongs to the downstream skill,
 moved.
 
 Never run this speculatively "just to check" — it is a write step, not a status query. To answer
-"what's next?" without writing, read `docs/roadmap*.txt` and the relevant `validation.md` files
+"what's next?" without writing, read `docs/roadmap*.txt` and the relevant report files (`validation.md`, or `verification.md` under `tlc-spec-lean`)
 directly.
 
 ## Step 1 — Determine whether real work is in flight
+
+**First, before anything below writes a byte: run `git status --porcelain` and keep its output** —
+Step 6's `Uncommitted` field reports it, and sampled any later it lists this seed's own writes.
 
 Read `.specs/STATE.md` if it exists. The question is **not** "is the Handoff non-empty?" — this
 skill's own prior seed always leaves it non-empty, and so does every downstream pause, so an
@@ -536,7 +541,8 @@ test, whatever its objective says.
 One line per roadmap, so the whole backlog shape is visible — not a single disconnected pointer.
 
 - **Single-section mode:** one line for `docs/ROADMAP.md`: how many of its features are done
-  (Step 2's test) out of the total in `docs/roadmap.txt`.
+  (Step 2's test) out of the total in `docs/roadmap.txt`, with the same four labels multi-section uses
+  below (`DONE`, `IN PROGRESS`, `NOT STARTED`; `NOT YET DECOMPOSED` cannot occur here).
 - **Multi-section mode:** walk the topological list in `docs/ROADMAP-INDEX.md`'s **Ordering** section
   — that is build order; the roadmaps table is not necessarily sorted. Locate it by that name, never
   by its position in the output shape: inserting one block renumbers every later one. For
@@ -575,7 +581,9 @@ target; it is what Steps 7 and 8 need in front of them.
 **Guard against name drift.** If a roadmap name has no `.specs/features/<name>/` directory but a
 similarly-named one exists (`auth-login` vs. `auth-signin`), do not count it as unbuilt — that is
 almost certainly the same feature built under a different name. Report the mismatch and stop, rather
-than seeding a pointer that would rebuild shipped work.
+than seeding a pointer that would rebuild shipped work. **A directory whose name is itself another
+entry of the roadmaps is that entry, never drift:** `notes-list/` beside an unbuilt `notes-tag` is two
+features sharing a prefix, and stopping on it would freeze every backlog whose names share one.
 
 **Do not assert what you did not check.** Step 6's template asks for `Completed` / `In-progress`. If
 the target has partial work on disk (a `spec.md`, a `tasks.md` with unchecked boxes) but no PASS,
@@ -591,23 +599,36 @@ end there.
 ## Step 5 — Write the durable Status block (this skill's own file)
 
 Insert or replace a `## Status` block in `docs/ROADMAP-INDEX.md` (multi-section) or `docs/ROADMAP.md`
-(single-section): if the heading is already there — both output shapes leave it in place — replace
-only its body, **up to the next heading of any level** (`#`, `##`, `###`, …), respecting code
-fences. Not "up to the next `##`": in a roadmap the feature entries are bare `### <feature-name>`
-sections with no `##` container of their own, so a cut that stops only at `##` swallows every one of
-them and deletes the feature list. That is the same cut `split_block` makes in
-`scripts/convert-to-multi.py`, for the same reason and with the same fence handling — this block's
-own body never contains a heading, so the stricter rule loses nothing. The failure is silent where it
-bites: `docs/roadmap.txt` survives, so the next seed still finds targets and nobody notices until
-someone opens the roadmap. If the heading is missing (a legacy or hand-made file), insert it
-immediately after the H1 title, or at the very top when the file has none. Leave the rest of the file
-untouched — `## Cross-Cutting Decisions` lives in this same file and is never yours to rewrite here.
+(single-section). **Write it with the script**, from this skill's own `scripts/` (the directory
+Step 5's version paragraph below locates):
+
+```
+python3 <this-skill-dir>/scripts/status-block.py <STATUS-PATH> --body <file holding the new body>
+```
+
+It replaces the body, appends the previous body verbatim to `docs/roadmap-history.md` first, carries
+the block's `**Last run**:` line over, inserts the block after the H1 when it is missing, and refuses
+— writing nothing — a body that contains a heading. **Why a script, and why the old rule failed.** The
+block ends at the next `#`/`##` heading, or at a `### <name>` heading whose name is a feature in a
+`docs/roadmap*.txt`: single-section roadmaps carry their feature entries as bare `### <feature-name>`
+sections with no `##` container, so a cut that stops only at `##` would swallow them. The rule this
+replaced stopped at the next heading of **any** level, on the premise that this block never contains a
+heading of its own — and on a real project unattended runs had written `###` sub-headings and
+paragraphs of narrative into it, which that cut could never reach: the block stood at 120 KB, and
+every agent pointed at it paid for all of it on every turn. `docs/roadmap-history.md` is a log for
+people; nothing in this skill ever points an agent at it, and neither may you.
+
+**No code-execution tool?** Apply the same rule by hand: the extent above (fence-aware), the previous
+body appended under a dated `##` heading to `docs/roadmap-history.md` before you replace it, the
+`**Last run**:` line kept, no heading in the new body — and say in Step 7 that the degraded path ran.
+Leave the rest of the file untouched — `## Cross-Cutting Decisions` lives in this same file and is
+never yours to rewrite here.
 
 ```markdown
 ## Status
 
 _Backlog position. Regenerated by spec-driven-roadmap v<version> on <YYYY-MM-DD>; feature status is
-derived from `.specs/features/<name>/validation.md`, never hand-edited here._
+derived from each feature's report under `.specs/features/<name>/`, never hand-edited here._
 
 - `docs/ROADMAP-<slugA>.md` — DONE (4/4, verified PASS)
 - `docs/ROADMAP-<slugB>.md` — IN PROGRESS (2/5 verified PASS)
@@ -619,7 +640,16 @@ derived from `.specs/features/<name>/validation.md`, never hand-edited here._
 flagged dimensions.
 
 **Handoff**: seeded to `.specs/STATE.md` — or one of the not-seeded states below
+
+**Last run**: <carried over from the previous block; absent until a run has written one>
 ```
+
+**`**Last run**:` is the loop's line, not yours** — one line, replaced by each run through
+`status-block.py --last-run`, which sends the run's full account to `docs/roadmap-history.md`
+(handover-prompt.md Step 10). The script carries it over when you rewrite the block; never write it
+yourself and never expand it. It is the run's own claim, not a verdict: when it disagrees with the
+counts Step 2 produced (a run that recorded PASS on a feature the gate refuses), the counts win — add
+one sub-bullet saying which feature it misstates, and say it in Step 7.
 
 **Two fields in that italic header line are resolved, not copied.** `<version>` is **this** skill's
 own version — the `metadata.version` value in its own `SKILL.md` frontmatter, read at run time,
@@ -670,10 +700,12 @@ re-run exit writes this instead:
 Step 5 runs before Step 6, so decide from Step 1's evidence test and Step 6's own two skip cases. One
 line, regenerated on every seed, so it cannot go stale.
 
-One exception to "counts, names and paths": when the target is partly built, add **one** sub-bullet
-under its line naming the state in a sentence (`on disk but not done: a surviving mutant`), and one
-more if the in-flight test looked at a feature other than the target (Step 1's honesty note). Those
-are facts about position, not feature detail.
+One exception to "counts, names and paths": up to three one-sentence sub-bullets, one per fact that
+applies, under the line of the roadmap holding the target (in single-section mode, the
+`docs/ROADMAP.md` line) — the target is partly built (`notes-list on disk but not done: a surviving
+mutant`); the in-flight test looked at a feature other than the target (Step 1's honesty note); the
+`**Last run**:` line misstates a feature (see that line's paragraph above). Those are facts about
+position, not feature detail, and nothing else earns a sub-bullet.
 
 Keep it to counts, names and paths. Never copy feature objectives or task lists here — that detail
 already lives in the roadmap body below it. The version and the date are part of the block's own
@@ -716,7 +748,7 @@ For `tlc-spec-lean` 1.1.0, exactly these seven — bold label, colon, **no bulle
 **Feature**: <target feature name>
 **Where**: not started - no plan.md on disk yet
 **In progress**: none
-**Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Plan source: `<ROADMAP-PATH>` section `<target>` (objective, scope-units, dependencies, flagged dimensions and open questions are there — read it before asking anything). Project-wide decisions already settled: `<STATUS-PATH>` `## Cross-Cutting Decisions` — read them before planning and do not re-decide what they answer. Backlog position: `<STATUS-PATH>` `## Status`.
+**Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Plan source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints this feature's entry from `<ROADMAP-PATH>`, the open questions and gray areas naming it, the contracts it consumes and the project-wide `## Cross-Cutting Decisions` (settled: read them before planning and do not re-decide what they answer). Do not open `<ROADMAP-PATH>` whole; if the script cannot run, read only its `### <target>` entry and the lines naming `<target>`. Backlog position: `<STATUS-PATH>` `## Status`.
 **Blockers**: none
 **Uncommitted**: none
 **Branch**: <output of `git branch --show-current`>
@@ -731,7 +763,7 @@ For `tlc-spec-driven` v3.x, exactly these eight:
 - **Phase / Task**: not started — no spec.md on disk yet
 - **Completed**: none
 - **In-progress** (file:line): none
-- **Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Spec source: `<ROADMAP-PATH>` section `<target>` (objective, scope-units, dependencies, flagged dimensions and open questions are there — read it before clarifying). Project-wide decisions already settled: `<STATUS-PATH>` `## Cross-Cutting Decisions` — read before Discuss and do not re-decide what it answers. Backlog position: `<STATUS-PATH>` `## Status`.
+- **Next step**: specify feature `<target>` — create it at `.specs/features/<target>/` using that exact directory name. Spec source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints this feature's entry from `<ROADMAP-PATH>`, the open questions and gray areas naming it, the contracts it consumes and the project-wide `## Cross-Cutting Decisions` (settled: read before Discuss and do not re-decide what it answers). Do not open `<ROADMAP-PATH>` whole; if the script cannot run, read only its `### <target>` entry and the lines naming `<target>`. Backlog position: `<STATUS-PATH>` `## Status`.
 - **Blockers**: none
 - **Uncommitted files**: none
 - **Branch**: <output of `git branch --show-current`>
@@ -745,18 +777,26 @@ at a file that does not exist:
 | `<ROADMAP-PATH>` | `docs/ROADMAP-<slug>.md` | `docs/ROADMAP.md` |
 | `<STATUS-PATH>` | `docs/ROADMAP-INDEX.md` | `docs/ROADMAP.md` |
 | `<BUILD-ORDER-TXT>` | `docs/roadmap-<slug>.txt` (from the index's **Build-order file** column) | `docs/roadmap.txt` |
+| `<ROADMAP-SKILL-DIR>` | this skill's own directory as installed — relative to the project root when it sits inside it (`.claude/skills/spec-driven-roadmap`), absolute otherwise | the same |
 
 `<STATUS-PATH>` carries **both** project-level blocks — `## Status` and `## Cross-Cutting Decisions`
 (decompose-phase Step 7a) — which is why one placeholder serves both references above. They live
 together for the same reason: exactly one of each exists per project. `<BUILD-ORDER-TXT>` is unused
 by the Handoff itself; it lives here because Step 10 resolves its placeholders against this one table.
+`<ROADMAP-SKILL-DIR>` is the one that is not a roadmap path: the brief script is this skill's, so the
+Handoff has to say where this skill lives on the builder's disk. Resolve it from the path of this
+skill's own `SKILL.md` — the same file Step 5 reads the version from — never from memory.
 
 Notes on the fields that carry real weight:
 
 - **Next step** is the highest-value field in this file: it is the one place both the downstream
   skill's resume *and* the human read. It must carry (a) the trigger phrase confirmed at Phase 0,
   (b) the exact directory name so the built feature matches the roadmap's name, (c) the roadmap
-  path, and (d) the pointer to `## Cross-Cutting Decisions`. Without (c) the entire Phase 2 output —
+  path — through the brief command, with the path kept as its fallback — and (d) the pointer to
+  `## Cross-Cutting Decisions`, which the brief prints whole. **Why the brief and not the file:** the
+  roadmap is shared by the whole backlog, and on two real projects its files reached 80-190 KB; a
+  builder that opens one to use a single entry carries all of it on every later turn. Measured on
+  those two projects, the brief is a median 9-11% of the roadmap and status files it replaces. Without (c) the entire Phase 2 output —
   objective, scope-units, dependencies, sizing, dimensions — reaches nothing, and the user gets
   re-interviewed on scope this skill already resolved. Without (d) the same happens to decompose-phase
   Step 7a: that skill's Discuss starts from `spec.md` and resolves the rest from the code, and neither
@@ -766,12 +806,15 @@ Notes on the fields that carry real weight:
   inconsistently, which is worse than not having asked at all.
 - **When the target already has artifacts — the template's `not started` line is then false.** Step 4
   says not to assert what you did not check; this is the wording. `Where` (lean) or `Phase / Task`
-  (driven) names what is on disk and the state of its report, in one line: `plan.md and checks.md on
+  (driven) names what is on disk and the state of its report, in one line — for lean, led by the id of
+  the check the report refuses when there is one, since its schema is `<check id> - <what is done,
+  what is not>`: `plan.md and checks.md on
   disk; verification.md says PASS but a fault row shows a surviving mutant — not done, needs fixes`.
   The trigger in **Next step** stays `specify feature`, because it is the one phrase this skill has
-  confirmed, but the clause is then followed by: `Artifacts already exist at
-  .specs/features/<target>/ — read them and the report first and do not start the plan over.` A FAIL
-  or refused report is *needs fixes*, never *unstarted*.
+  confirmed, but its `create it at …` clause is **replaced** — the directory is not to be created,
+  it exists — by: `its directory .specs/features/<target>/ already exists — read its artifacts and
+  its report first, fix what the report refuses, and do not start the plan over`. A FAIL or refused
+  report is *needs fixes*, never *unstarted*.
 - **What the profiles change in Next step, and only that.** The four clauses (a)-(d) are the same for
   both. The word differs: `tlc-spec-driven` reads `<STATUS-PATH>` before its **Discuss**, while
   `tlc-spec-lean` has no Discuss and reads it before **planning** — write the word the confirmed
@@ -782,6 +825,9 @@ Notes on the fields that carry real weight:
 - **Branch** is unconditional. Obtain it with `git branch --show-current`; use `none` only outside a
   git repo.
 - **Uncommitted files** (lean: `**Uncommitted**`) — report what `git status --porcelain` actually shows, not a blind `none`.
+  **Sample it at Step 1, before this seed writes anything**, and never list the files this seed
+  itself writes (`<STATUS-PATH>`, `docs/roadmap-history.md`, `.specs/STATE.md`): the field describes
+  the work the downstream skill resumes, and the seed's own writes are not that work.
   The downstream skill's resume reconciles this field against git, so a false `none` is a claim it
   will catch and have to work around. Outside a git repo that command errors rather than returning
   an empty list, so there is nothing to report: write exactly `none — not a git repository`. The

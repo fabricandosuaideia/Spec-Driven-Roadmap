@@ -285,7 +285,10 @@ def install_skills(proj, scenario):
     os.makedirs(os.path.join(dest, "scripts"), exist_ok=True)
     shutil.copyfile(os.path.join(REPO, "SKILL.md"), os.path.join(dest, "SKILL.md"))
     copy_tree(os.path.join(REPO, "references"), os.path.join(dest, "references"))
-    for name in ("check-roadmap.py", "convert-to-multi.py"):
+    # The installer's own list, not a copy of it: a third hand-kept list of the
+    # runtime scripts had already fallen two scripts behind when this was written.
+    m = re.search(r"REQUIRED_SCRIPTS=\(([^)]*)\)", read(os.path.join(REPO, "install.sh")))
+    for name in (m.group(1).split() if m else ()):
         shutil.copyfile(os.path.join(REPO, "scripts", name),
                         os.path.join(dest, "scripts", name))
 
@@ -482,7 +485,16 @@ def score_state(proj, scenario, before):
                    for f in now["feature_dirs"] for x in ("spec.md", "validation.md")),
            "a downstream artifact was authored (rule 10)")
         status = read(os.path.join(proj, "docs", "ROADMAP.md"))
-        sm = re.search(r"^##\s+Status\s*$(.*?)(?=^#)", status, re.M | re.S)
+        sm = re.search(r"^##\s+Status\s*$(.*?)(?=^#{1,2}\s|^###\s+`?notes-)", status, re.M | re.S)
+        body_s = sm.group(1) if sm else ""
+        ck("`## Status` carries no heading and no run narrative of its own (bounded)",
+           bool(sm) and "###" not in body_s and "Execução autônoma" not in body_s,
+           "the fixture's loop narrative or its ### Encerramento is still inside the block")
+        hist = read(os.path.join(proj, "docs", "roadmap-history.md"))
+        ck("the old block was archived to docs/roadmap-history.md, not lost",
+           "Encerramento" in hist and "Execução autônoma" in hist, "docs/roadmap-history.md lacks it")
+        ck("the loop's **Last run** line survived the rewrite, once",
+           body_s.count("**Last run**:") == 1, "found %d" % body_s.count("**Last run**:"))
         ck("`## Status` names notes-list as next", bool(sm) and "notes-list" in sm.group(1)
            and re.search(r"Next feature\*\*:[^\n]*notes-list", sm.group(1)) is not None,
            "Status block: %s" % (sm.group(1).strip()[:200] if sm else "missing"))

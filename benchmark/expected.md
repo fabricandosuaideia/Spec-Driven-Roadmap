@@ -206,7 +206,14 @@ Asserted by `run-benchmark.py score`: the Handoff carries exactly `Feature`, `Wh
 `Next step`, `Blockers`, `Uncommitted`, `Branch`, in that order, as bare `**Label**:` lines; none of
 `Phase / Task`, `Completed`, `In-progress`, `Uncommitted files`; `Feature` is `notes-list`; `Where` does
 not begin `not started`; no `spec.md` or `validation.md` appears under `.specs/features/`; and the
-`## Status` block names `notes-list` as the next feature. **A run that writes the eight-field driven
+`## Status` block names `notes-list` as the next feature.
+
+**Since 3.23.0 the fixture's `## Status` is bloated the way real ones got**: a `**Last run**:` line, a
+paragraph a loop run wrote, and a `### Encerramento` sub-heading. A correct seed rewrites the block
+with `scripts/status-block.py` (or the same rule by hand): the block ends up with no heading and no
+narrative, the old body is appended verbatim to `docs/roadmap-history.md`, and the `**Last run**:` line
+survives exactly once. The old cut — to the next heading of any level — stops at `### Encerramento`
+and leaves the narrative in place, which is the defect the scenario now plants. **A run that writes the eight-field driven
 Handoff reaches every conclusion above correctly and still fails the third assertion — which is the
 point of the scenario:** the reading skill would not recognise the fields.
 

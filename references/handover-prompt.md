@@ -358,11 +358,11 @@ same error in two files. Do not fall back to option A either; it has no target f
 
 Give the prompt **verbatim, in one copy-paste block** — the downstream skill is entered by the user
 typing its trigger, so a paraphrase is a broken handoff. Resolve the placeholders exactly as the
-table below prescribes — Step 6's table defines only three of the seven, and one of the seven must
+table below prescribes — Step 6's table defines only four of the eight, and one of the eight must
 not be resolved at all. Write the prose in the confirmed output language, but keep trigger phrases,
 feature names and file paths exactly as they are on disk.
 
-**Placeholders — resolve six, leave the seventh exactly as written.** The two templates use one kind
+**Placeholders — resolve seven, leave the eighth exactly as written.** The two templates use one kind
 of placeholder they do not share, and mixing them up is the one way to emit a prompt that looks right
 and cannot work:
 
@@ -372,6 +372,7 @@ and cannot work:
 | `<ROADMAP-PATH>` | substituted | Step 6's table |
 | `<STATUS-PATH>` | substituted | Step 6's table |
 | `<BUILD-ORDER-TXT>` | substituted | Step 6's table |
+| `<ROADMAP-SKILL-DIR>` | substituted | Step 6's table — where this skill lives on the builder's disk, for the brief and status scripts |
 | `<downstream-skill>` | substituted | the skill confirmed at Phase 0 — its **name**, not its trigger phrase; both appear in the prompt and they are different strings |
 | `<DISCHARGED-LIST>` | substituted | resolved below; `none` when there are none |
 | `<current-feature>` | **literal — type the angle brackets** | nothing. It is the loop run's own per-iteration variable, defined inside the prompt itself |
@@ -394,8 +395,10 @@ guess. A prompt built on a trigger the installed skill does not answer to is ine
 
 ```
 specify feature <target> — create it at `.specs/features/<target>/` using that exact directory name.
-Spec source: <ROADMAP-PATH>. Read <STATUS-PATH> `## Cross-Cutting Decisions` before Discuss and treat
-it as settled — do not re-decide what it answers.
+Spec source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints the
+entry from <ROADMAP-PATH>, the questions naming it and <STATUS-PATH> `## Cross-Cutting Decisions`,
+which are settled before Discuss: do not re-decide what they answer. Do not open <ROADMAP-PATH> whole;
+if the script cannot run, read only its `### <target>` entry and the lines naming <target>.
 ```
 
 The directory-name clause is not redundant with Step 6. This prompt is pasted into a **fresh**
@@ -408,20 +411,23 @@ source):
 
 ```
 specify feature <target> — create it at `.specs/features/<target>/` using that exact directory name.
-Plan source: <ROADMAP-PATH>. Read <STATUS-PATH> `## Cross-Cutting Decisions` before planning and treat
-it as settled — do not re-decide what it answers.
+Plan source: run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <target>` — it prints the
+entry from <ROADMAP-PATH>, the questions naming it and <STATUS-PATH> `## Cross-Cutting Decisions`,
+which are settled before planning: do not re-decide what they answer. Do not open <ROADMAP-PATH> whole;
+if the script cannot run, read only its `### <target>` entry and the lines naming <target>.
 ```
 
 *Unless Step 6 recorded a blocker.* Then give no command at all: report the question that has to be
 answered first, so the user is not handed a command that would start a feature that cannot start
 cleanly.
 
-Omit the last sentence only for a **legacy roadmap generated before Step 7 existed** — that is the
-only way the block is absent, since decompose-phase's sanity check forces it to exist (all-`N/A` at
+The brief prints `## Cross-Cutting Decisions` itself, so no separate pointer to it is needed — and on
+a **legacy roadmap generated before Step 7 existed** it prints that the block is missing, which is
+true. That is the only way the block is absent, since decompose-phase's sanity check forces it to exist (all-`N/A` at
 minimum) and Phase 1 pre-creates the heading in multi-section mode. Check the file before omitting;
-do not reason your way into this branch. That sentence is what makes decompose-phase Step 7a reach
-the build, and a prompt without it hands the user a roadmap whose project-wide answers the downstream
-skill will never see.
+do not reason your way into this branch. The brief is what makes decompose-phase Step 7a reach
+the build, and a prompt that sends the builder to the roadmap file instead hands it the whole backlog
+to carry on every turn to use one entry of it.
 
 **Option B — one roadmap in one loop.** *(Two templates follow, one per profile. The first is
 `tlc-spec-driven`'s; `tlc-spec-lean`'s comes right after it, in its own block. Emit exactly one.)* Tell the user first that `/loop` must be the literal first
@@ -459,12 +465,17 @@ every iteration, re-read <BUILD-ORDER-TXT> and set it to the first name at or af
 is not on the discharged list below and has no verified PASS in
 `.specs/features/<current-feature>/validation.md`. Start that feature with:
 `specify feature <current-feature> — create it at `.specs/features/<current-feature>/` using that
-exact directory name, spec source: <ROADMAP-PATH>`. Do not skip a feature, do not reorder them, and
+exact directory name, spec source: the <ROADMAP-PATH> entry <current-feature>`. Do not skip a feature, do not reorder them, and
 do not start the next one until the current one has that verified PASS. Exception — these features
 are already discharged and must be skipped, never built: <DISCHARGED-LIST>.
 
-Before each feature's gray-area discussion, read <STATUS-PATH> `## Cross-Cutting Decisions` and
-treat every entry as settled — do not re-decide it, and keep every feature consistent with it.
+Before each feature's gray-area discussion, run
+`python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <current-feature>` and work from its output: the
+feature's entry, the questions naming it, the contracts it consumes, and `## Cross-Cutting Decisions`,
+which are settled — do not re-decide them, and keep every feature consistent with them. Never open
+<ROADMAP-PATH> or <STATUS-PATH> whole: each is shared by the whole backlog and you would carry all of
+it on every later turn. If the script cannot run, read only the `### <current-feature>` entry and the
+lines that name it.
 
 No user is available for this run. Dispose of every stop as follows and never wait for an answer,
 but never leave one silently unrecorded either:
@@ -575,9 +586,13 @@ asserting a project fact the data beside it contradicts, a status line describin
 happen are the same defect. Where the artifact and the evidence disagree, the evidence wins: fix the
 artifact and record that you did.
 
-Write the run's outcome into <STATUS-PATH> `## Status` before you stop: which feature you were on,
-what state it reached, and — when you stopped — the reason, in one line each. A run that halts and
-leaves no trace in the roadmap looks, to the next reader, exactly like one that never started.
+Record the run's outcome before you stop, with
+`python3 <ROADMAP-SKILL-DIR>/scripts/status-block.py <STATUS-PATH> --last-run "<date> - <feature> - <state reached> - <why you stopped>" --note <a file holding your full account>`:
+the one line lands in <STATUS-PATH> `## Status`, the account in `docs/roadmap-history.md`. If it cannot
+run, replace the single `**Last run**:` line of that block yourself and append the account to
+`docs/roadmap-history.md`. Never write paragraphs or headings into `## Status` — every later agent
+pointed at it pays for them. A run that halts and leaves no trace looks, to the next reader, exactly
+like one that never started.
 **Features are built one at a time and that is not negotiable.** Never start the next one before this
 one has a verified PASS, whatever capacity is idle. Every dependency in this roadmap points backwards
 to a feature in the same file, so building ahead means building on work nothing has verified. Batching
@@ -607,12 +622,17 @@ every iteration, re-read <BUILD-ORDER-TXT> and set it to the first name at or af
 is not on the discharged list below and has no verified PASS in
 `.specs/features/<current-feature>/verification.md`. Start that feature with:
 `specify feature <current-feature> — create it at `.specs/features/<current-feature>/` using that
-exact directory name, plan source: <ROADMAP-PATH>`. Do not skip a feature, do not reorder them, and
+exact directory name, plan source: the <ROADMAP-PATH> entry <current-feature>`. Do not skip a feature, do not reorder them, and
 do not start the next one until the current one has that verified PASS. Exception — these features
 are already discharged and must be skipped, never built: <DISCHARGED-LIST>.
 
-Before each feature's plan, read <STATUS-PATH> `## Cross-Cutting Decisions` and treat every entry as
-settled — do not re-decide it, and keep every feature consistent with it.
+Before each feature's plan, run
+`python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <current-feature>` and work from its output: the
+feature's entry, the questions naming it, the contracts it consumes, and `## Cross-Cutting Decisions`,
+which are settled — do not re-decide them, and keep every feature consistent with them. Never open
+<ROADMAP-PATH> or <STATUS-PATH> whole: each is shared by the whole backlog and you would carry all of
+it on every later turn. If the script cannot run, read only the `### <current-feature>` entry and the
+lines that name it.
 
 No user is available for this run. Dispose of every stop as follows and never wait for an answer,
 but never leave one silently unrecorded either:
@@ -709,9 +729,13 @@ asserting a project fact the data beside it contradicts, a status line describin
 happen are the same defect. Where the artifact and the evidence disagree, the evidence wins: fix the
 artifact and record that you did — except a check, which the bullet above governs.
 
-Write the run's outcome into <STATUS-PATH> `## Status` before you stop: which feature you were on,
-what state it reached, and — when you stopped — the reason, in one line each. A run that halts and
-leaves no trace in the roadmap looks, to the next reader, exactly like one that never started.
+Record the run's outcome before you stop, with
+`python3 <ROADMAP-SKILL-DIR>/scripts/status-block.py <STATUS-PATH> --last-run "<date> - <feature> - <state reached> - <why you stopped>" --note <a file holding your full account>`:
+the one line lands in <STATUS-PATH> `## Status`, the account in `docs/roadmap-history.md`. If it cannot
+run, replace the single `**Last run**:` line of that block yourself and append the account to
+`docs/roadmap-history.md`. Never write paragraphs or headings into `## Status` — every later agent
+pointed at it pays for them. A run that halts and leaves no trace looks, to the next reader, exactly
+like one that never started.
 **Features are built one at a time and that is not negotiable.** Never start the next one before this
 one has a verified PASS, whatever capacity is idle. Every dependency in this roadmap points backwards
 to a feature in the same file, so building ahead means building on work nothing has verified.
@@ -823,14 +847,15 @@ the paste to them (their file, their call).
 
 ```markdown
 - `docs/ROADMAP-INDEX.md` `## Status` — current backlog position and the next feature to build.
-- `docs/ROADMAP-INDEX.md` `## Cross-Cutting Decisions` — project-wide decisions already made with
-  the user (deletion policy, auth model, failure handling, …). Read before discussing gray areas;
-  treat as settled and keep every feature consistent with it.
-- `docs/ROADMAP-*.md` — per-feature objective, scope-units, dependencies, flagged dimensions.
-  Read the relevant section before specifying a feature.
+- Before specifying a feature, run `python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <feature>`:
+  it prints that feature's roadmap entry, the questions naming it, and the project-wide
+  `## Cross-Cutting Decisions` — settled; keep every feature consistent with them. Do not open the
+  `docs/ROADMAP*.md` files whole.
 ```
 
-In single-section mode both blocks are in `docs/ROADMAP.md`; adjust the paths accordingly. This
+In single-section mode both blocks are in `docs/ROADMAP.md`; adjust the paths accordingly, and resolve
+`<ROADMAP-SKILL-DIR>` from Step 6's table — these lines are pasted as they are, so a placeholder left in
+them is a command nobody can run. This
 bridge is the durable half of the delivery: the Handoff's **Next step** carries the pointer for the
 next feature only, while these lines make it reach every feature after it.
 

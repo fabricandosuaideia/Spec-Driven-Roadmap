@@ -239,14 +239,20 @@ release_gate() {
         python3 "$guards" || ok=1
     fi
 
-    # The cost measurement ships to users and decides which levers they believe
-    # in; a miscount there is a wrong decision downstream, so its self-test (which
-    # plants the transcript shapes that broke earlier counters) runs every release.
-    local measure="$REPO_ROOT/scripts/measure-agents.py"
-    if [[ -f "$measure" ]]; then
-        printf '\n%s\n' "Running the cost-measurement self-test..."
-        python3 "$measure" --selftest || ok=1
-    fi
+    # Three shipped scripts carry self-tests that plant the shapes which broke
+    # earlier versions (a split API response, a run's ### inside ## Status, a
+    # feature whose name prefixes another's). A self-test nobody runs is a
+    # decoration, so every release runs them; a missing script fails the gate.
+    local scr
+    for scr in measure-agents.py feature-brief.py status-block.py; do
+        if [[ -f "$REPO_ROOT/scripts/$scr" ]]; then
+            printf '\n%s\n' "Running the $scr self-test..."
+            python3 "$REPO_ROOT/scripts/$scr" --selftest || ok=1
+        else
+            printf '\n! %s\n' "scripts/$scr is missing — its self-test did not run." >&2
+            ok=1
+        fi
+    done
 
     if [[ $ok -eq 0 ]]; then
         return 0

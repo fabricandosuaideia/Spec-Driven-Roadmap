@@ -58,9 +58,10 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 .\install.ps1 -Global -Force
 ```
 
-The skill itself is markdown plus three Python 3 helper scripts (standard library only), so it is
+The skill itself is markdown plus five Python 3 helper scripts (standard library only), so it is
 fully cross-platform; only the installer differs by OS. They convert a single-roadmap project into
-section roadmaps, check a roadmap, and measure what agent runs cost; each needs a working `python3`
+section roadmaps, check a roadmap, measure what agent runs cost, print one feature's slice of the
+roadmap for its builder, and keep the roadmap's status block small; each needs a working `python3`
 on PATH. On Windows the bare `python3` is usually the Microsoft Store stub, which opens the Store
 instead of running anything: install Python from python.org, after which its
 `py -3` launcher works too.

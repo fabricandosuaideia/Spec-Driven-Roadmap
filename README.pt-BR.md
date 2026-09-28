@@ -58,10 +58,11 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 .\install.ps1 -Global -Force
 ```
 
-A skill em si é markdown mais três scripts auxiliares em Python 3 (só biblioteca padrão), então é
+A skill em si é markdown mais cinco scripts auxiliares em Python 3 (só biblioteca padrão), então é
 totalmente multiplataforma; só o instalador muda por SO. Eles convertem um projeto de roadmap único
-em roadmaps por seção, conferem um roadmap e medem quanto as execuções de agentes custam; cada um
-precisa de um `python3` funcionando no PATH. No Windows, o `python3` puro costuma ser o stub da Microsoft Store, que abre a
+em roadmaps por seção, conferem um roadmap, medem quanto as execuções de agentes custam, imprimem só
+o trecho do roadmap que o construtor de uma feature precisa, e mantêm pequeno o bloco de status do
+roadmap; cada um precisa de um `python3` funcionando no PATH. No Windows, o `python3` puro costuma ser o stub da Microsoft Store, que abre a
 Store em vez de rodar qualquer coisa: instale o Python pelo python.org — depois disso o
 launcher `py -3` dele também funciona.
 
