@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.24.0"
+  version: "3.25.0"
 ---
 
 # Spec-Driven Roadmap
@@ -31,7 +31,7 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 | 1 | [references/index-phase.md](references/index-phase.md) | Multi-section mode only: section map, dependency graph, boundary contracts. |
 | 2 | [references/decompose-phase.md](references/decompose-phase.md) | Slice into vertical features with full coverage, open questions, and a build order. Then pre-empt the cross-cutting gray areas, and record the ones left to the downstream skill. |
 | Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`. Steps 1-7 only; it ends there whenever nothing was seeded. |
-| Handover | [references/handover-prompt.md](references/handover-prompt.md) | Reached only from the seed's Step 7. Asks which implementation prompt the user wants — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed) — and emits it. |
+| Handover | [references/handover-prompt.md](references/handover-prompt.md) | Reached only from the seed's Step 7. Asks which implementation prompt the user wants — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed) — and emits it. The `/loop` template for the confirmed profile is in [loop-tlc-spec-lean.md](references/loop-tlc-spec-lean.md) or [loop-tlc-spec-driven.md](references/loop-tlc-spec-driven.md); read only that one, and only for a loop. |
 
 ## Version and model
 

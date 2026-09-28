@@ -9,6 +9,48 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.25.0 — 2026-09-28
+
+**Step 7 of the build kit, scaled down by measuring it — and three defects the execution found in what
+3.23.0 and 3.24.0 shipped.**
+
+**The step that got smaller.** The plan was to split the skill so each run loads only its path. By the
+cost law this whole kit rests on, what a file costs is its size times the turns that carry it, and
+`handover-prompt.md` is read at the very end of a run, so few turns carry it; the files carried longest
+(`SKILL.md`, `scope-phase.md`, `decompose-phase.md`) are read early and are governed by this skill's
+rule to read a reference whole, which exists for a recorded reason. So only the one real seam was cut
+(CLAUDE.md's "What did not work" allows no other): each profile's `/loop` template moved to its own
+file, `references/loop-tlc-spec-driven.md` and `references/loop-tlc-spec-lean.md`, read only for a loop
+and only for the confirmed profile. What a run loads at the handover: **−33% under option A, −14%
+under option B** (66,798 bytes before). `check-consistency.py` now reads the templates from those
+files and fails if one appears in `handover-prompt.md` again.
+
+**Executed:** one blind agent ran the whole seed and handover (Steps 1-10, option B, sub-agents yes)
+on `state-lean`. It read only the lean loop file and emitted it with every placeholder resolved,
+`<ROADMAP-SKILL-DIR>` included. It also found:
+
+- **A defect in 3.24.0's tier, in the unrecoverable direction.** The fixture's entries label their
+  dimensions `flagged dimensions`; `derive_tier()` looked only for `implicit dimension`, read the absent
+  field as "none", and gave `C` — the least verification — to a feature with persistence/state. A field
+  that cannot be read now never yields `C` (`B` at least, and the brief says why), and the alternative
+  label is read. The self-test fixture that had passed only because of the defect was completed.
+- **Placeholders no table covered.** The lean template carried `<project-root>`, and both carried
+  `<date>`, `<feature>` … in the `--last-run` line 3.23.0 added, while Step 10 tells the agent to stop
+  on any placeholder not in its table. `<PROJECT-ROOT>` joins the table (absolute path — the lean gate
+  runs from its own directory); the run-time values are now capitalised words the run fills.
+- **"Verified PASS" defined sixty lines after its first use.** The resume rule says "no verified PASS"
+  while `notes-list`'s refused report literally reads `**Verdict**: PASS`; a top-down reader could skip
+  a failed feature. Both templates now define it where it is first used.
+- Also fixed: a partly built target — the loop and Option A said "create it at" for a directory that
+  exists (now: read the artifacts and report, fix what it refuses, do not start over); the brief's tier
+  could contradict a `checks.md` already approved under another profile (keep the approved one, as
+  the gate requires); the bridge lines' `<feature>` is the reader's to fill.
+
+**Not re-run.** These fixes were made after the execution. Step 5 rewrites the loop templates next and
+its own execution will cover them.
+
+---
+
 ## 3.24.0 — 2026-09-28
 
 **Step 3 of the build kit: every feature gets a risk tier, derived rather than chosen, and the tier

@@ -192,6 +192,8 @@ def brief(root, name):
         origin = "the entry states %s, below its floor — the floor wins: %s" % (got, why)
     parts += ["", "## Risk tier: %s" % tier, "", "_%s._" % origin, ""]
     parts += ["- %s" % line for line in TIER_MEANING[tier]]
+    parts += ["- If this feature's checks.md was already approved under another `Profile:`, keep that one — "
+              "tlc-spec-lean's gate refuses a report whose profile differs — and say so."]
 
     oq = [i for i in CR.bullets(raw_block(text, "## Open Questions") or "")
           if names_feature(i, name) or reaches(i, name)]
@@ -285,6 +287,8 @@ An entry looks like this:
 ### app-list
 
 - **objective** — list notes.
+- **size** — Small
+- **implicit dimensions present** — none
 - **external contract consumed** — none
 
 ### app-lowered
@@ -345,6 +349,11 @@ def selftest():
         expect("auth is A", CR.derive_tier(f_auth)[0] == "A")
         expect("a dimension that is not an A trigger is B", CR.derive_tier(f_ext)[0] == "B")
         expect("consuming a contract keeps it out of C", CR.derive_tier(f_contract)[0] == "B")
+        expect("an entry whose dimensions field cannot be read is never C",
+               CR.derive_tier({"size": "Small", "external contract consumed": "none"})[0] == "B")
+        expect("a differently-labelled dimensions field is still read",
+               CR.derive_tier({"size": "Small", "flagged dimensions": "concurrency",
+                               "external contract consumed": "none"})[0] == "A")
         expect("a raised tier with a reason is read as raised",
                CR.stated_tier({"risk tier": "A — raised from B: touches billing"}) == ("A", True))
         expect("a bare higher tier is not read as raised", CR.stated_tier({"risk tier": "A"}) == ("A", False))

@@ -68,6 +68,7 @@ NUMBER_WORDS = {
 
 failures = []
 DESCRIPTION_MAX = 1024
+LOOP_TEMPLATE_FILES = ("loop-tlc-spec-driven.md", "loop-tlc-spec-lean.md")
 checks_run = 0
 
 
@@ -496,10 +497,14 @@ def check_loop_templates(root):
     two-strikes rule are the ones that must never drift apart: a fix made to one
     template and not the other is the accretion this file exists to catch.
     """
-    text = read(root, "references", "handover-prompt.md") or ""
-    blocks = re.findall(r"^```\n(/loop Implement the roadmap.*?)^```", text, re.M | re.S)
-    check("handover-prompt.md carries exactly two /loop templates (one per profile)",
-          len(blocks) == 2, "found %d" % len(blocks))
+    blocks = []
+    for name in LOOP_TEMPLATE_FILES:
+        text = read(root, "references", name) or ""
+        blocks += re.findall(r"^```\n(/loop Implement the roadmap.*?)^```", text, re.M | re.S)
+    stray = re.findall(r"^/loop Implement the roadmap", read(root, "references", "handover-prompt.md") or "", re.M)
+    check("each profile's loop file carries its one /loop template, and handover-prompt.md none",
+          len(blocks) == 2 and not stray, "found %d in %s, %d in handover-prompt.md"
+          % (len(blocks), " + ".join(LOOP_TEMPLATE_FILES), len(stray)))
     if len(blocks) != 2:
         return
     shared = {

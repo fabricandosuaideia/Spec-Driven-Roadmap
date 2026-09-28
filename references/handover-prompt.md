@@ -358,11 +358,13 @@ same error in two files. Do not fall back to option A either; it has no target f
 
 Give the prompt **verbatim, in one copy-paste block** — the downstream skill is entered by the user
 typing its trigger, so a paraphrase is a broken handoff. Resolve the placeholders exactly as the
-table below prescribes — Step 6's table defines only four of the eight, and one of the eight must
+table below prescribes — Step 6's table defines only four of the nine, and one of the nine must
 not be resolved at all. Write the prose in the confirmed output language, but keep trigger phrases,
 feature names and file paths exactly as they are on disk.
 
-**Placeholders — resolve seven, leave the eighth exactly as written.** The two templates use one kind
+**Placeholders — resolve eight, leave the ninth exactly as written.** Capitalised run-time words in
+the templates (`DATE`, `FEATURE`, `ACCOUNT-FILE`) are not placeholders: the run fills them, and they
+stay as written. The two templates use one kind
 of placeholder they do not share, and mixing them up is the one way to emit a prompt that looks right
 and cannot work:
 
@@ -375,6 +377,7 @@ and cannot work:
 | `<ROADMAP-SKILL-DIR>` | substituted | Step 6's table — where this skill lives on the builder's disk, for the brief and status scripts |
 | `<downstream-skill>` | substituted | the skill confirmed at Phase 0 — its **name**, not its trigger phrase; both appear in the prompt and they are different strings |
 | `<DISCHARGED-LIST>` | substituted | resolved below; `none` when there are none |
+| `<PROJECT-ROOT>` | substituted | the project root's absolute path — the lean gate runs from its own skill directory, so a relative root would point at the wrong tree |
 | `<current-feature>` | **literal — type the angle brackets** | nothing. It is the loop run's own per-iteration variable, defined inside the prompt itself |
 
 `<current-feature>` is the only placeholder that survives into the pasted text, and it survives on
@@ -417,6 +420,10 @@ which are settled before planning: do not re-decide what they answer. Do not ope
 if the script cannot run, read only its `### <target>` entry and the lines naming <target>.
 ```
 
+**When Step 4 found the target partly built**, replace its `create it at …` clause the way Step 6's
+Next step does: the directory exists — say so, and tell the builder to read the artifacts and the
+report first, fix what the report refuses, and not start over.
+
 *Unless Step 6 recorded a blocker.* Then give no command at all: report the question that has to be
 answered first, so the user is not handed a command that would start a feature that cannot start
 cleanly.
@@ -429,10 +436,10 @@ do not reason your way into this branch. The brief is what makes decompose-phase
 the build, and a prompt that sends the builder to the roadmap file instead hands it the whole backlog
 to carry on every turn to use one entry of it.
 
-**Option B — one roadmap in one loop.** *(Two templates follow, one per profile. The first is
-`tlc-spec-driven`'s; `tlc-spec-lean`'s comes right after it, in its own block. Emit exactly one.)* Tell the user first that `/loop` must be the literal first
+**Option B — one roadmap in one loop.** *(One template per profile, each in its own file — see
+"Where the templates are" below. Emit exactly one.)* Tell the user first that `/loop` must be the literal first
 thing in the message — it is their CLI's own loop command (Claude Code, Cursor, OpenCode all have
-one), and it is already baked into the front of the prompt below, so it must be pasted as-is, not
+one), and it is already baked into the front of the template, so it must be pasted as-is, not
 retyped after a greeting. This skill never runs that loop itself; it only writes the prompt.
 
 **Scope rule — one loop, one roadmap, in both modes.** `<ROADMAP-PATH>` and `<BUILD-ORDER-TXT>` are
@@ -454,307 +461,12 @@ be corrected first.
 Say all of this in the same breath as the prompt: which roadmap the loop builds, which sections it
 does not, and that the next one is one re-seed away.
 
-```
-/loop Implement the roadmap at <ROADMAP-PATH>, one feature at a time, in the exact order of
-<BUILD-ORDER-TXT>, using the `<downstream-skill>` skill for every feature — run its full cycle
-(specify → design → tasks → execute → verify). This run covers <ROADMAP-PATH> and nothing else: no
-other `docs/ROADMAP*.md` file is in scope, whatever <STATUS-PATH> lists.
+**Where the templates are.** Each profile's template lives in its own file, so a run loads only the
+one it emits: [loop-tlc-spec-driven.md](loop-tlc-spec-driven.md) or
+[loop-tlc-spec-lean.md](loop-tlc-spec-lean.md). Read the one matching the confirmed profile, emit its block
+verbatim, and read neither under option A. What follows here applies to both.
 
-`<current-feature>` below is this run's own variable, not a name to resolve once. At the start of
-every iteration, re-read <BUILD-ORDER-TXT> and set it to the first name at or after `<target>` that
-is not on the discharged list below and has no verified PASS in
-`.specs/features/<current-feature>/validation.md`. Start that feature with:
-`specify feature <current-feature> — create it at `.specs/features/<current-feature>/` using that
-exact directory name, spec source: the <ROADMAP-PATH> entry <current-feature>`. Do not skip a feature, do not reorder them, and
-do not start the next one until the current one has that verified PASS. Exception — these features
-are already discharged and must be skipped, never built: <DISCHARGED-LIST>.
-
-Before each feature's gray-area discussion, run
-`python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <current-feature>` and work from its output: the
-feature's entry, its risk tier and what that tier sets for this skill (follow it), the questions naming it, the contracts it consumes, and `## Cross-Cutting Decisions`,
-which are settled — do not re-decide them, and keep every feature consistent with them. Never open
-<ROADMAP-PATH> or <STATUS-PATH> whole: each is shared by the whole backlog and you would carry all of
-it on every later turn. If the script cannot run, read only the `### <current-feature>` entry and the
-lines that name it.
-
-No user is available for this run. Dispose of every stop as follows and never wait for an answer,
-but never leave one silently unrecorded either:
-
-- A gray area not settled in `## Cross-Cutting Decisions` — treat it as declined: choose the
-  default and record it with its rationale in that feature's spec under Assumptions & Open Questions.
-- A request to approve this run's own spec, context, design or task list — approve and continue,
-  then note in that same section which artifacts were self-approved. Nobody reviewed them, and that
-  line is what lets somebody review them later.
-- **The offer of phase-batch sub-agents**, which the downstream skill makes above its own task
-  threshold and then waits on. <SUBAGENT-DISPOSITION> Say which you took, in that feature's spec.
-  Read that skill's own sub-agent reference from disk for the threshold and the batch size — they are
-  its numbers, not this prompt's, and they move between its versions.
-- Any other choice about how to execute — ordering inside a feature, how much to do before checking —
-  pick one, say which, continue.
-- A project-level fact the run cannot invent, such as which test framework to use — take it from
-  `## Cross-Cutting Decisions`; if it is not there, record it as an open question and choose the most
-  conservative option that exists in the repository already. Never invent a credential and never
-  reach a network service to resolve one.
-- A failing test — never edit, weaken, skip or delete a test to reach a PASS, **and never add one
-  either**. A new test asserting the opposite of the failing one leaves the suite holding two
-  contradictory claims about the same input and manufactures the look of coverage; the prohibition
-  covers adding for the same reason it covers editing. Never record a feature as done while its
-  suite is red. If a test is genuinely wrong, leave it failing and write
-  down why. This is the one stop where continuing costs more than halting: a verified PASS is the
-  only evidence this run produces, and a test bent to produce it destroys the evidence rather than
-  the defect.
-- **The same forgery from the implementation side is also forbidden, and it is the one that hides.**
-  Never change behaviour in a way that contradicts an acceptance criterion or a settled
-  `## Cross-Cutting Decisions` entry in order to turn a test green. Inverting a rule usually satisfies
-  the assertion, leaves `tests/` untouched, and arrives in a diff of the source carrying no label that
-  says what was traded away. When the only implementations that pass are ones the spec forbids, that
-  is a genuinely wrong test: leave it red and say which criterion each rejected implementation
-  violated.
-- **Where a feature's own artifacts demand what this instruction forbids, this instruction wins.** A
-  `tasks.md` whose done-when is *"test X passes"*, a roadmap entry claiming `open questions — none`
-  while an unanswered one blocks the work — rewrite the artifact to match the acceptance criterion,
-  and record that you rewrote it and why. Left unstated, this is the pressure point that manufactures
-  a bent test: a task list ordering the very thing the rule refuses.
-
-**A feature counts as done only when its `validation.md` carries a consolidated verdict line reading
-PASS, with at least one `file:line` citation.** A report whose acceptance-criteria rows contain the
-word `PASS` while its verdict says otherwise is **not** a pass — never decide this by searching the
-file for `PASS`, which is exactly how a failed feature gets skipped. Write your own verdict so that
-test cannot be got wrong: one consolidated line, and nothing above it that reads like one.
-
-**Nobody is reviewing this run, so every verification is self-verification.** Say so in the report:
-name the artifacts you approved yourself and the verdict you reached on your own work. A PASS this
-run records is evidence the suite was green, not evidence anyone independent agreed — and the
-difference matters to whoever reads it next.
-
-**When the downstream skill's own loop cannot terminate, this instruction ends it.** That skill
-treats a red gate as *stop, fix, re-run* — correct in general, and a deadlock here: if the only fixes
-that would turn the gate green are ones this instruction forbids, its loop can never exit and the
-feature can never reach verification. Reaching that point **is** the answer. Record the feature as
-not done, name every fix you rejected and which criterion each violated, and let the rule below end
-the run.
-
-If the same feature comes out of verification without a PASS twice, stop the whole run and report it.
-Two verification runs, not two rewrites: you are never required to ship a change you have already
-shown to be wrong merely to spend a cycle. Do not try a third time and do not move on to the next
-feature — a feature that cannot pass is the one thing this loop cannot settle by itself, and
-continuing past it builds on top of it. **This stop outranks the finishing condition below.** That
-one asks for a PASS on every feature and can therefore never be reached when a feature has none;
-stopping here, and saying which feature and why, is the correct end of the run.
-
-**Write a FAIL the downstream gate can actually read.** Its own script decides by looking at
-headings matching `## Validation…` and at any line containing `Result:` — a verdict written anywhere
-else is invisible to it. A run that wrote `## VERDICT: FAIL` was told by that gate that the report
-*"has no PASS/FAIL verdict"*, which is the worst possible outcome: a feature that failed, recorded in
-a way the thing checking for failure cannot see. **Read the downstream skill's own template from disk
-and match it** — never invent a heading of your own, however clear it reads.
-
-**Those two demands collide if you follow the template literally, so reconcile them this way.** That
-gate joins *every* line it recognises into one string before deciding, and the template emits three
-such lines — the sensor's `**Result**:`, Gate Check's `- **Result**:` and the chat block's
-`## Validation: <feature> - [PASS | FAIL]`. Together they put both words in the haystack, and the gate
-then reports *"still the template placeholder"* instead of your verdict. Keep every section heading
-verbatim, **relabel only the inline result fields** so they stop matching that pattern —
-`**Sensor verdict** —`, `**Gate outcome** —` — and let one `## Validation: <feature> — <verdict>`
-line be the only thing the gate sees. Verified against the real script: it then reads `FAIL` as
-`FAIL`.
-
-Per-criterion rows say `MET` / `NOT MET`, never `PASS`. **When a criterion is met by the code and denied by the test guarding it**, say exactly that
-rather than collapsing it either way: `MET, contradicted by <test>`. Calling it `MET` hides a red
-suite and calling it `NOT MET` blames code that is correct, and the consolidated verdict is a FAIL in
-both readings anyway — what a later reader needs is which of the two is broken.
-
-**A phase with nothing to do is done, not skipped.** If the implementation already satisfies every
-acceptance criterion, execute is complete: say so and move to verification. Do not manufacture a
-change to have something to show — an edit made for that reason is indistinguishable, in a diff, from
-one made to bend a result. A FAIL that a later iteration mistakes for a pass is how the loop skips past unfinished work,
-which is the one outcome every rule here is aimed at.
-
-**When a feature ends without a PASS, no task inside it is complete either.** Leave its checkboxes
-unticked, whatever their individual done-whens say. A `tasks.md` full of ticks under a failed feature
-is read by the next reviewer as progress that did not happen.
-
-**Do not commit the failure.** The downstream skill may make its own atomic commit after each task
-whose gate passed — that is its contract and this instruction does not override it. What must not
-happen is a **feature** landing in history as done while its suite is red: no commit closing it, no
-branch merged, no tag. Leave that state in the working tree, where a person sees it before it becomes
-part of the record.
-
-**Reconcile every claim an artifact makes about itself, not only the ones named here.** `open
-questions — none` beside an unanswered question is the example; a task's done-when, a comment
-asserting a project fact the data beside it contradicts, a status line describing work that did not
-happen are the same defect. Where the artifact and the evidence disagree, the evidence wins: fix the
-artifact and record that you did.
-
-Record the run's outcome before you stop, with
-`python3 <ROADMAP-SKILL-DIR>/scripts/status-block.py <STATUS-PATH> --last-run "<date> - <feature> - <state reached> - <why you stopped>" --note <a file holding your full account>`:
-the one line lands in <STATUS-PATH> `## Status`, the account in `docs/roadmap-history.md`. If it cannot
-run, replace the single `**Last run**:` line of that block yourself and append the account to
-`docs/roadmap-history.md`. Never write paragraphs or headings into `## Status` — every later agent
-pointed at it pays for them. A run that halts and leaves no trace looks, to the next reader, exactly
-like one that never started.
-**Features are built one at a time and that is not negotiable.** Never start the next one before this
-one has a verified PASS, whatever capacity is idle. Every dependency in this roadmap points backwards
-to a feature in the same file, so building ahead means building on work nothing has verified. Batching
-happens *inside* a feature; the sequence *between* features is the guarantee.
-
-Backlog position is at that same block. Stop when every name in <BUILD-ORDER-TXT> from
-`<target>` onward has a verified PASS or is on the discharged list above; report and stop there
-rather than continuing into another roadmap.
-```
-
-**Option B, `tlc-spec-lean`'s template.** Same scope rule, same `<current-feature>` discipline, same
-placeholders — what differs is the cycle it drives, what "done" means, and every stop it disposes of.
-Its differences from the template above are exactly these: the cycle is **plan → checks → build →
-verify** with no Discuss, design or task list; the human stop is the **end of Plan**, not a Discuss;
-the gate is `validate_verification.py`, which reads a `**Verdict**:` line and refuses a PASS its own
-rows contradict, so there is no verdict-format workaround to carry; and the Verifier is a fresh
-sub-agent that the run dispatches and does not write itself.
-
-```
-/loop Implement the roadmap at <ROADMAP-PATH>, one feature at a time, in the exact order of
-<BUILD-ORDER-TXT>, using the `<downstream-skill>` skill for every feature — run its full cycle
-(plan → checks → build → verify). This run covers <ROADMAP-PATH> and nothing else: no other
-`docs/ROADMAP*.md` file is in scope, whatever <STATUS-PATH> lists.
-
-`<current-feature>` below is this run's own variable, not a name to resolve once. At the start of
-every iteration, re-read <BUILD-ORDER-TXT> and set it to the first name at or after `<target>` that
-is not on the discharged list below and has no verified PASS in
-`.specs/features/<current-feature>/verification.md`. Start that feature with:
-`specify feature <current-feature> — create it at `.specs/features/<current-feature>/` using that
-exact directory name, plan source: the <ROADMAP-PATH> entry <current-feature>`. Do not skip a feature, do not reorder them, and
-do not start the next one until the current one has that verified PASS. Exception — these features
-are already discharged and must be skipped, never built: <DISCHARGED-LIST>.
-
-Before each feature's plan, run
-`python3 <ROADMAP-SKILL-DIR>/scripts/feature-brief.py <current-feature>` and work from its output: the
-feature's entry, its risk tier and what that tier sets for this skill (follow it), the questions naming it, the contracts it consumes, and `## Cross-Cutting Decisions`,
-which are settled — do not re-decide them, and keep every feature consistent with them. Never open
-<ROADMAP-PATH> or <STATUS-PATH> whole: each is shared by the whole backlog and you would carry all of
-it on every later turn. If the script cannot run, read only the `### <current-feature>` entry and the
-lines that name it.
-
-No user is available for this run. Dispose of every stop as follows and never wait for an answer,
-but never leave one silently unrecorded either:
-
-- A decision the plan needs that `## Cross-Cutting Decisions` does not settle — choose the default and
-  record it in that feature's `plan.md` under `## Assumptions`, with its rationale and `Confirmed?`
-  set to `n`. That table is where that skill already puts a decision the user did not make.
-- The stop at the end of Plan, where that skill presents the plan for a human to confirm before any
-  check exists — approve and continue, and write in that same `## Assumptions` section that the plan
-  was self-approved. Do the same for `checks.md`. Nobody reviewed them, and that line is what lets
-  somebody review them later.
-- **The size gate and the Verifier**, the two places that skill uses sub-agents.
-  <SUBAGENT-DISPOSITION> Say which you took, in that feature's `checks.md` under `## Handoff`. Read
-  that skill's own build and verify references from disk for the budget and the dispatch rule — they
-  are its numbers and its rule, not this prompt's, and they move between its versions.
-- Any other choice about how to execute — ordering inside a feature, how much to do before checking —
-  pick one, say which, continue.
-- A project-level fact the run cannot invent, such as which test framework to use — take it from
-  `## Cross-Cutting Decisions`; if it is not there, record it as an open question and choose the most
-  conservative option that exists in the repository already. Never invent a credential and never
-  reach a network service to resolve one. That skill's blast-radius rule stands: local edits and local
-  commits only — never `git push`, never a deploy, never a change to production data.
-- A failing test — never edit, weaken, skip or delete a test to reach a PASS, **and never add one
-  either**. A new test asserting the opposite of the failing one leaves the suite holding two
-  contradictory claims about the same input and manufactures the look of coverage; the prohibition
-  covers adding for the same reason it covers editing. Never record a feature as done while its
-  suite is red. If a test is genuinely wrong, leave it failing and write
-  down why. This is the one stop where continuing costs more than halting: a verified PASS is the
-  only evidence this run produces, and a test bent to produce it destroys the evidence rather than
-  the defect.
-- **The same forgery from the implementation side is also forbidden, and it is the one that hides.**
-  Never change behaviour in a way that contradicts an acceptance criterion or a settled
-  `## Cross-Cutting Decisions` entry in order to turn a test green. Inverting a rule usually satisfies
-  the assertion, leaves `tests/` untouched, and arrives in a diff of the source carrying no label that
-  says what was traded away. When the only implementations that pass are ones the spec forbids, that
-  is a genuinely wrong test: leave it red and say which criterion each rejected implementation
-  violated.
-- **A check is fixed once approved, and this run approves its own.** That skill's rule is that a
-  genuinely wrong check is a stop-and-ask, never an edit; an unattended run cannot ask, so it stops
-  that feature instead. Where a check's proof can only go green by bending behaviour, or a roadmap
-  entry claims `open questions — none` while an unanswered one blocks the work, do not edit the
-  check to fit: record in `## Assumptions` which check you refused to satisfy and why, leave it red,
-  and let the rule below end the run.
-
-**A feature counts as done only when `validate_verification.py <current-feature> --root <project-root>`
-exits 0** — run from that skill's own directory — **and its `verification.md` carries
-`**Verdict**: PASS` with at least one `file:line` citation.** Exit `2` means the gate found nothing to
-read: that is not done, and it is never a pass. Never pass `--allow-empty`. Never decide this by
-searching the report for `PASS`: a failed report is full of `PASS` rows.
-
-**The Verifier writes `verification.md`; you do not.** Dispatch it as that skill's verify reference
-prescribes, after the last commit of the feature, in the same turn, over every check. A FAIL is
-written the way a PASS is — `**Verdict**: FAIL` at the top, `FAIL` in the `Result` cell of each
-check that failed — and no heading or label of your own invention.
-
-**Nobody is reviewing this run, so say what its PASS is.** The plan and the checks were approved by
-this run itself, and a fresh sub-agent that read them is independent of the builder but is the same
-kind of reader. A PASS this run records is evidence that the suite was green and that a second reader
-found nothing against the checks — not that any person agreed. Name the artifacts you self-approved
-in each feature's `## Assumptions`.
-
-**When that skill's own loop cannot terminate, this instruction ends it.** It treats a red gate as
-*stop, fix, re-run* — correct in general, and a deadlock here: if the only fixes that would turn the
-gate green are ones this instruction forbids, the feature can never reach a PASS. Reaching that point
-**is** the answer. Record the feature as not done, name every fix you rejected and which criterion each
-violated, and let the rule below end the run.
-
-If the same feature comes out of verification without a PASS twice, stop the whole run and report it.
-Two verification runs, not two rewrites: you are never required to ship a change you have already
-shown to be wrong merely to spend a cycle. Do not try a third time and do not move on to the next
-feature — a feature that cannot pass is the one thing this loop cannot settle by itself, and
-continuing past it builds on top of it. **This stop outranks the finishing condition below.** That
-one asks for a PASS on every feature and can therefore never be reached when a feature has none;
-stopping here, and saying which feature and why, is the correct end of the run.
-
-**A phase with nothing to do is done, not skipped.** If the implementation already satisfies every
-check, build is complete: say so and move to verification. Do not manufacture a change to have
-something to show — an edit made for that reason is indistinguishable, in a diff, from one made to
-bend a result.
-
-**When a feature ends without a PASS, none of its checks is complete either.** Leave the completion
-marks in its `checks.md` unset, whatever each proof says on its own. Marks under a failed feature are
-read by the next reviewer as progress that did not happen.
-
-**Do not commit the failure.** That skill makes its own coherent commits, each checked by its own
-script — that is its contract and this instruction does not override it. What must not happen is a
-**feature** landing in history as done while its suite is red: no commit closing it, no branch merged,
-no tag. Leave that state in the working tree, where a person sees it before it becomes part of the
-record.
-
-**Reconcile every claim an artifact makes about itself, not only the ones named here.** `open
-questions — none` beside an unanswered question is the example; a check's expected value, a comment
-asserting a project fact the data beside it contradicts, a status line describing work that did not
-happen are the same defect. Where the artifact and the evidence disagree, the evidence wins: fix the
-artifact and record that you did — except a check, which the bullet above governs.
-
-Record the run's outcome before you stop, with
-`python3 <ROADMAP-SKILL-DIR>/scripts/status-block.py <STATUS-PATH> --last-run "<date> - <feature> - <state reached> - <why you stopped>" --note <a file holding your full account>`:
-the one line lands in <STATUS-PATH> `## Status`, the account in `docs/roadmap-history.md`. If it cannot
-run, replace the single `**Last run**:` line of that block yourself and append the account to
-`docs/roadmap-history.md`. Never write paragraphs or headings into `## Status` — every later agent
-pointed at it pays for them. A run that halts and leaves no trace looks, to the next reader, exactly
-like one that never started.
-**Features are built one at a time and that is not negotiable.** Never start the next one before this
-one has a verified PASS, whatever capacity is idle. Every dependency in this roadmap points backwards
-to a feature in the same file, so building ahead means building on work nothing has verified.
-
-Backlog position is at that same block. Stop when every name in <BUILD-ORDER-TXT> from
-`<target>` onward has a verified PASS or is on the discharged list above; report and stop there
-rather than continuing into another roadmap.
-```
-
-**What is deliberately *not* in that template, so it is not "restored" by someone comparing the two.**
-No Discuss disposition, because that skill has none. No `tasks.md` and no phase-batch offer, because
-it has neither. No verdict-relabelling workaround: that exists for `validate_state.py`, which joins
-every line it recognises into one string, and `validate_verification.py` reads the `**Verdict**:` line
-and the rows directly. And no *"write your own verdict so that test cannot be got wrong"* — the
-Verifier writes it. Where the two templates *do* share a clause it is word for word, on purpose: the
-failing-test clause and the implementation-side forgery clause are the two that must never drift
-apart, and `scripts/check-consistency.py` compares them.
-
-Five clauses in that template are load-bearing and easy to "tidy" into breakage. The
+Five clauses in each template are load-bearing and easy to "tidy" into breakage. The
 `<current-feature>` resume rule replaces a literal `Start at <target>`, because `/loop` re-reads the
 whole prompt every iteration and a fixed start restarts at the same feature forever. The stop
 condition says *"or is on the discharged list"* because a question-only feature can never earn a PASS
@@ -855,7 +567,8 @@ the paste to them (their file, their call).
 
 In single-section mode both blocks are in `docs/ROADMAP.md`; adjust the paths accordingly, and resolve
 `<ROADMAP-SKILL-DIR>` from Step 6's table — these lines are pasted as they are, so a placeholder left in
-them is a command nobody can run. This
+them is a command nobody can run. `<feature>` in them is the one exception: it is the reader's own
+variable, filled each time a feature starts, and stays as written. This
 bridge is the durable half of the delivery: the Handoff's **Next step** carries the pointer for the
 next feature only, while these lines make it reach every feature after it.
 

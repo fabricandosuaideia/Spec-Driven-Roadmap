@@ -189,7 +189,7 @@ def field(fields, *names):
 # reads a `- name` line, so an entry whose one English label was that would still
 # leave every per-feature check with nothing to read.
 KNOWN_FIELDS = ("objective", "scope-unit", "depends", "external contract", "size",
-                "task estimate", "tasks", "implicit dimension", "open question",
+                "task estimate", "tasks", "implicit dimension", "flagged dimension", "open question",
                 "needs pre-written context", "needs context", "discharge", "risk tier")
 
 
@@ -599,13 +599,18 @@ TIER_RANK = {"C": 0, "B": 1, "A": 2}
 def derive_tier(fields):
     """(tier, reason) — the floor Phase 2 may raise with a reason and never lower."""
     size = (field(fields, "size") or "").strip().lower()
-    dims = (field(fields, "implicit dimension") or "").lower()
+    dims_raw = field(fields, "implicit dimension", "flagged dimension", "dimension")
+    dims = (dims_raw or "").lower()
     consumed = field(fields, "external contract") or "none"
     if any(size.startswith(s) for s in TIER_A_SIZES):
         return "A", "size %s" % size.split()[0]
     hit = [d for d in TIER_A_DIMS if d in dims]
     if hit:
         return "A", "dimension %s" % ", ".join(hit)
+    # A field that could not be read is not a field that says "none" (CLAUDE.md
+    # lesson 6): C is the least verification, so it needs positive evidence.
+    if dims_raw is None or not size:
+        return "B", "no readable %s field, so it cannot be C" % ("dimensions" if dims_raw is None else "size")
     if reads_as_none(dims) and reads_as_none(consumed):
         return "C", "no implicit dimension, consumes no contract, not Large"
     return "B", "has a dimension or consumes a contract, none of them an A trigger"
