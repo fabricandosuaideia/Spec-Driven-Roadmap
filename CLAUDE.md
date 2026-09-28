@@ -29,11 +29,12 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 
 | | |
 |---|---|
-| `scripts/check-consistency.py` | 26 checks over the invariants that keep this repo's duplicated facts in step. **Run after any edit to `SKILL.md`, `references/` or `scripts/`.** |
+| `scripts/check-consistency.py` | Checks (it prints the count) over the invariants that keep this repo's duplicated facts in step. **Run after any edit to `SKILL.md`, `references/` or `scripts/`.** |
 | `scripts/check-roadmap.py` | Lints a roadmap the skill produced. Shipped to users; Phase 2 runs it. |
 | `scripts/check-conversion-guards.py` | Every path on which the conversion must refuse. Builds and deletes its own trees. Called by the release gate, and by the hook when the conversion or its fixture changes. |
 | `scripts/run-benchmark.py` | Sets up an isolated run and scores it. See [`benchmark/`](benchmark/). |
 | `scripts/convert-to-multi.py` | Shipped to users. The single→multi conversion. |
+| `scripts/measure-agents.py` | Shipped to users. Reads a project's Claude Code transcripts and decomposes token cost by class, role, retry and orchestrator. Read-only. `--selftest` runs in the release gate. |
 | `scripts/hooks/pre-commit` | Runs the consistency check before a commit that touches an invariant. Install once: `bash scripts/hooks/install.sh`. |
 | `scripts/bump-version.sh` | Writes all three version declarations **and runs the consistency check**, refusing the release when it fails. |
 

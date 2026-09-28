@@ -25,7 +25,7 @@ FORCE="false"
 REQUIRED_REFS=(scope-phase.md index-phase.md decompose-phase.md handoff-seed.md handover-prompt.md)
 # Runtime scripts the skill itself invokes. Maintainer-only tooling (bump-version.sh)
 # deliberately stays in the repo and is not installed.
-REQUIRED_SCRIPTS=(convert-to-multi.py check-roadmap.py)
+REQUIRED_SCRIPTS=(convert-to-multi.py check-roadmap.py measure-agents.py)
 
 print_status()  { echo "→ $1"; }
 print_success() { echo "✓ $1"; }

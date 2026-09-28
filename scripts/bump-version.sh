@@ -239,6 +239,15 @@ release_gate() {
         python3 "$guards" || ok=1
     fi
 
+    # The cost measurement ships to users and decides which levers they believe
+    # in; a miscount there is a wrong decision downstream, so its self-test (which
+    # plants the transcript shapes that broke earlier counters) runs every release.
+    local measure="$REPO_ROOT/scripts/measure-agents.py"
+    if [[ -f "$measure" ]]; then
+        printf '\n%s\n' "Running the cost-measurement self-test..."
+        python3 "$measure" --selftest || ok=1
+    fi
+
     if [[ $ok -eq 0 ]]; then
         return 0
     fi

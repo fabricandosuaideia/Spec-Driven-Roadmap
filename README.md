@@ -58,10 +58,10 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 .\install.ps1 -Global -Force
 ```
 
-The skill itself is markdown plus one Python 3 helper script (standard library only), so it is fully
-cross-platform; only the installer differs by OS. That script is used for exactly one thing —
-converting a single-roadmap project into section roadmaps — and it needs a working `python3` on
-PATH. On Windows the bare `python3` is usually the Microsoft Store stub, which opens the Store
+The skill itself is markdown plus three Python 3 helper scripts (standard library only), so it is
+fully cross-platform; only the installer differs by OS. They convert a single-roadmap project into
+section roadmaps, check a roadmap, and measure what agent runs cost; each needs a working `python3`
+on PATH. On Windows the bare `python3` is usually the Microsoft Store stub, which opens the Store
 instead of running anything: install Python from python.org, after which its
 `py -3` launcher works too.
 
@@ -78,6 +78,13 @@ roadmap and every `.specs/features/` directory — including a built feature no 
 A failure is a question for you, not a verdict.
 
 Phase 2 runs the same checks whenever it closes a roadmap, so this is for asking later.
+
+### Where did my quota go?
+
+Ask — *"measure my agent cost"* — and the skill reads this project's own Claude Code transcripts and
+shows where the tokens went: by role, by retry, and how much of each conversation is context piling
+up turn after turn. It edits nothing and runs nothing else. Save a baseline before you change how
+agents run, and compare after: a saving nobody measured is a guess.
 
 ### Which version do I have?
 

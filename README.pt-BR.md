@@ -58,10 +58,10 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 .\install.ps1 -Global -Force
 ```
 
-A skill em si é markdown mais um script auxiliar em Python 3 (só biblioteca padrão), então é
-totalmente multiplataforma; só o instalador muda por SO. Esse script serve para exatamente uma
-coisa — converter um projeto de roadmap único em roadmaps por seção — e precisa de um `python3`
-funcionando no PATH. No Windows, o `python3` puro costuma ser o stub da Microsoft Store, que abre a
+A skill em si é markdown mais três scripts auxiliares em Python 3 (só biblioteca padrão), então é
+totalmente multiplataforma; só o instalador muda por SO. Eles convertem um projeto de roadmap único
+em roadmaps por seção, conferem um roadmap e medem quanto as execuções de agentes custam; cada um
+precisa de um `python3` funcionando no PATH. No Windows, o `python3` puro costuma ser o stub da Microsoft Store, que abre a
 Store em vez de rodar qualquer coisa: instale o Python pelo python.org — depois disso o
 launcher `py -3` dele também funciona.
 
@@ -79,6 +79,13 @@ feature construída que nenhum roadmap nomeia mais. Uma falha é uma pergunta pa
 veredito.
 
 A Phase 2 roda as mesmas checagens sempre que fecha um roadmap; isto aqui é para perguntar depois.
+
+### Para onde foi minha cota?
+
+Peça — *"mede o custo dos meus agentes"* — e a skill lê os transcritos do Claude Code deste projeto e
+mostra para onde os tokens foram: por papel, por nova tentativa, e quanto de cada conversa é contexto
+se acumulando turno após turno. Não edita nada e não roda mais nada. Salve uma linha de base antes de
+mudar como os agentes rodam, e compare depois: economia que ninguém mediu é chute.
 
 ### Qual versão eu tenho?
 

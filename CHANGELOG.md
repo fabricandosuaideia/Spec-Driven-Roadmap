@@ -9,6 +9,44 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.22.0 — 2026-09-28
+
+**The skill can now measure what agent runs cost — step 1 of making every project it plans cheaper
+to build.**
+
+A two-project investigation, read from existing transcripts and never from a new run, found the quota
+going where the user's own guides said: on the WordPress AI Agent Manager's multi-agent pipeline
+(2,629 transcripts) re-reading cached context is 75% of the relative cost and the model's output 1.9%;
+builders are 52%, verifiers 21%, the orchestrator session 10% (2,688 turns at 498k average context,
+1,195 task notifications), and retries from attempt 2 on 27.5%. Every agent starts near 35k tokens of
+context and grows about 2.5k per turn; for builders **80.6% of all context tokens is that growth**.
+Every lever against it — a fresh agent per phase, a context budget, fewer retries, a leaner
+orchestrator — is a hypothesis until measured before and after, so the measurement comes first.
+
+- **`scripts/measure-agents.py`**, shipped by both installers. Read-only, standard library. Finds the
+  project's transcripts the way Claude Code names them, de-duplicates each API response (one response
+  is several JSONL lines), labels roles from each agent's `.meta.json` (`role:feature:attempt` for
+  workflow agents), and prints token-class shares, cost by kind and role, context at turn 1, average
+  context, growth share, retry share, features by highest attempt, and orchestrator notifications.
+  `--save-baseline` / `--baseline` compare two windows. It prints counts only, never content, and says
+  outright that its unit uses public API price ratios and is neither money nor quota. Exit `2` when
+  nothing was measured: an empty measurement is not "zero cost".
+- **`--selftest`** plants the shapes that break a naive counter (a response split over two lines, a turn
+  outside the window, a notification, labelled and unlabelled agents) and **runs in the release gate**.
+  Six deliberate defects were injected into the script; the self-test caught all six.
+- **Checked against reality:** on the WordPress transcripts it reproduces the user's independently
+  written guide within about one point on every figure (1,598M units, 1,195 vs 1,194 notifications).
+- `SKILL.md` gains a short standalone "Measuring what the agent runs cost" section and two trigger
+  phrases; the README (three languages) says what it is for and no longer claims the skill has one
+  script used for one thing. `check-consistency.py` gains a check that the description stays within
+  the Agent Skills spec's 1,024 characters (it is at 960).
+
+**Not executed by a blind agent**, deliberately: the procedure is "run one command, report it", and the
+script's own correctness is what the self-test and the reproduction cover. The steps that follow
+(bounded artifacts, risk tiers, the sub-agent pipeline) are procedure, and those will be.
+
+---
+
 ## 3.21.0 — 2026-09-28
 
 **Compatible with the Tech Leads Club's current skills: `tlc-spec-lean` is now the default downstream,

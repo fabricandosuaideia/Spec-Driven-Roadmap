@@ -1,10 +1,10 @@
 ---
 name: spec-driven-roadmap
-description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a machine-readable build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) and seeds the downstream spec-driven skill so it can start building feature one. Sources the scope from an existing PRD, architecture doc or flowchart export, from an interview when the user has no document, or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "turn this PRD into a backlog", or "I do not know what to build yet" - and also to CHECK a roadmap this skill already produced: "check my roadmap", "validate my roadmap", "is my roadmap sound", "lint the roadmap". Do NOT use for writing a feature's spec, design, tasks or code, for driving construction, or for "resume work" - those belong to the downstream spec-driven skill.
+description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a machine-readable build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) and seeds the downstream spec-driven skill so it can start building feature one. Sources the scope from an existing PRD, architecture doc or flowchart export, from an interview when the user has no document, or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "turn this PRD into a backlog", or "I do not know what to build yet" - and also to CHECK a roadmap this skill already produced: "check my roadmap", "validate my roadmap", "is my roadmap sound", "lint the roadmap" - and to MEASURE agent cost: "measure my agent cost", "where did my quota go". Do NOT use for writing a feature's spec, design, tasks or code, for driving construction, or for "resume work" - those belong to the downstream spec-driven skill.
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.21.0"
+  version: "3.22.0"
 ---
 
 # Spec-Driven Roadmap
@@ -90,6 +90,22 @@ verdict, and the script never edits. If the file is not on disk, the install pre
 point at the README's reinstall path, and fall back to decompose-phase.md's written sanity checks.
 
 Phase 2 runs it too, as its own closing check — see decompose-phase.md, "Sanity checks".
+
+## Measuring what the agent runs cost
+
+Also standalone, also a read: *"measure my agent cost"*, *"where did my quota go"*.
+
+```
+python3 <skill-dir>/scripts/measure-agents.py --project <project-root> [--since YYYY-MM-DD]
+```
+
+It reads the project's own Claude Code transcripts and prints shares — token classes, cost by role
+(from each agent's label), context at the first turn and how much of it is growth, retries, and how
+many notifications the orchestrator processed. **You run it; report what it points at, in the
+user's language, and never read its unit as money or quota** — the script says why. Save a baseline
+with `--save-baseline` before a change to how agents run and compare with `--baseline` after it: a
+lever with no before/after measurement is a hypothesis, and must be reported as one. Exit `2` means
+nothing was measured (no transcripts, or none in the window) — say that, never "zero cost".
 
 ## Non-negotiable rules
 

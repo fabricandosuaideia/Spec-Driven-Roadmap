@@ -67,6 +67,7 @@ NUMBER_WORDS = {
 }
 
 failures = []
+DESCRIPTION_MAX = 1024
 checks_run = 0
 
 
@@ -173,6 +174,17 @@ def check_generated_blocks_never_start_a_line(root):
                 if line.rstrip() == block:
                     bad.append("references/%s:%d starts with %r" % (r, i, block))
     check("generated-block names never start a line in references/", not bad, "\n".join(bad))
+
+
+def check_description_length(root):
+    """The Agent Skills spec caps `description` at 1024 characters, and a field
+    over a documented limit fails packaging and upload outright rather than being
+    truncated. Every release that adds a trigger phrase moves it closer."""
+    skill = read(root, "SKILL.md") or ""
+    m = re.search(r"^description:\s*(.*)$", skill, re.M)
+    n = len(m.group(1).strip().strip('"')) if m else -1
+    check("SKILL.md description is within the spec's %d characters" % DESCRIPTION_MAX,
+          0 < n <= DESCRIPTION_MAX, "found %d" % n)
 
 
 def check_rule_count(root):
@@ -499,7 +511,7 @@ def main():
     print("versions"); check_versions(root)
     print("cross-file pointers"); check_section_pointers(root)
     check_generated_blocks_never_start_a_line(root)
-    print("counted facts"); check_rule_count(root); check_counted_facts(root)
+    print("counted facts"); check_rule_count(root); check_counted_facts(root); check_description_length(root)
     print("installers"); check_installer_payload(root)
     print("trilingual parity")
     check_trilingual_parity(root, "guide", scope(root)["guides"], "guide")
