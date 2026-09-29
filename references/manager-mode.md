@@ -65,6 +65,16 @@ python3 <this-skill-dir>/scripts/plan-pipeline.py --root <project-root> --manage
 and show the owner the one line it prints: which sections have work left, which need decomposing,
 where it will stop.
 
+**Features the gate cannot decide.** The line may name features "needing the owner": a feature with a
+report the downstream gate refuses — a real FAIL, or a PASS written in a shape the script does not
+read — or a feature still pending that a finished one depends on. The manager never builds a section
+holding one, nor any section depending on it, because it cannot tell finished work from unfinished
+there: on a real project six features of a closed section had PASS reports the script could not read,
+and an unattended run would have rebuilt all of them. For each, read its report with the owner and
+write the owner's word into `pipeline.json`: `"featureStatus": {"<feature>": "done"}` when the report
+really says it is finished, `"build"` when it must be built again. Never edit the report itself — it
+is the downstream skill's record, not this skill's.
+
 ## The prompt
 
 Hand over this prompt, `<PROJECT-ROOT>` and `<ROADMAP-SKILL-DIR>` resolved as in handoff-seed.md

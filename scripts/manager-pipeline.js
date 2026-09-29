@@ -20,7 +20,10 @@ export const meta = {
 // args (from plan-pipeline.py --manager): { project, skillDir, downstream, downstreamDir, statusPath,
 //   mainBranch, pipelineScript, model?, decomposeModel?, delegation, delegatedOn, stopAt[],
 //   sectionsPerRun, effort: { decompose, plan, final },
-//   sections: [{ slug, roadmap, txt, dependsOn[], decomposed, pending[] }] }   (build order)
+//   sections: [{ slug, roadmap, txt, dependsOn[], decomposed, pending[], doubtful{} }] }   (build order)
+// `doubtful` lists features the downstream gate cannot decide (a report it refuses, or a pending
+// feature a finished one depends on). They are the owner's to classify in pipeline.json's
+// `featureStatus`; until then the section is not built, and neither is anything depending on it.
 
 const A = args || {}
 const P = A.project
@@ -77,6 +80,8 @@ for (const s of SECTIONS) {
   if (s.decomposed && !(s.pending || []).length) { lines.push(`${s.slug}: already done`); continue }
   const bad = (s.dependsOn || []).find(d => blockedSections.has(d))
   if (bad) { blockedSections.add(s.slug); lines.push(`${s.slug}: skipped — depends on ${bad}, which did not finish`); log(`${s.slug}: skipped`); continue }
+  const doubt = Object.keys(s.doubtful || {})
+  if (doubt.length) { blockedSections.add(s.slug); lines.push(`${s.slug}: needs the owner — the gate cannot decide ${doubt.join(', ')}; classify each in featureStatus`); log(`${s.slug}: needs the owner`); continue }
   if (built >= PER_RUN) { stopped = `sectionsPerRun (${PER_RUN}) reached — launch again to continue`; break }
 
   if (!s.decomposed) {

@@ -141,6 +141,59 @@ def is_done(root, ds, ds_dir, name):
     return r.returncode == 0
 
 
+def deps_of(fields):
+    dep = CR.field(fields, "depends on", "depends") or ""
+    return re.findall(r"`?([a-z0-9]+(?:-[a-z0-9]+)+)`?", dep)
+
+
+OWNER_WORDS = ("done", "build")
+
+
+def classify(root, ds, ds_dir, entries, order, cfg, roadmap_rel):
+    """(done, pending, discharged, doubtful) for one roadmap's build order.
+
+    The downstream gate decides, except where it cannot: a feature whose report exists but that the
+    gate refuses (a real FAIL, or a PASS written in a shape the script does not read), and a feature
+    still "pending" that a finished feature depends on (which cannot be). On a real project seven
+    such features sat in two closed sections, and an unattended run would have rebuilt all of them.
+    Those are the owner's to classify, in pipeline.json's `featureStatus` ("done" or "build"); until
+    then they are doubtful, and nothing plans around them."""
+    owner = cfg.get("featureStatus") or {}
+    bad = sorted(k for k, v in owner.items() if v not in OWNER_WORDS)
+    if bad:
+        raise RuntimeError("%s featureStatus takes \"done\" or \"build\"; not: %s" % (CONFIG, ", ".join(bad)))
+    done, pending, discharged = [], [], []
+    for name in order:
+        fields = entries.get(name)
+        if fields is None:
+            raise RuntimeError("%s is in the build order but has no entry in %s" % (name, roadmap_rel))
+        said = owner.get(name)
+        if CR.field(fields, "discharge"):
+            discharged.append(name)
+        elif said == "done" or (said != "build" and is_done(root, ds, ds_dir, name)):
+            done.append(name)
+        else:
+            pending.append(name)
+    report = PROFILES[ds][0]
+    doubtful = {}
+    for name in pending:
+        if owner.get(name) == "build":
+            continue
+        if os.path.isfile(os.path.join(root, ".specs", "features", name, report)):
+            doubtful[name] = "has a %s the gate refuses" % report
+            continue
+        needers = [d for d in done if name in deps_of(entries[d])]
+        if needers:
+            doubtful[name] = "finished feature %s depends on it" % needers[0]
+    return done, pending, discharged, doubtful
+
+
+def doubtful_message(doubtful):
+    return ("%d feature(s) the downstream gate cannot decide — classify each in %s \"featureStatus\" as "
+            "\"done\" or \"build\" before an unattended run builds around it: %s"
+            % (len(doubtful), CONFIG, "; ".join("%s (%s)" % kv for kv in sorted(doubtful.items()))))
+
+
 def plan(root, roadmap_rel, cfg):
     ds, ds_dir = downstream(root)
     if not ds:
@@ -156,17 +209,9 @@ def plan(root, roadmap_rel, cfg):
     entries = {n: f for n, f, _b in CR.parse_features(text)}
     status = os.path.join("docs", "ROADMAP-INDEX.md") if os.path.isfile(os.path.join(root, "docs", "ROADMAP-INDEX.md")) \
         else os.path.join("docs", "ROADMAP.md")
-    pending, done, discharged = [], [], []
-    for name in order:
-        fields = entries.get(name)
-        if fields is None:
-            raise RuntimeError("%s is in the build order but has no entry in %s" % (name, roadmap_rel))
-        if CR.field(fields, "discharge"):
-            discharged.append(name)
-        elif is_done(root, ds, ds_dir, name):
-            done.append(name)
-        else:
-            pending.append(name)
+    done, pending, discharged, doubtful = classify(root, ds, ds_dir, entries, order, cfg, roadmap_rel)
+    if doubtful:
+        raise RuntimeError(doubtful_message(doubtful))
     lanes = max(1, int(cfg.get("lanes") or 1))
     lane_of, load = {}, {n: 0 for n in range(1, lanes + 1)}
     feats = []
@@ -175,8 +220,7 @@ def plan(root, roadmap_rel, cfg):
         floor, _why = CR.derive_tier(fields)
         stated, _r = CR.stated_tier(fields)
         tier = stated if stated and CR.TIER_RANK[stated] >= CR.TIER_RANK[floor] else floor
-        dep = CR.field(fields, "depends on", "depends") or ""
-        deps = [d for d in re.findall(r"`?([a-z0-9]+(?:-[a-z0-9]+)+)`?", dep) if d in pending and d != name]
+        deps = [d for d in deps_of(fields) if d in pending and d != name]
         first = next((lane_of[d] for d in deps if d in lane_of), None)
         lane = first or min(load, key=lambda k: (load[k], k))
         lane_of[name] = lane
@@ -233,8 +277,8 @@ def index_sections(root):
     return [by[s] for s in order]
 
 
-def section_states(root):
-    """Each section, with `decomposed` and the features its downstream gate does not pass yet."""
+def section_states(root, cfg=None):
+    """Each section, with `decomposed`, the features still to build, and the doubtful ones."""
     ds, ds_dir = downstream(root)
     if not ds:
         raise RuntimeError("no tlc-spec-lean or tlc-spec-driven under %s/.claude/skills" % root)
@@ -242,8 +286,12 @@ def section_states(root):
     for sec in index_sections(root):
         names = CR.txt_names(os.path.join(root, sec["txt"]))
         decomposed = bool(names) and os.path.isfile(os.path.join(root, sec["roadmap"]))
-        pending = [n for n in names if not is_done(root, ds, ds_dir, n)] if decomposed else []
-        out.append(dict(sec, decomposed=decomposed, pending=pending))
+        pending, doubtful = [], {}
+        if decomposed:
+            with open(os.path.join(root, sec["roadmap"]), encoding="utf-8") as fh:
+                entries = {n: f for n, f, _b in CR.parse_features(fh.read())}
+            _d, pending, _q, doubtful = classify(root, ds, ds_dir, entries, names, cfg or {}, sec["roadmap"])
+        out.append(dict(sec, decomposed=decomposed, pending=pending, doubtful=doubtful))
     return out, ds, ds_dir
 
 
@@ -252,7 +300,7 @@ def manager_args(root, cfg):
     if not (mgr.get("delegation") or "").strip():
         raise RuntimeError("%s has no manager.delegation: manager mode decides what would otherwise be asked, "
                            "and only the owner can hand that over, in their own words" % CONFIG)
-    secs, ds, ds_dir = section_states(root)
+    secs, ds, ds_dir = section_states(root, cfg)
     status = os.path.join("docs", "ROADMAP-INDEX.md")
     return {
         "project": root, "skillDir": SKILL_DIR, "downstream": ds, "downstreamDir": ds_dir,
@@ -336,6 +384,14 @@ x
         subprocess.run(["git", "-C", root, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q",
                         "--allow-empty", "-m", "init"], check=True)
         cfg = dict(DEFAULT_CONFIG, confirmed=True, gate="make check", lanes=2)
+        try:
+            plan(root, os.path.join("docs", "ROADMAP.md"), cfg)
+            refused = ""
+        except RuntimeError as e:
+            refused = str(e)
+        expect("a feature with a report the gate refuses is doubtful until the owner classifies it",
+               "n-fail (has a verification.md the gate refuses)" in refused and "featureStatus" in refused)
+        cfg = dict(cfg, featureStatus={"n-fail": "build"})
         args, info = plan(root, os.path.join("docs", "ROADMAP.md"), cfg)
         names = [f["name"] for f in args["features"]]
         by = {f["name"]: f for f in args["features"]}
@@ -349,6 +405,15 @@ x
                and by["n-big"]["lane"] == by["n-fail"]["lane"])
         expect("an independent feature goes to the least-loaded lane", by["n-next"]["lane"] != by["n-fail"]["lane"])
         expect("the gate comes from the confirmed config", args["gate"] == "make check" and args["downstream"] == "tlc-spec-lean")
+        _a, info2 = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, featureStatus={"n-fail": "done"}))
+        expect("classified done, it is skipped without touching its report", "n-fail" in info2["done"]
+               and "n-fail" not in info2["pending"])
+        try:
+            plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, featureStatus={"n-fail": "maybe"}))
+            ok_word = False
+        except RuntimeError as e:
+            ok_word = "featureStatus" in str(e)
+        expect("featureStatus takes only done or build", ok_word)
         expect("no barrier and no model unless the config sets them",
                args["barrierGate"] is None and args["barrierEvery"] == 0 and args["model"] is None)
         args2, _ = plan(root, os.path.join("docs", "ROADMAP.md"),
@@ -363,7 +428,7 @@ x
         expect("--init detects the real main branch", written["mainBranch"] == "master")
         expect("--init leaves the barrier and the model for the user to set",
                written["barrierGate"] is None and written["model"] is None)
-        written.update(confirmed=True, gate="make check", mainBranch="main")
+        written.update(confirmed=True, gate="make check", mainBranch="main", featureStatus={"n-fail": "build"})
         json.dump(written, open(os.path.join(root, CONFIG), "w"))
         import io
         import contextlib
@@ -401,6 +466,19 @@ x
         expect("a section with a roadmap and a build order is decomposed, and lists what is left",
                secs[0]["decomposed"] and "n-fail" in secs[0]["pending"] and "n-done" not in secs[0]["pending"])
         expect("a section with neither is not decomposed", not secs[1]["decomposed"] and secs[1]["pending"] == [])
+        expect("without the owner's word a refused report makes the section doubtful",
+               "n-fail" in section_states(root)[0][0]["doubtful"])
+        # n-next is done and depends on n-done; make it depend on n-big (pending) instead
+        core = os.path.join(root, "docs", "ROADMAP-core.md")
+        body = open(core).read()
+        open(core, "w").write(body.replace("- **depends on** — n-done", "- **depends on** — n-big"))
+        os.makedirs(os.path.join(root, ".specs", "features", "n-next"))
+        open(os.path.join(root, ".specs", "features", "n-next", "verification.md"), "w").write("**Verdict**: PASS\n")
+        d2 = section_states(root, {"featureStatus": {"n-fail": "build"}})[0][0]["doubtful"]
+        expect("a pending feature a finished one depends on is doubtful (a question gate with no discharge line)",
+               d2.get("n-big", "").startswith("finished feature n-next depends on it"))
+        open(core, "w").write(body)
+        shutil.rmtree(os.path.join(root, ".specs", "features", "n-next"))
         written = json.load(open(os.path.join(root, CONFIG)))
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             rc = main(["--root", root, "--manager"])
@@ -474,11 +552,17 @@ def main(argv=None):
             print(str(e), file=sys.stderr)
             return 1
         todo = [x for x in margs["sections"] if not x["decomposed"] or x["pending"]]
+        doubt = {k: v for x in margs["sections"] for k, v in x["doubtful"].items()}
         print("manager: %d section(s), %d with work left (%s); stops at %s; scriptPath %s" % (
               len(margs["sections"]), len(todo),
-              ", ".join("%s:%s" % (x["slug"], len(x["pending"]) if x["decomposed"] else "to decompose") for x in todo) or "none",
+              ", ".join("%s:%s" % (x["slug"], ("%d, %d needing the owner" % (len(x["pending"]), len(x["doubtful"]))
+                                              if x["doubtful"] else len(x["pending"])) if x["decomposed"] else "to decompose")
+                        for x in todo) or "none",
               ", ".join(margs["stopAt"]) or "nothing", os.path.join(SKILL_DIR, "scripts", "manager-pipeline.js")),
               file=sys.stderr)
+        if doubt:
+            print("a section with a feature that needs the owner is not built, nor is any section depending on "
+                  "it. " + doubtful_message(doubt), file=sys.stderr)
         if not todo:
             return 1
         print(json.dumps(margs, indent=1))

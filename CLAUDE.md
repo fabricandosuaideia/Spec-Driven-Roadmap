@@ -92,7 +92,8 @@ none of it is yours to decide unprompted.
 **Never edit by hand:** `benchmark/RESULTS.md` (the runner appends it), and the three version
 declarations (`bump-version.sh` writes them together, and refuses when they already disagree). In a
 user's project the skill's own equivalents: `## Status` and `docs/roadmap-history.md` are
-`status-block.py`'s, and `docs/process/pipeline.json`'s `"confirmed"` is the user's alone.
+`status-block.py`'s, and `docs/process/pipeline.json`'s `"confirmed"`, `"featureStatus"` and
+`"manager.delegation"` are the user's alone.
 
 **What is never touched without saying so:** the 13 non-negotiable rules in `SKILL.md`, the prompt
 templates Step 10 emits — options A and C in `references/handover-prompt.md`, the two `/loop` templates

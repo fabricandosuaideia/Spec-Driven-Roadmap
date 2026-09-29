@@ -9,6 +9,43 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.32.1 — 2026-09-29
+
+**The planner no longer rebuilds finished work it cannot read.** Found before the first real
+manager-mode launch, on the user's project. `plan-pipeline.py --manager` reported `views:1` and
+`gate:6` as work left in two closed sections. Launched, it would have rebuilt seven finished features.
+
+- **`gate:6`: a gap in the skill.** Six features had PASS reports in shapes the downstream gate script
+  does not read: a verdict line still reading `[PASS | FAIL]`, a PASS with no `file:line`, verdicts
+  only in prose. The seed counts them done because it reads the report when the script disagrees. The
+  planner trusted only the script.
+- **`views:1`: a defect in 3.32.0.** `--manager` ignored a question-only feature's `discharge` line,
+  which the per-roadmap planner always honoured. The roadmap was right, and the diagnosis first given
+  to the user blamed it. That was wrong.
+
+**What changed:**
+- **One classification for both paths** (`classify` in `plan-pipeline.py`). A feature is **doubtful**
+  when its report exists but the gate refuses it, or when it is still pending and a finished feature
+  depends on it (which cannot be).
+  - A doubtful feature is never planned on its own. Option C refuses with the list.
+  - Manager mode holds the section as "needs the owner", and holds every section depending on it;
+    independent sections still run.
+  - The owner decides in `pipeline.json`: `"featureStatus": {"<feature>": "done" | "build"}`. The
+    downstream skill's report is never edited, because it is that skill's record.
+- **Direction of error.** A refused feature, even a plain FAIL, now needs a person before the next
+  run. That is where a blocked feature belongs anyway, and it cannot make finished work read as
+  unfinished.
+
+**Executed:**
+- **`plan-pipeline.py --selftest`:** 6 new assertions. They cover refusal without the owner's word,
+  `build`, `done`, a bad word, a doubtful section, and the dependency signal.
+- **`check-pipeline.mjs`:** 1 manager scenario and 1 mutant.
+- **Against a copy of the user's project** (roadmaps, reports and downstream skill copied to a
+  scratch directory; the project untouched), `--manager` now names exactly the six `gate` features
+  and nothing in `views`.
+
+---
+
 ## 3.32.0 — 2026-09-29
 
 **Manager mode: the whole backlog, unattended, on the owner's written delegation.** Asked for by the

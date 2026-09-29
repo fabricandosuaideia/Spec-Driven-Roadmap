@@ -214,6 +214,12 @@ const managerScenarios = {
       slug => slug === 'a' ? ['a-a: blocked'] : ['x: merged (attempt 1)'])
     return !r.children.some(c => c.slug === 'b') && r.children.some(c => c.slug === 'c') && r.out.some(l => /^b: skipped/.test(l))
   },
+  'manager: a section with a feature the gate cannot decide is not built, nor anything depending on it': async src => {
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: ['a-x'], doubtful: { 'a-x': 'has a validation.md the gate refuses' } }),
+      sec('b', { dependsOn: ['a'] }), sec('c')] })
+    return !r.calls.some(c => c.slug === 'a' || c.slug === 'b') && r.children.map(c => c.slug).join() === 'c' &&
+      r.out.some(l => /^a: needs the owner — the gate cannot decide a-x/.test(l)) && r.out.some(l => /^b: skipped/.test(l))
+  },
   'manager: a red barrier stops the run': async src => {
     const r = await runManager(src, { sections: [sec('a'), sec('b')] }, slug => ['a-a: merged (attempt 1)', 'barrier: red after a-a — t'])
     return r.children.length === 1 && r.out.some(l => /stopped: the barrier is red after a/.test(l))
@@ -257,6 +263,7 @@ const managerMutants = {
   'stopAt ignored': ['if (STOP_AT.has(s.slug))', 'if (false)'],
   'red barrier ignored': ["if (red) { stopped = `the barrier is red after ${s.slug}`; break }", ''],
   'decisions not marked': ['**Decided by the manager', '**Decided'],
+  'doubtful features built anyway': ['if (doubt.length) {', 'if (false) {'],
 }
 
 let failed = 0

@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.32.0"
+  version: "3.32.1"
 ---
 
 # Spec-Driven Roadmap
@@ -204,7 +204,8 @@ replaces, so no run has a reason to keep an old Handoff beside the new one.
   their effort and context budget. Never overwrites a file the user changed.
 - `docs/process/pipeline.json` — Step 10, option C only, through `scripts/plan-pipeline.py --init`: the
   pipeline's config. Its gate commands — per feature, and the batch barrier when the project has one —
-  are confirmed by the user, never by this skill.
+  are confirmed by the user, never by this skill; so are manager mode's delegation and `featureStatus`,
+  the user's word on a feature the downstream gate cannot decide.
 - `docs/roadmap-history.md` — append-only, through `scripts/status-block.py`: every `## Status` and
   `## Handoff` body the seed replaces, every older copy of the Handoff it moves out of `.specs/STATE.md`,
   and each loop run's account. A log for people; no prompt points an agent at it.

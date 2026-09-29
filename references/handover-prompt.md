@@ -588,7 +588,11 @@ them for an unattended run:
    - **The model** (`"model"`), for every agent the pipeline starts. Left `null`, they all inherit the
      session's model — say so, and say which one that is: a real run went out on a model nobody chose.
 
-   Write their answers and `"confirmed": true` into the file.
+   Write their answers and `"confirmed": true` into the file. If `plan-pipeline.py` then refuses
+   with features the gate "cannot decide" — a report the gate refuses, or a pending feature a
+   finished one depends on — read each report with the user and write their word into
+   `"featureStatus"` (`"done"` or `"build"`), never into the report; manager-mode.md, "Features the
+   gate cannot decide", says why.
    Never confirm it yourself: `plan-pipeline.py` refuses an unconfirmed config because every PASS the
    pipeline records is that command's verdict. A gate may take longer than one command's 10 minutes:
    the pipeline runs every gate detached and waits for it, so that is not a reason to pick a shorter
