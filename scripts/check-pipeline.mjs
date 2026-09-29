@@ -151,6 +151,17 @@ const scenarios = {
     const rec = r.calls.find(c => c.role === 'record')
     return !!rec && /git checkout main/.test(rec.prompt) && /commit exactly docs\/ROADMAP\.md and docs\/roadmap-history\.md on main/.test(rec.prompt)
   },
+  'outside manager mode no test may be edited, and nobody is told otherwise': async src => {
+    const r = await run(src, { features: [feat('a', 'C')] }, pass())
+    const b = r.calls.find(c => c.role === 'build'), v = r.calls.find(c => c.role === 'verify')
+    return /never edit, weaken, skip, delete/.test(b.prompt) && !/REVOKED/.test(b.prompt) && !/REVOKED/.test(v.prompt)
+  },
+  'in manager mode a revoked assertion may be corrected, and the verifier checks every test change': async src => {
+    const r = await run(src, { managerMode: true, features: [feat('a', 'C')] }, pass())
+    const b = r.calls.find(c => c.role === 'build'), v = r.calls.find(c => c.role === 'verify')
+    return /REVOKED-TEST <file>:<line>/.test(b.prompt) && /same strength/.test(b.prompt) && !/never edit, weaken/.test(b.prompt) &&
+      /REVOKED TESTS \(manager mode\)/.test(v.prompt) && /is a blocker issue/.test(v.prompt)
+  },
   'a model set in the config reaches every agent': async src => {
     const r = await run(src, { model: 'sonnet', barrierGate: 'x', features: [feat('a', 'A')] }, pass())
     const none = await run(src, { features: [feat('a')] }, pass())
@@ -167,6 +178,7 @@ const mutants = {
   'red barrier ignored': ['if (!green) barrierRed = merged', 'if (false) barrierRed = merged'],
   'launch request not scoped': ['never ask.\n${LAUNCHED}', 'never ask.'],
   'gate not waited for': ['tail --pid=<that PID>', 'cat <that PID>'],
+  'verifier not told to check test changes in manager mode': ["${MANAGED ? REVOKED_CHECK(f) + '\\n' : ''}", ''],
   'barrier only at the end': ['if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()', ''],
 }
 
@@ -187,7 +199,7 @@ async function runManager(src, argsOver, child = () => ['x: merged (attempt 1)',
     if (role === 'plan') return { exitCode: 0, line: 'ok', argsJson: JSON.stringify({ features: [{ name: slug + '-a' }], roadmap: `docs/ROADMAP-${slug}.md` }) }
     if (role === 'final') return { recorded: true, summary: 's' }
   }
-  const workflow = async (ref, a) => { const slug = a.roadmap.match(/ROADMAP-(.+)\.md/)[1]; children.push({ ref, slug }); return child(slug) }
+  const workflow = async (ref, a) => { const slug = a.roadmap.match(/ROADMAP-(.+)\.md/)[1]; children.push({ ref, slug, managerMode: a.managerMode }); return child(slug) }
   const fn = new AsyncFunction('args', 'agent', 'parallel', 'phase', 'log', 'workflow', src.replace(/^export const meta/m, 'const meta'))
   let out, error = null
   try { out = await fn({ ...MBASE, ...argsOver }, agent, fns => Promise.all(fns.map(f => f())), () => {}, () => {}, workflow) } catch (e) { error = e.message }
@@ -200,6 +212,10 @@ const managerScenarios = {
     const roles = r.calls.map(c => c.role + ':' + (c.slug || '')).join()
     return roles === 'decompose:a,plan:a,plan:b,final:' && r.children.map(c => c.slug).join() === 'a,b' &&
       r.children.every(c => c.ref.scriptPath === '/s/scripts/roadmap-pipeline.js')
+  },
+  'manager: every child pipeline runs in manager mode': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('b', { decomposed: true, pending: ['b-a'] })] })
+    return r.children.length === 2 && r.children.every(c => c.managerMode === true)
   },
   'manager: a finished section costs nothing': async src => {
     const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: [] }), sec('b')] })
@@ -264,6 +280,7 @@ const managerMutants = {
   'red barrier ignored': ["if (red) { stopped = `the barrier is red after ${s.slug}`; break }", ''],
   'decisions not marked': ['**Decided by the manager', '**Decided'],
   'doubtful features built anyway': ['if (doubt.length) {', 'if (false) {'],
+  'child pipelines not told they run in manager mode': ['{ ...pargs, managerMode: true }', 'pargs'],
 }
 
 let failed = 0

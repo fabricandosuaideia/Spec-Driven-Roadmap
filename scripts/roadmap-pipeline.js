@@ -51,6 +51,11 @@ const BARRIER_EVERY = Math.max(0, A.barrierEvery || 0)
 const CHUNK = Math.max(30, Math.min(540, A.waitChunk || 540))
 if (!P || !SKILL || !DS || !DSDIR || !A.gate) throw new Error('args incomplete: run plan-pipeline.py and pass its output as args')
 const MODEL = A.model ? { model: A.model } : {}
+// Set by manager-pipeline.js only. In manager mode nobody is there to authorise a test correction,
+// and on a real project two features in two days each spent five attempts and stopped the chain on
+// tests asserting behaviour the owner had revoked; the owner authorised the same correction by hand
+// both times. MANAGED lets the builder make that one correction and makes the verifier check it.
+const MANAGED = !!A.managerMode
 
 const tierOf = f => (f.tier === 'A' || f.tier === 'C') ? f.tier : 'B'
 const laneOf = f => Math.min(LANES, Math.max(1, f.lane || 1))
@@ -82,7 +87,10 @@ FEATURE: ${f.name}, risk tier ${tierOf(f)}. Its spec source is the output of: py
 DOWNSTREAM SKILL: ${DS}, at ${DSDIR}. Read its SKILL.md and only the references your role needs.
 ${WORKTREE(f)}
 CONTEXT BUDGET: every turn re-reads your whole conversation. Read files with offset/limit, grep for a symbol instead of reading a directory, send long command output to a file and read back only the lines that matter, never paste a whole log or diff, never re-read a file that did not change.
-TESTS: never edit, weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green. A test that is genuinely wrong stays red, with the reason written down.`
+${MANAGED ? REVOKED_RULE : 'TESTS: never edit, weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green. A test that is genuinely wrong stays red, with the reason written down.'}`
+
+const REVOKED_RULE = `TESTS: never weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green.
+MANAGER MODE — one exception, because nobody is there to authorise it: an existing test whose assertion states exactly a behaviour that an owner decision recorded in the roadmap revokes (an answered open question, a settled Cross-Cutting Decision, or an acceptance criterion as the owner answered it) may have THAT assertion corrected, and only it: in a commit of its own whose message quotes the decision and names where it is recorded; the new assertion states the decided behaviour at the same strength — as specific, no looser matcher, no removed check, no skip. List each in your notes as REVOKED-TEST <file>:<line> — <the decision, quoted>. A test red for any other reason stays red, with the reason written down: the independent verifier refuses every test change that is not such a correction.`
 
 const ANGLES = [
   'Build the feature exactly as its spec source states.',
@@ -114,9 +122,11 @@ const VERIFY = f => `${COMMON(f)}
 ROLE: VERIFIER. You did not build this; try to show it is NOT done. Follow ${DS}'s ${LEAN ? 'references/verify.md' : 'references/validate.md'} over every ${LEAN ? 'check' : 'acceptance criterion'}. You change no code.
 GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, run the gate yourself (${A.gate}) — ${RUN_GATE(A.gate, wt(f))}
    and report the mismatch as a minor issue.
-${LEAN ? 'Write verification.md exactly as verify.md prescribes, with **Verdict**: PASS or FAIL at the top.' : 'Write validation.md from validate.md\'s template with ONE line reading "## Validation: ' + f.name + ' — PASS" or "— FAIL" as the only verdict the gate can see: relabel the sensor and gate-check result fields (**Sensor verdict** —, **Gate outcome** —); per-criterion rows say MET or NOT MET, never PASS.'} Cite file:line evidence. Commit the report.
+${MANAGED ? REVOKED_CHECK(f) + '\n' : ''}${LEAN ? 'Write verification.md exactly as verify.md prescribes, with **Verdict**: PASS or FAIL at the top.' : 'Write validation.md from validate.md\'s template with ONE line reading "## Validation: ' + f.name + ' — PASS" or "— FAIL" as the only verdict the gate can see: relabel the sensor and gate-check result fields (**Sensor verdict** —, **Gate outcome** —); per-criterion rows say MET or NOT MET, never PASS.'} Cite file:line evidence. Commit the report.
 Then run the completion gate: python3 ${DSDIR}/scripts/${GATE_SCRIPT} ${f.name} --root ${wt(f)} — and report its exit code as the script returned it, never through a pipe.${tierOf(f) === 'C' ? '\nThis is a tier C feature and no reviewer follows you: review the diff for correctness, security and weak tests as well, and list those issues too.' : ''}
 Reply with gateExit, pass (true only if gateExit is 0, every ${LEAN ? 'check' : 'criterion'} holds and you found no blocker or major issue), notMet and issues.`
+
+const REVOKED_CHECK = f => `REVOKED TESTS (manager mode): list every change on this branch to a test that already existed on ${MAIN} (git diff ${MAIN}...feat/${f.name}, over the project's test files). Each must be a REVOKED-TEST the builder declared, in a commit of its own that quotes an owner decision recorded in the roadmap; read that decision where the commit says it is, and confirm it revokes exactly the old assertion and that the new one states the decided behaviour at the same strength. Every change that fails any of this — an undeclared edit, no such decision, a decision that does not revoke that assertion, a weaker assertion, a skip or a deletion — is a blocker issue at that file:line.`
 
 const REVIEW = f => `${COMMON(f)}
 

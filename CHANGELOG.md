@@ -9,6 +9,52 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.33.0 — 2026-09-29
+
+**In manager mode, a builder may correct a test that asserts what the owner revoked. The verifier
+checks every such correction.** This was asked for by the owner after the first real manager run.
+Twice in two days, a feature on the user's project spent all its attempts on existing tests that
+asserted behaviour the owner had revoked (BUG-031, then BUG-096), and it stopped the chain behind it.
+The pipeline forbids a builder to edit an existing test, which is the guard against bending a test
+to reach a pass. Each time the owner authorised the same correction by hand, in one commit citing the
+decision. The owner scoped the change to manager mode: "quem usa o modo gestor não quer interrupção"
+(whoever uses manager mode does not want to be interrupted).
+
+- **`roadmap-pipeline.js`:** a new `managerMode` arg, which only `manager-pipeline.js` sets.
+  - With it, the builder's TESTS clause allows one correction. It applies to the assertion of an
+    existing test that states exactly a behaviour an owner decision recorded in the roadmap revokes,
+    and to nothing else. The correction goes in its own commit quoting the decision, at the same
+    strength, and is declared as `REVOKED-TEST <file>:<line> — <decision>`.
+  - The verifier gets `REVOKED TESTS`. It lists every change on the branch to a test that already
+    existed, reads the decision each one cites, and makes a blocker of any change that is not such a
+    correction: an undeclared edit, a decision that does not revoke it, a weaker assertion, a skip,
+    or a deletion.
+  - Without `managerMode` (option C, run by a person) nothing changes, and the builder is never told
+    the exception exists.
+- **`references/manager-mode.md`** states the exception, and the new `benchmark/revoke-fixture`
+  (scenario `manager-revoke`) plants it.
+
+**Executed:**
+- **`check-pipeline.mjs`:** 3 new scenarios. They cover outside manager mode (no exception, no
+  check), inside it (both), and the manager passing `managerMode` to every child. There are 2 new
+  mutants, and both are caught.
+- **A real manager run on `benchmark/revoke-fixture`** (Sonnet 5.5; 7 agents, 357 k tokens, 3
+  minutes): `calc: 1 merged`.
+  - The builder corrected the revoked assertion in a commit of its own, before the implementation
+    commit (`REVOKED-TEST tests/test_calc.py: …`). Its message quotes the owner's answer and says
+    where it is recorded.
+  - `assertIsNone(calc.div(1, 0))` became `assertRaises(ZeroDivisionError)`, the same input with a
+    specific exception.
+  - `test_div_floors` is untouched.
+  - The verifier's report carries a "Revoked tests" table that checks the commit, its isolation and
+    the decision it cites.
+  - The tree ended clean and the suite is green.
+  - **Not exercised for real:** a builder attempting a correction that no decision supports. The
+    verifier's check is what refuses it, and the stubs hold that the check is always in its prompt in
+    manager mode.
+
+---
+
 ## 3.32.1 — 2026-09-29
 
 **The planner no longer rebuilds finished work it cannot read.** Found before the first real

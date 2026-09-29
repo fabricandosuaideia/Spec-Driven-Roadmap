@@ -1,0 +1,47 @@
+{
+ "confirmed": true,
+ "gate": "bash gate.sh",
+ "barrierGate": null,
+ "barrierEvery": 0,
+ "model": "sonnet",
+ "waitChunk": 30,
+ "testHint": "python3 -m unittest discover -s tests -t . -q",
+ "setup": "",
+ "push": false,
+ "mainBranch": "master",
+ "lanes": 1,
+ "checklist": null,
+ "effort": {
+  "implement": {
+   "A": "xhigh",
+   "B": "high",
+   "C": "medium"
+  },
+  "prove": "medium",
+  "verify": {
+   "A": "high",
+   "B": "high",
+   "C": "medium"
+  },
+  "review": "high",
+  "merge": "medium",
+  "record": "low"
+ },
+ "maxAttempts": {
+  "A": 5,
+  "B": 4,
+  "C": 3
+ },
+ "manager": {
+  "delegation": "Decide every open question yourself, taking the conservative option; I will review each decision afterwards.",
+  "delegatedOn": "2026-09-29",
+  "stopAt": [],
+  "sectionsPerRun": 4,
+  "decomposeModel": null,
+  "effort": {
+   "decompose": "high",
+   "plan": "low",
+   "final": "medium"
+  }
+ }
+}

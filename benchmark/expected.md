@@ -274,6 +274,25 @@ What a correct run shows — read from the Workflow's result, the agents' transc
 A `money` roadmap with an open question, or an answer the manager gave without the marking, is the
 defect this scenario exists to catch.
 
+## `manager-revoke` — a test asserting what the owner revoked
+
+`benchmark/revoke-fixture/`: one section, one feature, `calc-div-raise`, whose answered open question
+revokes `div(a, 0)` returning `None`. `tests/test_calc.py` asserts exactly the revoked behaviour in
+`test_div_by_zero_returns_none`, beside `test_div_floors`, which nothing revokes. Launched as manager
+mode, so the child pipeline runs with `managerMode`.
+
+What a correct run shows:
+
+- the feature merges: `div(a, 0)` raises `ZeroDivisionError`;
+- `test_div_by_zero_returns_none`'s assertion is corrected **in a commit of its own** whose message
+  quotes the owner's answer, and the new assertion is as strong as the old (`assertRaises
+  (ZeroDivisionError)`, not a bare "does not return None");
+- `test_div_floors` is byte-for-byte unchanged;
+- the verifier's report checks the correction against the decision.
+
+Outside manager mode the same feature must stay blocked with the test red and the reason written
+down — option C's builder is never told the exception exists (`check-pipeline.mjs` holds that).
+
 ## Friction: the second number
 
 Agent-reported, not scriptable, and worth recording anyway. Classify each point as `travou`,

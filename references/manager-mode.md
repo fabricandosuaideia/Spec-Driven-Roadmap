@@ -24,6 +24,17 @@ What does not change: this skill still authors no spec, plan, check or code. Eve
 the downstream skill, run by option C's agents, with the same prover, verifier, reviewer, merge gate
 and barrier.
 
+**One test rule changes, and only here.** Everywhere else a builder never edits an existing test to
+reach a pass: a test that is wrong stays red for a person to authorise. Nobody is there in manager
+mode, and on a real project two features in two days each spent all their attempts, and stopped the
+chain behind them, on tests asserting behaviour the owner had revoked — the owner authorised the same
+correction by hand both times. So in manager mode the builder may correct **that assertion and only
+it**, when an owner decision recorded in the roadmap (an answered question, a settled Cross-Cutting
+Decision) revokes exactly the behaviour it states: in a commit of its own quoting the decision, the new
+assertion as strong as the old. The independent verifier checks every change to an existing test on
+the branch and refuses the feature for any that is not such a correction — an undeclared edit, a
+decision that does not revoke it, a weaker assertion, a skip or a deletion.
+
 **Why a script and not a prompt.** A manager that is a conversation grows with every section: on a
 measured multi-agent build the coordinator went from 41k to 88k tokens of context in 25 turns, and a
 conversation that runs for a day is compacted — which is where a mission gets lost. This manager's

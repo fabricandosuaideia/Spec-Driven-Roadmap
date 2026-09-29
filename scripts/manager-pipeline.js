@@ -103,7 +103,9 @@ for (const s of SECTIONS) {
 
   built++
   let out
-  try { out = await workflow({ scriptPath: A.pipelineScript }, pargs) } catch (e) { out = null; lines.push(`${s.slug}: blocked — the pipeline did not run: ${e.message}`) }
+  // managerMode lets a builder correct a test asserting behaviour the owner revoked, and makes the
+  // verifier check every test change; option C, run by a person, never gets it.
+  try { out = await workflow({ scriptPath: A.pipelineScript }, { ...pargs, managerMode: true }) } catch (e) { out = null; lines.push(`${s.slug}: blocked — the pipeline did not run: ${e.message}`) }
   out = Array.isArray(out) ? out : []
   const merged = out.filter(l => /: merged/.test(l)).length
   const unfinished = out.filter(l => /: (blocked|skipped|held|merge-failed)/.test(l))
