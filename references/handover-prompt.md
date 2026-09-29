@@ -72,6 +72,11 @@ default to the loop because it looks faster.** Ask, in the confirmed output lang
   conversation, the verifier reuses the prover's receipt instead of re-running the suite, and this
   session only receives one line per feature at the end.
 
+  **Manager mode is not a fourth option here.** It is its own entry
+  ([manager-mode.md](manager-mode.md)), for an owner who will not be there at all, and it runs only on
+  their written delegation. In a multi-section project in Claude Code, when the user asks how to build
+  everything unattended, name it in one sentence and do not offer it as a choice.
+
 Everywhere below, **"the roadmap"** means that one file and its build order — `<ROADMAP-PATH>` and
 `<BUILD-ORDER-TXT>` exactly as Step 6's table resolves them for the target section.
 

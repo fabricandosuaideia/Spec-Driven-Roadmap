@@ -22,10 +22,10 @@ FORCE="false"
 
 # The skill is these files and nothing else. Used to validate the download
 # before anything on disk is touched.
-REQUIRED_REFS=(scope-phase.md index-phase.md decompose-phase.md handoff-seed.md handover-prompt.md loop-tlc-spec-driven.md loop-tlc-spec-lean.md upgrade-project.md)
+REQUIRED_REFS=(scope-phase.md index-phase.md decompose-phase.md handoff-seed.md handover-prompt.md loop-tlc-spec-driven.md loop-tlc-spec-lean.md upgrade-project.md manager-mode.md)
 # Runtime scripts the skill itself invokes. Maintainer-only tooling (bump-version.sh)
 # deliberately stays in the repo and is not installed.
-REQUIRED_SCRIPTS=(convert-to-multi.py check-roadmap.py measure-agents.py feature-brief.py status-block.py write-agents.py plan-pipeline.py roadmap-pipeline.js bench-gate.py)
+REQUIRED_SCRIPTS=(convert-to-multi.py check-roadmap.py measure-agents.py feature-brief.py status-block.py write-agents.py plan-pipeline.py roadmap-pipeline.js manager-pipeline.js bench-gate.py)
 
 print_status()  { echo "→ $1"; }
 print_success() { echo "✓ $1"; }

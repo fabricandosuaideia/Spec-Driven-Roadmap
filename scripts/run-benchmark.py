@@ -77,6 +77,9 @@ SCENARIOS = {
     # Option C with real agents: the harness relays the launch request to every agent, and a gate
     # can outlast one command — neither is visible to check-pipeline.mjs's stubbed agents.
     "pipeline-build": ("the pipeline's project: two small features, a gate longer than one wait", ["pipeline-fixture"]),
+    # Manager mode with real agents: one section decomposed, one to decompose with a planted open
+    # question that nobody is there to answer.
+    "manager-build": ("manager mode: two sections, one to decompose with an open question", ["manager-fixture"]),
 }
 
 # Scenarios that must NOT get the downstream skill: their whole point is the
@@ -86,7 +89,7 @@ NO_DOWNSTREAM = {"0b-interview"}
 # Scenarios whose downstream is tlc-spec-lean rather than tlc-spec-driven. Every
 # other scenario keeps the driven skill only, so that Phase 0 finds exactly one
 # candidate and never has to ask which — that question is its own test.
-LEAN_DOWNSTREAM = {"state-lean", "pipeline-build"}
+LEAN_DOWNSTREAM = {"state-lean", "pipeline-build", "manager-build"}
 
 # The seven, keyed to how they surface in a roadmap. Each pattern list is
 # alternatives in the languages the skill may write in — it follows the source
@@ -182,7 +185,7 @@ def cmd_setup(args):
             copy_tree(os.path.join(FIXTURE, "state"), proj)
             copy_tree(os.path.join(FIXTURE, want.split(":", 1)[1]), proj)
             continue
-        if want in ("loop-fixture", "pipeline-fixture"):
+        if want in ("loop-fixture", "pipeline-fixture", "manager-fixture"):
             copy_tree(os.path.join(REPO, "benchmark", want), proj)
             os.remove(os.path.join(proj, "README.md"))
             continue
@@ -208,9 +211,9 @@ def cmd_setup(args):
     installed = install_skills(proj, args.scenario)
 
     if any(w.startswith("state:") or w == "state-lean" for w in wants) or "loop-fixture" in wants \
-            or "pipeline-fixture" in wants:
+            or "pipeline-fixture" in wants or "manager-fixture" in wants:
         git_init(proj)
-        if "pipeline-fixture" in wants:
+        if "pipeline-fixture" in wants or "manager-fixture" in wants:
             # The fixture's config names the branch features merge into; git's default decides it.
             cfg_path = os.path.join(proj, "docs", "process", "pipeline.json")
             cfg = json.load(open(cfg_path, encoding="utf-8"))

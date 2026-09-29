@@ -210,6 +210,15 @@ nombres y rutas ya resueltos. Pégalo en una sesión nueva.
 
 La [guía](guide/HOW-IT-WORKS.es.md) explica qué cede cada opción a cambio.
 
+**Modo gestor — el backlog entero, sin nadie mirando.** En un proyecto multi-sección, en Claude Code,
+puedes pedir el *"manager mode"* (modo gestor): un Workflow recorre cada sección pendiente, en el
+orden de construcción, descompone cada una justo antes de construirla — **decidiendo él mismo las
+preguntas abiertas y marcando cada decisión como `Decided by the manager`** para que la revises — y
+la construye con el pipeline de la opción C. Solo se ejecuta con tu delegación por escrito
+(`manager.delegation` en `docs/process/pipeline.json`), se detiene antes de las secciones que
+reserves (`stopAt`), ante una barrera en rojo, y nunca construye sobre una sección que no terminó.
+Fuera del modo gestor, la skill nunca decide por ti.
+
 ## Actualizar un proyecto que ya usa la skill
 
 Los proyectos nuevos no necesitan nada de esto. Un proyecto que planificó una versión anterior recibe

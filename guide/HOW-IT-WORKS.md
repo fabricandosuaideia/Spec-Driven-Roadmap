@@ -286,6 +286,17 @@ red — because every PASS the pipeline records rests on it, and can time that c
 longer than one command's 10 minutes is run detached and waited for. Same precondition as B: zero
 open questions.
 
+**Manager mode — not a fourth option, a way of working.** A, B and C each build one roadmap and stop,
+because the seam between two sections is where a person re-plans. When nobody will be there — a
+build left running day and night — ask for *"manager mode"* in a multi-section project, in Claude
+Code. You write, once, what you delegate (`manager.delegation`) and which sections still need you
+(`stopAt`). Then a Workflow — a script, not a conversation, so it cannot lose its mission to a
+long context — takes each remaining section in build order, decomposes it just before building it,
+answers the open questions itself (the conservative option, marked `Decided by the manager`), and
+builds it with option C's pipeline. It stops before a reserved section or on a red barrier, and skips
+anything that depends on a section that did not finish. Afterwards, the decisions are yours to review:
+each one is marked in the roadmaps and listed in the run's record.
+
 ⚠️ **Either way, run that prompt in a new chat session, with clean context** — not in the session
 that generated the roadmap. The skill will tell you this too. In a fresh session **the prompt itself
 is the channel**: your build skill re-derives what it needs from the paths in that prompt and the

@@ -203,6 +203,14 @@ paths already resolved. Paste it into a fresh session.
 
 The [guide](guide/HOW-IT-WORKS.md) explains what each option trades away.
 
+**Manager mode — the whole backlog, unattended.** In a multi-section project, in Claude Code, you can
+ask for *"manager mode"*: a Workflow walks every section still to do, in build order, decomposes each
+one just before building it — **deciding the open questions itself and marking every decision
+`Decided by the manager`** for you to review — and builds it with option C's pipeline. It runs only
+on your written delegation (`manager.delegation` in `docs/process/pipeline.json`), stops before the
+sections you reserve (`stopAt`), on a red barrier, and never builds on a section that did not finish.
+Outside manager mode the skill never decides for you.
+
 ## Upgrading a project that already uses the skill
 
 New projects need nothing here. A project an earlier version planned gets the new behaviour in one

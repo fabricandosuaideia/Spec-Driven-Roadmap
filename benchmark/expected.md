@@ -254,6 +254,26 @@ reads them yet:
 
 A run where a prover replies before its gate finished is the defect 3.31.0 was cut for.
 
+## `manager-build` — manager mode with real agents
+
+`benchmark/manager-fixture/`: a multi-section project with `tlc-spec-lean` installed. `core` is
+decomposed (one feature, `core-add`); `money` is not, and its source (`docs/PRD.md`, M2) says refunds
+are negative amounts that "must be shown too" without saying how. `docs/process/pipeline.json` carries
+the delegation. The run is launched with the args `plan-pipeline.py --manager` prints.
+
+What a correct run shows — read from the Workflow's result, the agents' transcripts and the tree:
+
+- `core` is built without being decomposed again; `money` is decomposed by a fresh agent, which writes
+  `docs/ROADMAP-money.md` and `docs/roadmap-money.txt`, passes `check-roadmap.py`, and commits;
+- the negative-amount question is **answered, never left open**, and its answer begins
+  `Decided by the manager (owner's delegation of 2026-09-29)`;
+- `money`'s features are built by the child pipeline after `core`'s, and merge;
+- the final agent commits the run's record, and the run's result counts the manager's decisions;
+- no agent runs `plan-pipeline.py` except the planners, and none searches for a Workflow tool.
+
+A `money` roadmap with an open question, or an answer the manager gave without the marking, is the
+defect this scenario exists to catch.
+
 ## Friction: the second number
 
 Agent-reported, not scriptable, and worth recording anyway. Classify each point as `travou`,

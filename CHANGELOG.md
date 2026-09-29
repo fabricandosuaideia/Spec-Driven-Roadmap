@@ -9,6 +9,81 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.32.0 — 2026-09-29
+
+**Manager mode: the whole backlog, unattended, on the owner's written delegation.** Asked for by the
+owner, to finish a 17-section project running day and night. Options A, B and C each build one roadmap
+and stop, because the seam between sections is where a person re-plans. Manager mode is for when
+nobody will be there. It is an additional way of working, not a fourth option, and it is generic: every
+project-specific value (gates, barrier, reserved sections, the delegation itself) lives in that
+project's `docs/process/pipeline.json`.
+
+**Two non-negotiable rules changed. This is the third rule change in this repository's history.**
+- **Rule 1** ("never decide a genuine ambiguity") gains one exception, manager mode, which exists only
+  on the owner's written delegation. There the manager decides what would have been asked. It takes
+  the option the procedure calls conservative, or the cheapest to reverse, and marks every such answer
+  **Decided by the manager (owner's delegation of <date>)** for review. Outside it, nobody decides for
+  the user.
+- **Rule 10** ("never loop") gains the same exception. The manager marches through sections, and still
+  authors no spec, plan or code.
+
+**Why the manager is a script and not a prompt.** A conversation that runs for a day grows, is
+compacted, and loses its mission. On a measured build the coordinator went from 41k to 88k tokens of
+context in 25 turns. `scripts/manager-pipeline.js` is a Workflow: its mission is its code and the disk.
+For each section in build order it runs:
+1. a fresh decomposer (Phase 2, deciding and marking), only if the section is not yet decomposed;
+2. a fresh planner (`plan-pipeline.py`);
+3. `roadmap-pipeline.js` as a child workflow;
+4. at the end, a fresh agent that runs the seed and records the run and every decision.
+
+It skips finished sections and stops before `stopAt` sections, on a red barrier, and at
+`sectionsPerRun` (a Workflow caps at 1000 agents). It skips any section that depends on one that did
+not finish. Each section is decomposed just before it is built, so it is planned against the code the
+previous sections left.
+
+- **`plan-pipeline.py --manager`:**
+  - It reads the sections from `docs/ROADMAP-INDEX.md`: the `## Roadmaps` table for slugs, files and
+    dependencies, and the `## Ordering` numbered list for order. It records whether each section is
+    decomposed and which features the downstream gate still refuses.
+  - It refuses without `manager.delegation`.
+  - Run against the Sales-ai index, a 22-section real one (only reading the file), it listed all 22 in
+    the owner's build order with their dependencies.
+- **`references/manager-mode.md`:**
+  - It gives the preconditions, and the delegation is asked of the owner in their own words, never
+    written by the agent.
+  - It carries the prompt, what a run does, and how to review, continue and measure.
+- **Other files:** `SKILL.md` gains its own entry and the description gains the trigger (1016
+  characters of 1,024). The installers, README, guide (three languages), CLAUDE.md and CONTRIBUTING.md
+  now carry it.
+
+**Executed:**
+- **`check-pipeline.mjs`:** 12 manager scenarios, run on stub agents and a stub child workflow, and
+  4 manager mutants. All hold, and all 4 mutants are caught.
+  - One scenario was added after a contradiction was found by reading: the scoping line told every
+    agent never to run `plan-pipeline.py`, including the planner, whose role is to run it. The real
+    planner ran it anyway, following its role.
+- **`plan-pipeline.py --selftest`:** 7 new assertions.
+- **A real manager run on the new `benchmark/manager-fixture`** (scenario `manager-build`), on Sonnet
+  5.5 with the fixture's delegation. It has two sections: `core`, decomposed with one feature, and
+  `money`, not decomposed. `money`'s source leaves open how a negative amount is shown.
+  - **Result: `core: 1 merged`, `money: 1 merged`, 3 decisions recorded.** 18 agents, 915 k tokens,
+    15 minutes.
+  - **`core` was built without being decomposed again.** Its feature was refused once, because the
+    tests could not be imported by the gate, and passed at attempt 2, so the retry path ran for real.
+  - **`money` was decomposed by a fresh agent** and linted to 0 failed. The planted question was
+    **answered, never left open**: "Decided by the manager (owner's delegation of 2026-09-29): sign
+    before the currency symbol, `-R$ 0,05` … because it leaves the positive format untouched and is a
+    one-line change to reverse". The builder built on that decision, and it merged.
+  - **The barrier** ran green after each section.
+  - **The final agent** ran the seed (`## Status`: both roadmaps DONE), wrote the `**Last run**:`
+    line and the decisions to the history, and committed. The tree ended clean on the main branch.
+  - **Scoping and gates.** Only the two planners ran `plan-pipeline.py`, and no agent searched for a
+    Workflow tool. Every gate was detached and waited for.
+  - **Not exercised for real:** `stopAt`, a red barrier, a section skipped behind an unfinished one,
+    and `sectionsPerRun`. The stub scenarios hold each of them.
+
+---
+
 ## 3.31.0 — 2026-09-29
 
 **Option C's first real run built one feature and proved nothing. It now proves.** Found on the user's

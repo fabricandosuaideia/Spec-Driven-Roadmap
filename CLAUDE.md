@@ -40,6 +40,7 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 | `scripts/write-agents.py` | Shipped to users. Writes `.claude/agents/roadmap-*.md` (option B); never overwrites a changed file. |
 | `scripts/plan-pipeline.py` | Shipped to users. Prints the pipeline's args; refuses until `docs/process/pipeline.json`'s gate is confirmed by the user. |
 | `scripts/roadmap-pipeline.js` | Shipped to users. The option C Workflow script. |
+| `scripts/manager-pipeline.js` | Shipped to users. Manager mode's Workflow script: every section in build order, decomposed under the owner's delegation, then built by `roadmap-pipeline.js` as a child workflow. |
 | `scripts/bench-gate.py` | Shipped to users. Times the project's full gate; writes nothing. |
 | `scripts/check-pipeline.mjs` | Maintainer. The pipeline's control flow on stubbed agents, plus planted defects. Release gate, when `node` exists. |
 
@@ -96,8 +97,9 @@ user's project the skill's own equivalents: `## Status` and `docs/roadmap-histor
 **What is never touched without saying so:** the 13 non-negotiable rules in `SKILL.md`, the prompt
 templates Step 10 emits — options A and C in `references/handover-prompt.md`, the two `/loop` templates
 in `references/loop-tlc-spec-*.md` — and the Handoff schemas in `handoff-seed.md` Step 6 (eight fields
-for `tlc-spec-driven`, seven for `tlc-spec-lean`). Two rule changes have happened in this repository's history; both are named
-in the `CHANGELOG.md` entry that made them.
+for `tlc-spec-driven`, seven for `tlc-spec-lean`). Three rule changes have happened in this repository's history; each is named
+in the `CHANGELOG.md` entry that made them — the third, 3.32.0, gave rules 1 and 10 manager mode's
+exception.
 
 **Reading the downstream skill.** `references/handoff-seed.md` requires reading the downstream skill's
 real schema from disk, never from memory — `tlc-spec-lean` by default, `tlc-spec-driven` also

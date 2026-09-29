@@ -302,6 +302,17 @@ na branch principal mesclada e para todo merge seguinte quando fica vermelha —
 esteira registra se apoia nele, e pode cronometrar esse comando para você. Um gate mais longo que os 10
 minutos de um comando roda desanexado e é esperado. Mesma precondição da B: zero perguntas em aberto.
 
+**Modo gestor — não é uma quarta opção, é um jeito de trabalhar.** A, B e C constroem um roadmap cada
+e param, porque a costura entre duas seções é onde uma pessoa replaneja. Quando ninguém vai estar lá —
+um build deixado rodando dia e noite —, peça o *"manager mode"* num projeto multi-seção, no Claude
+Code. Você escreve, uma vez, o que delega (`manager.delegation`) e quais seções ainda precisam de você
+(`stopAt`). Aí um Workflow — um script, não uma conversa, então não perde a missão num contexto
+comprido — pega cada seção que falta na ordem de construção, decompõe logo antes de construir,
+responde ele mesmo as perguntas abertas (a opção conservadora, marcada `Decided by the manager`) e
+constrói com a esteira da opção C. Ele para antes de uma seção reservada ou numa barreira vermelha, e
+pula o que depende de uma seção que não terminou. Depois, as decisões são suas para revisar: cada uma
+fica marcada nos roadmaps e listada no registro da execução.
+
 ⚠️ **Em qualquer caso, rode esse prompt em uma nova sessão de chat, com contexto limpo** — não na
 sessão que gerou o roadmap. A própria skill vai te avisar disso. Numa sessão nova, **o canal é o
 próprio prompt**: sua skill de build re-deriva o que precisa a partir dos caminhos que estão nele e

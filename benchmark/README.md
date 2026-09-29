@@ -32,6 +32,7 @@ it would be worth having; as the benchmark, no.
 | `fixture/state-lean/` | the seed against `tlc-spec-lean`'s tree — scenario `state-lean` |
 | [`loop-fixture/`](loop-fixture/) | the loop prompt's project, with a test that cannot pass honestly — scenario `loop-build` |
 | [`pipeline-fixture/`](pipeline-fixture/) | option C with real agents: two small features, a gate longer than one wait, a batch barrier — scenario `pipeline-build` |
+| [`manager-fixture/`](manager-fixture/) | manager mode with real agents: one section decomposed, one to decompose around an open question nobody can answer — scenario `manager-build` |
 | [`expected.md`](expected.md) | the answer key — where each planted ambiguity must land, and why |
 | [`reports/`](reports/) | 25 reports (17 `validation.md`, 8 `lean-*` `verification.md`) for the Step 2 completion test |
 | `RESULTS.md` | the scoreboard, **appended by the runner**, never edited by hand |

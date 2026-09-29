@@ -17,7 +17,14 @@ null they inherit the session's, which is how a run went out on a model nobody c
 
     python3 plan-pipeline.py --root <project> --init          # write pipeline.json to confirm
     python3 plan-pipeline.py --root <project> [--roadmap docs/ROADMAP-x.md] > args.json
+    python3 plan-pipeline.py --root <project> --manager > args.json   # manager mode: every section
     python3 plan-pipeline.py --selftest
+
+`--manager` (references/manager-mode.md) prints the args of scripts/manager-pipeline.js instead: every
+section of docs/ROADMAP-INDEX.md in build order — read from its `## Roadmaps` table and `## Ordering`
+list, never guessed — with whether it is decomposed and which of its features are still to build. It
+refuses unless pipeline.json carries the owner's written delegation (`manager.delegation`): in that
+mode the manager decides what would otherwise be asked, and only the owner can hand that over.
 
 One roadmap per run, as for the loop: across roadmaps, producer names are provisional until a
 section is decomposed, and the seam between sections is where a person re-seeds.
@@ -67,6 +74,8 @@ DEFAULT_CONFIG = {
                "verify": {"A": "high", "B": "high", "C": "medium"}, "review": "high",
                "merge": "medium", "record": "low"},
     "maxAttempts": {"A": 5, "B": 4, "C": 3},
+    "manager": {"delegation": "", "delegatedOn": "", "stopAt": [], "sectionsPerRun": 4,
+                "decomposeModel": None, "effort": {"decompose": "xhigh", "plan": "low", "final": "medium"}},
 }
 
 
@@ -188,6 +197,75 @@ def plan(root, roadmap_rel, cfg):
     return args, {"done": done, "discharged": discharged, "pending": pending, "downstream": ds}
 
 
+SLUG_RE = re.compile(r"`?docs/ROADMAP-([A-Za-z0-9][\w-]*)\.md`?")
+
+
+def index_sections(root):
+    """Sections in build order from docs/ROADMAP-INDEX.md: its `## Roadmaps` table, ordered by the
+    numbered list in `## Ordering` (table order when that list names none of them)."""
+    path = os.path.join(root, "docs", "ROADMAP-INDEX.md")
+    if not os.path.isfile(path):
+        raise RuntimeError("no docs/ROADMAP-INDEX.md: manager mode needs a multi-section project")
+    text = open(path, encoding="utf-8").read()
+    table = CR.block(text, "## Roadmaps")
+    if table is None:
+        raise RuntimeError("docs/ROADMAP-INDEX.md has no `## Roadmaps` table")
+    rows = []
+    for line in table.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 5 or not SLUG_RE.search(cells[1]):
+            continue
+        slug = SLUG_RE.search(cells[1]).group(1)
+        txt = re.search(r"`?(docs/roadmap-[\w-]+\.txt)`?", cells[2])
+        deps = re.findall(r"`([A-Za-z0-9][\w-]*)`", cells[4])
+        rows.append({"slug": slug, "roadmap": "docs/ROADMAP-%s.md" % slug,
+                     "txt": txt.group(1) if txt else "docs/roadmap-%s.txt" % slug, "dependsOn": deps})
+    if not rows:
+        raise RuntimeError("docs/ROADMAP-INDEX.md `## Roadmaps` has no row naming a docs/ROADMAP-<slug>.md")
+    by = {r["slug"]: r for r in rows}
+    ordering = CR.block(text, "## Ordering") or ""
+    order = []
+    for line in ordering.splitlines():
+        m = re.match(r"^\s*\d+\.\s+.*?`([A-Za-z0-9][\w-]*)`", line)
+        if m and m.group(1) in by and m.group(1) not in order:
+            order.append(m.group(1))
+    order += [r["slug"] for r in rows if r["slug"] not in order]
+    return [by[s] for s in order]
+
+
+def section_states(root):
+    """Each section, with `decomposed` and the features its downstream gate does not pass yet."""
+    ds, ds_dir = downstream(root)
+    if not ds:
+        raise RuntimeError("no tlc-spec-lean or tlc-spec-driven under %s/.claude/skills" % root)
+    out = []
+    for sec in index_sections(root):
+        names = CR.txt_names(os.path.join(root, sec["txt"]))
+        decomposed = bool(names) and os.path.isfile(os.path.join(root, sec["roadmap"]))
+        pending = [n for n in names if not is_done(root, ds, ds_dir, n)] if decomposed else []
+        out.append(dict(sec, decomposed=decomposed, pending=pending))
+    return out, ds, ds_dir
+
+
+def manager_args(root, cfg):
+    mgr = dict(DEFAULT_CONFIG["manager"], **(cfg.get("manager") or {}))
+    if not (mgr.get("delegation") or "").strip():
+        raise RuntimeError("%s has no manager.delegation: manager mode decides what would otherwise be asked, "
+                           "and only the owner can hand that over, in their own words" % CONFIG)
+    secs, ds, ds_dir = section_states(root)
+    status = os.path.join("docs", "ROADMAP-INDEX.md")
+    return {
+        "project": root, "skillDir": SKILL_DIR, "downstream": ds, "downstreamDir": ds_dir,
+        "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main",
+        "pipelineScript": os.path.join(SKILL_DIR, "scripts", "roadmap-pipeline.js"),
+        "model": cfg.get("model") or None, "decomposeModel": mgr.get("decomposeModel") or None,
+        "delegation": mgr["delegation"].strip(), "delegatedOn": mgr.get("delegatedOn") or "",
+        "stopAt": list(mgr.get("stopAt") or []), "sectionsPerRun": int(mgr.get("sectionsPerRun") or 4),
+        "effort": dict(DEFAULT_CONFIG["manager"]["effort"], **(mgr.get("effort") or {})),
+        "sections": secs,
+    }
+
+
 # --------------------------------------------------------------------------- selftest
 
 def selftest():
@@ -299,6 +377,46 @@ x
             rc = main(["--root", root])
         expect("the summary line names the absolute scriptPath",
                rc == 0 and os.path.join(SKILL_DIR, "scripts", "roadmap-pipeline.js") in err.getvalue())
+
+        # manager mode: sections come from the index, in the order its ## Ordering list gives
+        open(os.path.join(root, "docs", "ROADMAP-INDEX.md"), "w").write("""# I
+
+## Roadmaps
+
+| Section | Roadmap file | Build-order file | Slug / prefix | Depends on |
+|---|---|---|---|---|
+| Later work | `docs/ROADMAP-late.md` | `docs/roadmap-late.txt` | `late` | `core` |
+| Core | `docs/ROADMAP-core.md` | `docs/roadmap-core.txt` | `core` | — |
+
+## Ordering
+
+1. `core` — first.
+2. `late` — needs core.
+""")
+        os.rename(os.path.join(root, "docs", "ROADMAP.md"), os.path.join(root, "docs", "ROADMAP-core.md"))
+        os.rename(os.path.join(root, "docs", "roadmap.txt"), os.path.join(root, "docs", "roadmap-core.txt"))
+        secs, _ds, _d = section_states(root)
+        expect("sections come in ## Ordering's order, not the table's", [x["slug"] for x in secs] == ["core", "late"])
+        expect("a section's dependencies are read from the table", secs[1]["dependsOn"] == ["core"])
+        expect("a section with a roadmap and a build order is decomposed, and lists what is left",
+               secs[0]["decomposed"] and "n-fail" in secs[0]["pending"] and "n-done" not in secs[0]["pending"])
+        expect("a section with neither is not decomposed", not secs[1]["decomposed"] and secs[1]["pending"] == [])
+        written = json.load(open(os.path.join(root, CONFIG)))
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            rc = main(["--root", root, "--manager"])
+        expect("manager mode refuses without the owner's written delegation", rc == 1)
+        written["manager"] = dict(written.get("manager") or {}, delegation="decide everything; I review later",
+                                  delegatedOn="2026-09-29", stopAt=["late"])
+        json.dump(written, open(os.path.join(root, CONFIG), "w"))
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = main(["--root", root, "--manager"])
+        margs = json.loads(out.getvalue()) if rc == 0 else {}
+        expect("with a delegation it prints the manager's args, delegation and stops included",
+               rc == 0 and margs.get("delegation", "").startswith("decide everything") and margs.get("stopAt") == ["late"]
+               and margs["pipelineScript"].endswith("roadmap-pipeline.js") and len(margs["sections"]) == 2)
+        expect("its summary line names the manager's absolute scriptPath",
+               os.path.join(SKILL_DIR, "scripts", "manager-pipeline.js") in err.getvalue())
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("\n%d failed" % len(failures))
@@ -310,6 +428,7 @@ def main(argv=None):
     ap.add_argument("--root", help="the project root")
     ap.add_argument("--roadmap", help="the one roadmap to build (default docs/ROADMAP.md)")
     ap.add_argument("--init", action="store_true", help="write docs/process/pipeline.json to confirm")
+    ap.add_argument("--manager", action="store_true", help="print manager-pipeline.js's args (manager mode)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
@@ -348,6 +467,22 @@ def main(argv=None):
         print("%s names mainBranch %r, which is not a branch of this repository — every merge would "
               "fail; set it to the branch features merge into" % (CONFIG, main_branch), file=sys.stderr)
         return 1
+    if a.manager:
+        try:
+            margs = manager_args(root, cfg)
+        except RuntimeError as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        todo = [x for x in margs["sections"] if not x["decomposed"] or x["pending"]]
+        print("manager: %d section(s), %d with work left (%s); stops at %s; scriptPath %s" % (
+              len(margs["sections"]), len(todo),
+              ", ".join("%s:%s" % (x["slug"], len(x["pending"]) if x["decomposed"] else "to decompose") for x in todo) or "none",
+              ", ".join(margs["stopAt"]) or "nothing", os.path.join(SKILL_DIR, "scripts", "manager-pipeline.js")),
+              file=sys.stderr)
+        if not todo:
+            return 1
+        print(json.dumps(margs, indent=1))
+        return 0
     rel = a.roadmap or os.path.join("docs", "ROADMAP.md")
     if not os.path.isfile(os.path.join(root, rel)):
         print("no roadmap at %s; in multi-section mode pass --roadmap docs/ROADMAP-<slug>.md" % rel, file=sys.stderr)

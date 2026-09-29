@@ -302,6 +302,18 @@ detiene todo merge siguiente cuando queda en rojo —, porque cada PASS que regi
 apoya en él, y puede medir el tiempo de ese comando por ti. Un gate más largo que los 10 minutos de un
 comando se ejecuta desacoplado y se espera. Misma precondición que B: cero preguntas abiertas.
 
+**Modo gestor — no es una cuarta opción, es una forma de trabajar.** A, B y C construyen un roadmap
+cada una y se detienen, porque la costura entre dos secciones es donde una persona vuelve a planificar.
+Cuando nadie va a estar ahí — un build que se deja corriendo día y noche —, pide el *"manager mode"*
+en un proyecto multi-sección, en Claude Code. Escribes, una vez, lo que delegas (`manager.delegation`)
+y qué secciones todavía te necesitan (`stopAt`). Entonces un Workflow — un script, no una
+conversación, así que no pierde su misión en un contexto largo — toma cada sección pendiente en el
+orden de construcción, la descompone justo antes de construirla, responde él mismo las preguntas
+abiertas (la opción conservadora, marcada `Decided by the manager`) y la construye con el pipeline de
+la opción C. Se detiene antes de una sección reservada o ante una barrera en rojo, y omite lo que
+depende de una sección que no terminó. Después, las decisiones son tuyas para revisar: cada una queda
+marcada en los roadmaps y listada en el registro de la ejecución.
+
 ⚠️ **En cualquier caso, ejecuta ese prompt en una sesión de chat nueva, con contexto limpio** — no en la
 sesión que generó el roadmap. La propia skill te lo va a advertir. En una sesión nueva **el prompt
 mismo es el canal**: tu skill de build vuelve a derivar lo que necesita de las rutas de ese prompt y

@@ -14,6 +14,7 @@ import url from 'node:url'
 
 const HERE = path.dirname(url.fileURLToPath(import.meta.url))
 const SOURCE = fs.readFileSync(path.join(HERE, 'roadmap-pipeline.js'), 'utf8')
+const MANAGER = fs.readFileSync(path.join(HERE, 'manager-pipeline.js'), 'utf8')
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
 
 const BASE = {
@@ -169,7 +170,114 @@ const mutants = {
   'barrier only at the end': ['if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()', ''],
 }
 
+// ---- manager mode: manager-pipeline.js, with stubbed agents and a stubbed child pipeline ----
+const MBASE = {
+  project: '/p', skillDir: '/s', downstream: 'tlc-spec-lean', downstreamDir: '/d', statusPath: 'docs/ROADMAP-INDEX.md',
+  mainBranch: 'main', pipelineScript: '/s/scripts/roadmap-pipeline.js', delegation: 'decide everything; I review later',
+  delegatedOn: '2026-09-29', stopAt: [], sectionsPerRun: 4, effort: { decompose: 'xhigh', plan: 'low', final: 'medium' },
+}
+const sec = (slug, over = {}) => ({ slug, roadmap: `docs/ROADMAP-${slug}.md`, txt: `docs/roadmap-${slug}.txt`, dependsOn: [], decomposed: false, pending: [], ...over })
+async function runManager(src, argsOver, child = () => ['x: merged (attempt 1)', 'barrier: green after x'], behave = {}) {
+  const calls = [], children = []
+  const agent = async (prompt, opts) => {
+    const [role, slug] = opts.label.split(':')
+    calls.push({ role, slug, prompt, model: opts.model, effort: opts.effort })
+    if (behave[role]) { const r = behave[role](slug); if (r !== undefined) return r }
+    if (role === 'decompose') return { ok: true, features: [slug + '-a'], decided: ['q? → a'] }
+    if (role === 'plan') return { exitCode: 0, line: 'ok', argsJson: JSON.stringify({ features: [{ name: slug + '-a' }], roadmap: `docs/ROADMAP-${slug}.md` }) }
+    if (role === 'final') return { recorded: true, summary: 's' }
+  }
+  const workflow = async (ref, a) => { const slug = a.roadmap.match(/ROADMAP-(.+)\.md/)[1]; children.push({ ref, slug }); return child(slug) }
+  const fn = new AsyncFunction('args', 'agent', 'parallel', 'phase', 'log', 'workflow', src.replace(/^export const meta/m, 'const meta'))
+  let out, error = null
+  try { out = await fn({ ...MBASE, ...argsOver }, agent, fns => Promise.all(fns.map(f => f())), () => {}, () => {}, workflow) } catch (e) { error = e.message }
+  return { out: out || [], error, calls, children }
+}
+
+const managerScenarios = {
+  'manager: a section not yet decomposed is decomposed, planned, then built by the pipeline, in order': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('b', { decomposed: true, pending: ['b-a'] })] })
+    const roles = r.calls.map(c => c.role + ':' + (c.slug || '')).join()
+    return roles === 'decompose:a,plan:a,plan:b,final:' && r.children.map(c => c.slug).join() === 'a,b' &&
+      r.children.every(c => c.ref.scriptPath === '/s/scripts/roadmap-pipeline.js')
+  },
+  'manager: a finished section costs nothing': async src => {
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: [] }), sec('b')] })
+    return !r.calls.some(c => c.slug === 'a') && r.out.some(l => l === 'a: already done')
+  },
+  'manager: it stops before a section the owner reserved (stopAt)': async src => {
+    const r = await runManager(src, { stopAt: ['b'], sections: [sec('a'), sec('b'), sec('c')] })
+    return r.children.map(c => c.slug).join() === 'a' && r.out.some(l => /stopped: b needs the owner/.test(l))
+  },
+  'manager: a section depending on one that did not finish is skipped; an independent one still runs': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('b', { dependsOn: ['a'] }), sec('c')] },
+      slug => slug === 'a' ? ['a-a: blocked'] : ['x: merged (attempt 1)'])
+    return !r.children.some(c => c.slug === 'b') && r.children.some(c => c.slug === 'c') && r.out.some(l => /^b: skipped/.test(l))
+  },
+  'manager: a red barrier stops the run': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('b')] }, slug => ['a-a: merged (attempt 1)', 'barrier: red after a-a — t'])
+    return r.children.length === 1 && r.out.some(l => /stopped: the barrier is red after a/.test(l))
+  },
+  'manager: it builds at most sectionsPerRun sections, then says to launch again': async src => {
+    const r = await runManager(src, { sectionsPerRun: 2, sections: [sec('a'), sec('b'), sec('c')] })
+    return r.children.length === 2 && r.out.some(l => /sectionsPerRun \(2\) reached/.test(l))
+  },
+  'manager: a failed plan blocks the section and never builds it': async src => {
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: ['a-a'] })] }, undefined,
+      { plan: () => ({ exitCode: 1, line: 'docs/ROADMAP-a.md: a is in the build order but has no entry', argsJson: '' }) })
+    return r.children.length === 0 && r.out.some(l => /a: blocked — planning failed/.test(l))
+  },
+  'manager: every agent carries the launch scoping, and the decomposer the delegation and the marking': async src => {
+    const r = await runManager(src, { sections: [sec('a')] })
+    const d = r.calls.find(c => c.role === 'decompose')
+    return r.calls.every(c => /LAUNCH REQUEST/.test(c.prompt)) && /decide everything; I review later/.test(d.prompt) &&
+      /Decided by the manager/.test(d.prompt) && /Never leave a question open/.test(d.prompt)
+  },
+  'manager: no agent is told never to run the command its own role runs': async src => {
+    const r = await runManager(src, { sections: [sec('a')] })
+    const plan = r.calls.find(c => c.role === 'plan')
+    return !!plan && /run python3 \/s\/scripts\/plan-pipeline\.py/.test(plan.prompt) && !/never run plan-pipeline\.py/.test(plan.prompt)
+  },
+  'manager: every decision reaches the final record': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('b')] })
+    const f = r.calls.find(c => c.role === 'final')
+    return !!f && /a: q\? → a/.test(f.prompt) && /b: q\? → a/.test(f.prompt) && r.out.some(l => /decisions made by the manager: 2/.test(l))
+  },
+  'manager: without the owner\'s delegation nothing runs': async src => {
+    const r = await runManager(src, { delegation: '  ', sections: [sec('a')] })
+    return !!r.error && r.calls.length === 0
+  },
+  'manager: the decomposer can run on its own model': async src => {
+    const r = await runManager(src, { model: 'sonnet', decomposeModel: 'opus', sections: [sec('a')] })
+    return r.calls.find(c => c.role === 'decompose').model === 'opus' && r.calls.filter(c => c.role !== 'decompose').every(c => c.model === 'sonnet')
+  },
+}
+const managerMutants = {
+  'dependants of an unfinished section not skipped': ['if (bad) { blockedSections.add', 'if (false) { blockedSections.add'],
+  'stopAt ignored': ['if (STOP_AT.has(s.slug))', 'if (false)'],
+  'red barrier ignored': ["if (red) { stopped = `the barrier is red after ${s.slug}`; break }", ''],
+  'decisions not marked': ['**Decided by the manager', '**Decided'],
+}
+
 let failed = 0
+for (const [name, test] of Object.entries(managerScenarios)) {
+  let held
+  try { held = await test(MANAGER) } catch (e) { held = false }
+  console.log((held ? '  ok   ' : '  FAIL ') + name)
+  if (!held) failed++
+}
+for (const [name, [from, to]] of Object.entries(managerMutants)) {
+  if (!MANAGER.includes(from)) { console.log('  FAIL manager mutant anchor missing: ' + name); failed++; continue }
+  const broken = MANAGER.replace(from, to)
+  let caught = false
+  for (const test of Object.values(managerScenarios)) {
+    let held
+    try { held = await test(broken) } catch (e) { held = false }
+    if (!held) { caught = true; break }
+  }
+  console.log((caught ? '  ok   ' : '  FAIL ') + 'manager mutant caught: ' + name)
+  if (!caught) failed++
+}
 for (const [name, test] of Object.entries(scenarios)) {
   let held
   try { held = await test(SOURCE) } catch (e) { held = false }

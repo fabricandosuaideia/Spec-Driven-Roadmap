@@ -1,10 +1,10 @@
 ---
 name: spec-driven-roadmap
-description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) and seeds the downstream spec-driven skill so it can start building feature one. Sources the scope from a PRD, architecture doc or flowchart export, from an interview when there is no document, or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "turn this PRD into a backlog", or "I do not know what to build yet"; to CHECK a roadmap it produced: "check my roadmap", "lint the roadmap"; to REFRESH its status after work: "update the roadmap status"; to MEASURE agent cost: "measure my agent cost", "where did my quota go"; and to UPGRADE a project that already uses it: "upgrade this project". Do NOT use for a feature's spec, design, tasks or code, for driving construction, or for "resume work" - those belong to the downstream spec-driven skill.
+description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a build-order .txt, or a ROADMAP-INDEX.md with one roadmap per section) and seeds the downstream spec-driven skill so it can start building feature one. Sources the scope from a PRD, architecture doc or flowchart, from an interview, or from an existing codebase. Use when the user says "generate a roadmap", "create a roadmap", "plan product", "decompose this into features", "turn this PRD into a backlog", or "I do not know what to build yet"; to CHECK a roadmap it produced: "check my roadmap", "lint the roadmap"; to REFRESH its status after work: "update the roadmap status"; to MEASURE agent cost: "measure my agent cost", "where did my quota go"; to UPGRADE a project that uses it: "upgrade this project"; and, on the owner's delegation, to BUILD every section unattended: "manager mode". Do NOT use for a feature's spec, design, tasks or code, for driving construction, or for "resume work" - those belong to the downstream spec-driven skill.
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.31.0"
+  version: "3.32.0"
 ---
 
 # Spec-Driven Roadmap
@@ -32,6 +32,7 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 | 2 | [references/decompose-phase.md](references/decompose-phase.md) | Slice into vertical features with full coverage, open questions, and a build order. Then pre-empt the cross-cutting gray areas, and record the ones left to the downstream skill. |
 | Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`, both through `scripts/status-block.py`. Its report (Step 7) ends the procedure only when nothing was seeded; otherwise the same reply asks Step 8's question. **Also its own entry, on a project with a roadmap:** *"update the roadmap status"*, *"refresh the status"*, *"re-seed"*, *"what's next"* after work was done — run it from its third trigger through to Step 8's question whenever Step 7 allows — asking how to build is part of the seed, and the user may decline it. Steps 1-7 may be handed to a sub-agent; Step 8 never — it is a question, so the session the user talks to asks it when the report comes back. Never answer such a request by editing `## Status` yourself. |
 | Upgrade | [references/upgrade-project.md](references/upgrade-project.md) | Its own entry, for a project a previous version already planned: baseline the cost, lint, re-run the seed (which empties `## Status` into `docs/roadmap-history.md`), offer the current bridge lines, then Steps 8-10 as usual. Never regenerates the roadmap; never installs the skill itself. |
+| Manager | [references/manager-mode.md](references/manager-mode.md) | Its own entry, Claude Code and multi-section only: *"manager mode"*, *"modo gestor"*, *"build everything unattended"*. On the owner's written delegation, a Workflow walks every remaining section in build order — decomposes it just before building it, deciding what would otherwise be asked and marking each decision as the manager's, then builds it with option C's pipeline. Stops where the owner reserved a section, on a red barrier, and never builds on a section that did not finish. |
 | Handover | [references/handover-prompt.md](references/handover-prompt.md) | Reached only from the seed's Step 7. Asks which implementation prompt the user wants — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed) — and emits it. The `/loop` template for the confirmed profile is in [loop-tlc-spec-lean.md](references/loop-tlc-spec-lean.md) or [loop-tlc-spec-driven.md](references/loop-tlc-spec-driven.md); read only that one, and only for a loop. |
 
 ## Version and model
@@ -115,7 +116,10 @@ nothing was measured (no transcripts, or none in the window) — say that, never
    it is unresolved. Never guess, never pick a silent default. An ambiguity belonging to no single
    feature has a home too: the `## Open Questions` roll-up, tagged `cross-cutting` and carrying an
    `affects:` line naming the features it reaches (Phase 2 Step 7a). "There was no feature to put it
-   in" is never a reason it goes unrecorded.
+   in" is never a reason it goes unrecorded. **The one exception is manager mode**
+   ([references/manager-mode.md](references/manager-mode.md)), which exists only on the owner's
+   written delegation: there the manager decides what would have been asked, and marks every such
+   answer as its own for the owner to review. Nowhere else does anyone decide for the user.
 2. **Vertical slices only.** A feature is route + service + persistence + test for one coherent
    capability. Never slice by architectural layer. *One bounded exception:* a genuinely shared
    foundation consumed by three or more later features may be its own slice, and must name its
@@ -163,7 +167,9 @@ nothing was measured (no transcripts, or none in the window) — say that, never
     `plan.md`, `checks.md`, `verification.md`, or application code. Never re-invoke this skill to march through features. Phase 0's own modes write
     only to `docs/` — never into the downstream skill's namespace. Handing the user a `/loop` prompt
     at the seed is not an exception: this skill emits that text and stops. The loop is the user's CLI
-    driving the downstream skill, never this skill running itself.
+    driving the downstream skill, never this skill running itself. **Manager mode is the one exception
+    the owner opts into**: a Workflow script, not a conversation, that runs the downstream skill section
+    after section through option C's pipeline — and even there this skill authors no spec, plan or code.
 11. **Seed one surface, and never clobber real work.** Write the durable backlog status to this
     skill's own `docs/` file, and only the downstream skill's own field schema to `.specs/STATE.md`'s
     `## Handoff` — never an entry under `## Decisions`. That section is always a full overwrite of
