@@ -110,7 +110,7 @@ pergunta qual deles é o autoritativo.
 | `docs/PROJECT.md` | Só se você passou pela entrevista (caminho B) |
 | `docs/CODEBASE-SUMMARY.md` | Só se ela mapeou seu código (caminho C) |
 | `.specs/STATE.md` (corpo do `## Handoff` reescrito) | Só quando há algo para semear *e* uma skill de build confirmada cujo schema seja legível — quatro exceções, abaixo |
-| `docs/roadmap-history.md` | Sempre que o seed reescreve o bloco de Status: o bloco antigo vem para cá, literal. Um registro para pessoas; nenhum agente é apontado para ele |
+| `docs/roadmap-history.md` | Sempre que o seed reescreve o bloco de Status ou o handoff: o antigo vem para cá, literal, junto com as cópias antigas do handoff que execuções deixaram em `.specs/STATE.md`. Um registro para pessoas; nenhum agente é apontado para ele |
 | `.claude/agents/roadmap-*.md` | Só se você escolher a opção B e sua sessão puder disparar sub-agentes |
 | `docs/process/pipeline.json` | Só se você escolher a opção C (a esteira), com o comando de gate que você confirmou |
 | `docs/process/cost-baseline.json` | Só quando você atualiza um projeto, ou pede para salvar uma linha de base de custo |
@@ -382,7 +382,7 @@ chute.
 
 Um projeto que uma versão anterior planejou recebe o comportamento novo ao pedir *"atualiza este
 projeto"* depois de instalar a versão nova nele: ela salva essa linha de base, confere o roadmap, roda o
-seed de novo — que esvazia o bloco de Status antigo para `docs/roadmap-history.md` —, oferece trocar as
+seed de novo — que esvazia o bloco de Status antigo e o handoff antigo para `docs/roadmap-history.md` —, oferece trocar as
 linhas de ponte antigas no seu `CLAUDE.md` e pergunta como você quer construir. Ela nunca regenera o
 roadmap.
 

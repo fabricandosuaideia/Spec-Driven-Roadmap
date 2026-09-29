@@ -95,6 +95,13 @@ decides whether the result means anything.** Four rules, each of which changed a
    discount that matters surfaced: 7 of 7 by "nobody filled a gap in silence", 4 of 7 by "a human
    actually decided".
 
+**And tell each agent to keep its scratch files inside its own copy.** A sub-agent inherits the
+scratchpad directory of the session that launched it, so every agent launched from one session shares
+one — a fourth level of the isolation failure, below the directory, the file and the tree. In 3.30.0's
+test two blind agents wrote `status-body.md` and `handoff-body.md` to the same scratchpad path within
+the same second; their trees came out different, so each had read its own, but that was luck.
+`setup` prints the reminder.
+
 ## Reading a result
 
 Two numbers, and they answer different questions.

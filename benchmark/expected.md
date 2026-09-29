@@ -191,8 +191,10 @@ that is the one clause whose failure destroys the only evidence the loop produce
 
 `benchmark/fixture/state-lean/`: a four-feature roadmap (`notes-create`, `notes-list`, `notes-tag`,
 `notes-export`) and a `.specs/` tree in `tlc-spec-lean`'s own shape. Only `tlc-spec-lean` is installed,
-so Phase 0 finds one candidate and asks nothing. The run is asked to do the **seed** (Steps 1-7), nothing
-else. Two traps, both in `.specs/features/`:
+so Phase 0 finds one candidate and asks nothing. The run is asked to do the **seed** — either as the
+user would (*"update the roadmap status"*) or as a delegating session would (Steps 1-7 in a sub-agent).
+What lands on disk is the same; what differs is how the run ends, and nothing on disk records that
+(below). Two traps, both in `.specs/features/`:
 
 | feature | on disk | what a correct seed concludes |
 |---|---|---|
@@ -216,6 +218,21 @@ survives exactly once. The old cut — to the next heading of any level — stop
 and leaves the narrative in place, which is the defect the scenario now plants. **A run that writes the eight-field driven
 Handoff reaches every conclusion above correctly and still fails the third assertion — which is the
 point of the scenario:** the reading skill would not recognise the fields.
+
+**Since 3.30.0 the fixture's `.specs/STATE.md` also carries two copies of the Handoff** that a past run
+kept rather than overwrite — `Handoff (superseded detail, kept for history - 2026-09-04)` and `Handoff
+addendum (2026-09-05, revisão do dono)` — as a real project's file did, where they were 72,899 of its
+82,586 bytes. The first repeats lean's fields, `**In progress**` included, for `notes-create`: a run
+that reads it as the live Handoff must still find the work not in flight, because that feature has a
+real PASS. A correct seed writes the Handoff with `status-block.py --handoff` (or the same rule by
+hand): exactly one section titled `Handoff` is left, and both copies' text is in
+`docs/roadmap-history.md`. Asserted by the scorer.
+
+**How the run ends is read from its final message, by hand** — the runner does not capture
+transcripts. Asked as the user would, a correct run's reply ends with Step 8's question (A, B, or C in
+Claude Code). Run as a delegated sub-agent, its report's last line is
+`Next: Step 8 — ask the user how to build (handover-prompt.md)`. A run that ends with only the next
+feature's trigger has done the seed and dropped the choice — the defect 3.30.0 was cut for.
 
 ## Friction: the second number
 

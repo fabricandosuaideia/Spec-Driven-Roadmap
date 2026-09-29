@@ -525,6 +525,20 @@ def check_docs_follow_the_skill(root):
           else "README shows no option-A prompt")
 
 
+def check_step_8_reminder(root):
+    """The line a delegated seed's report ends with is written twice: prescribed by
+    handoff-seed.md Step 7 and printed by status-block.py --handoff. It exists because
+    a real delegated seed ended at its sub-agent's report and nobody asked Step 8's
+    question; a script that prints one wording while the reference prescribes another
+    is two lines for the delegating session to recognise, and it will miss one."""
+    code = read(root, "scripts", "status-block.py") or ""
+    m = re.search(r'^NEXT_STEP_8 = "([^"]+)"', code, re.M)
+    prose = read(root, "references", "handoff-seed.md") or ""
+    check("the Step 8 reminder status-block.py prints is the line handoff-seed.md Step 7 prescribes",
+          bool(m) and ("`%s`" % m.group(1)) in prose,
+          "no NEXT_STEP_8 in status-block.py" if not m else "handoff-seed.md does not carry `%s`" % m.group(1))
+
+
 def check_loop_templates(root):
     """The two `/loop` templates in handover-prompt.md share clauses on purpose.
 
@@ -578,6 +592,7 @@ def main():
     check_trilingual_parity(root, "guide", scope(root)["guides"], "guide")
     check_trilingual_parity(root, "", scope(root)["readmes"], "README")
     print("procedure"); check_step_numbering(root); check_step_pointers(root); check_no_orphan_constants(root)
+    check_step_8_reminder(root)
     print("benchmark"); check_benchmark(root)
     print("loop templates"); check_loop_templates(root)
     print("risk tier"); check_tier_rule(root)

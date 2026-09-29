@@ -111,7 +111,7 @@ detiene y te pregunta cuál es el autoritativo.
 | `docs/PROJECT.md` | Solo si pasaste por la entrevista (camino B) |
 | `docs/CODEBASE-SUMMARY.md` | Solo si mapeó tu código (camino C) |
 | `.specs/STATE.md` (cuerpo de `## Handoff` reescrito) | Solo si hay algo que sembrar *y* una skill de build confirmada cuyo esquema sea legible — cuatro casos que se saltan, abajo |
-| `docs/roadmap-history.md` | Siempre que la siembra reescribe el bloque de Status: el bloque viejo va aquí, textual. Un registro para personas; a ningún agente se le apunta hacia él |
+| `docs/roadmap-history.md` | Siempre que la siembra reescribe el bloque de Status o el handoff: el viejo va aquí, textual, junto con las copias viejas del handoff que las ejecuciones dejaron en `.specs/STATE.md`. Un registro para personas; a ningún agente se le apunta hacia él |
 | `.claude/agents/roadmap-*.md` | Solo si eliges la opción B y tu sesión puede lanzar sub-agentes |
 | `docs/process/pipeline.json` | Solo si eliges la opción C (el pipeline), con el comando de gate que confirmaste |
 | `docs/process/cost-baseline.json` | Solo cuando actualizas un proyecto, o le pides guardar una línea base de costos |
@@ -381,7 +381,7 @@ midió es una suposición.
 
 Un proyecto que planificó una versión anterior recibe el comportamiento nuevo pidiendo *"upgrade this
 project"* tras instalar allí la nueva versión: guarda esa línea base, revisa el roadmap con el linter,
-vuelve a ejecutar la siembra — que vacía el bloque de Status viejo hacia `docs/roadmap-history.md` —,
+vuelve a ejecutar la siembra — que vacía el bloque de Status viejo y el handoff viejo hacia `docs/roadmap-history.md` —,
 ofrece reemplazar las líneas puente antiguas en tu `CLAUDE.md` y pregunta cómo quieres construir.
 Nunca regenera el roadmap.
 

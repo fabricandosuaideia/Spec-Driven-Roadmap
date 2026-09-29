@@ -104,7 +104,7 @@ contradiction — the run stops and asks you which one is authoritative.
 | `docs/PROJECT.md` | Only if you went through the interview (path B) |
 | `docs/CODEBASE-SUMMARY.md` | Only if it mapped your codebase (path C) |
 | `.specs/STATE.md` (`## Handoff` body rewritten) | Only with something to seed *and* a confirmed build skill whose schema is readable — four skip cases, below |
-| `docs/roadmap-history.md` | Whenever the seed rewrites the Status block: the old block goes here, verbatim. A log for people; no agent is ever pointed at it |
+| `docs/roadmap-history.md` | Whenever the seed rewrites the Status block or the handoff: the old one goes here, verbatim, with any old copies of the handoff runs had left in `.specs/STATE.md`. A log for people; no agent is ever pointed at it |
 | `.claude/agents/roadmap-*.md` | Only if you choose option B and your session can spawn sub-agents |
 | `docs/process/pipeline.json` | Only if you choose option C (the pipeline), with the gate command you confirmed |
 | `docs/process/cost-baseline.json` | Only when you upgrade a project, or ask it to save a cost baseline |
@@ -359,7 +359,7 @@ change how agents run and compare after; a saving nobody measured is a guess.
 
 A project an earlier version planned gets the new behaviour by asking *"upgrade this project"* after
 installing the new version there: it saves that baseline, lints the roadmap, re-runs the seed — which
-empties the old Status block into `docs/roadmap-history.md` — offers to replace old bridge lines in
+empties the old Status block and the old handoff into `docs/roadmap-history.md` — offers to replace old bridge lines in
 your `CLAUDE.md`, and asks how you want to build. It never regenerates the roadmap.
 
 ## What it deliberately does *not* do

@@ -173,7 +173,8 @@ Output lands in `docs/` — a `ROADMAP.md` plus a machine-readable `roadmap.txt`
 a risk tier — A, B or C, derived from its size and what it touches — that sets how much verification
 and how many attempts it gets. Backlog position lives in a `## Status` block the skill rewrites on
 every seed and keeps small: whatever earlier runs wrote into it moves, verbatim, to
-`docs/roadmap-history.md`.
+`docs/roadmap-history.md`. The handoff it writes into `.specs/STATE.md` is kept small the same way —
+the old one, and any old copies runs left beside it, go to that same file.
 
 When the run finishes, the skill asks how you want to build and hands you a prompt with the names and
 paths already resolved. Paste it into a fresh session.
@@ -211,7 +212,7 @@ run:
 
 The skill then saves a cost baseline from the project's own transcripts
 (`docs/process/cost-baseline.json`), lints the roadmap, re-runs its seed — which moves the old
-`## Status` into `docs/roadmap-history.md` and rewrites the handoff — offers to replace old bridge lines
+`## Status` and the old handoff, copies included, into `docs/roadmap-history.md` — offers to replace old bridge lines
 in your `CLAUDE.md` (only on your yes), and asks how you want to build. It never regenerates the
 roadmap or renames a feature. You can ask Claude Code for both steps in one sentence: *"reinstall
 spec-driven-roadmap in this project, then upgrade this project"*. Once a few features are built, ask

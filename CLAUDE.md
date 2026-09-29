@@ -36,7 +36,7 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 | `scripts/convert-to-multi.py` | Shipped to users. The single→multi conversion. |
 | `scripts/measure-agents.py` | Shipped to users. Reads a project's Claude Code transcripts and decomposes token cost by class, role, retry, model/effort and orchestrator. Read-only. |
 | `scripts/feature-brief.py` | Shipped to users. Prints one feature's slice of the roadmap for its builder (entry, questions, contracts, ledger, risk tier). Read-only. |
-| `scripts/status-block.py` | Shipped to users. The only writer of `## Status`; archives the old body to `docs/roadmap-history.md`. |
+| `scripts/status-block.py` | Shipped to users. The only writer of `## Status` and of the seed's `## Handoff` (`--handoff`); archives every body it replaces, and every old copy of the Handoff, to `docs/roadmap-history.md`. |
 | `scripts/write-agents.py` | Shipped to users. Writes `.claude/agents/roadmap-*.md` (option B); never overwrites a changed file. |
 | `scripts/plan-pipeline.py` | Shipped to users. Prints the pipeline's args; refuses until `docs/process/pipeline.json`'s gate is confirmed by the user. |
 | `scripts/roadmap-pipeline.js` | Shipped to users. The option C Workflow script. |
@@ -63,7 +63,9 @@ Every shipped script with a `--selftest` has it run by the release gate; the gat
 
 **One agent, one copy. Non-negotiable.** Every agent in a test gets its own freshly created copy of
 the fixture, under its own parent directory. Never point two agents at one tree, never reuse a tree a
-previous run wrote to, and never score a run whose directory you did not create for it. Use
+previous run wrote to, and never score a run whose directory you did not create for it. That includes
+scratch space: sub-agents inherit the launcher's scratchpad, so tell each to keep its scratch files
+inside its own copy. Use
 `scripts/run-benchmark.py setup --agents N`, which builds N isolated copies and refuses to reuse a
 path; hand-rolling the setup is where this goes wrong every time.
 

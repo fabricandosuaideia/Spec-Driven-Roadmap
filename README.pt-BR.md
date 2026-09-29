@@ -178,7 +178,8 @@ build (ou um `ROADMAP-INDEX.md` com um roadmap por seção, se você escolher o 
 carrega um nível de risco — A, B ou C, derivado do tamanho dela e do que ela toca — que define quanta
 verificação e quantas tentativas ela recebe. A posição no backlog fica em um bloco `## Status` que a
 skill reescreve a cada seed e mantém pequeno: o que execuções anteriores escreveram nele vai, literal,
-para `docs/roadmap-history.md`.
+para `docs/roadmap-history.md`. O handoff que ela escreve em `.specs/STATE.md` fica pequeno do mesmo
+jeito — o antigo, e as cópias antigas que execuções deixaram ao lado dele, vão para esse mesmo arquivo.
 
 Ao fim da execução, a skill pergunta como você quer construir e entrega um prompt com os nomes e os
 caminhos já resolvidos. Cole-o em uma sessão nova.
@@ -216,7 +217,7 @@ comportamento novo em uma execução:
 
 A skill então salva uma linha de base de custo a partir dos transcritos do próprio projeto
 (`docs/process/cost-baseline.json`), confere o roadmap, roda de novo o seed dela — que move o `## Status`
-antigo para `docs/roadmap-history.md` e reescreve o handoff —, oferece trocar as linhas de ponte antigas
+antigo e o handoff antigo, cópias incluídas, para `docs/roadmap-history.md` —, oferece trocar as linhas de ponte antigas
 no seu `CLAUDE.md` (só com o seu sim) e pergunta como você quer construir. Ela nunca regenera o
 roadmap nem renomeia uma feature. Você pode pedir os dois passos ao Claude Code em uma frase: *"reinstala
 o spec-driven-roadmap neste projeto e depois atualiza este projeto"*. Depois que algumas features

@@ -10,6 +10,10 @@ prompt's rules, so they live here.
 the target feature, the remaining build order, the blocker, the mode's resolved paths — is what
 Steps 1-6 produced. Running them against anything else emits a prompt pointing at nothing.
 
+**Run them in the session the user is talking to.** Steps 1-7 may have run in a sub-agent; these three
+never do. Steps 8 and 9 are questions, and a sub-agent has nobody to put them to — handed the whole
+procedure, it can only stop at the question or answer it itself, and either way the user never chose.
+
 **How step numbers read here.** A bare `Step 1`-`Step 7` is [handoff-seed.md](handoff-seed.md)'s —
 the numbering is continuous across the two files because it is one procedure. A bare `Step 8`-`Step
 10` is this file's. Any other file's steps are named with it, as they already are elsewhere

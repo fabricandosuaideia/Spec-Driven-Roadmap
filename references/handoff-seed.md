@@ -35,6 +35,13 @@ nothing about it depends on which skill builds from it.
 Then it hands the user **one prompt** to start construction with — either one feature, or a `/loop`
 run across one roadmap — and stops.
 
+**Steps 1-7 may run in a sub-agent; Step 8 never does.** Steps 1-7 read and write files, and a session
+that hands them off keeps that reading out of its own context. Step 8 is a question to the user, and
+only the session the user is talking to can ask it. So a prompt that delegates this procedure says
+that it ends at Step 7's report, and the session that delegated asks Step 8 as soon as that report
+comes back, whenever Step 7's exit list allows. A real run delegated "Steps 1-7 ONLY", relayed the
+report and stopped: the seed was written, and nobody asked the user how to build.
+
 This is the entire extent of this skill's involvement in construction — no waiting for PASS, no
 advancing to the next feature automatically, no re-invoking itself. Once this step reports, every
 subsequent "specify feature", "resume work", pause, and verify belongs entirely to the downstream
@@ -729,12 +736,34 @@ stale hypothesis it has to work around before it can start. Step 5's `## Status`
 target and the remaining build order, in a file no other skill rewrites; record the pending seed on
 its `**Handoff**` line and go to Step 7.
 
-Otherwise: locate the `## Handoff` header in `.specs/STATE.md` and replace only the body between it
-and the next `##` or EOF. Never touch `## Decisions`. If the file does not exist, create it in the shape the
+Otherwise write it **with the script**, from the same `scripts/` directory as Step 5's:
+
+```
+python3 <this-skill-dir>/scripts/status-block.py .specs/STATE.md --handoff <file holding the new body>
+```
+
+It replaces the body between the `## Handoff` header and the next `#`/`##` heading (fence-aware), and
+moves out of the file every other level-two section whose title starts with the word `Handoff` —
+`Handoff (superseded …)`, `Handoff addendum 2` — after appending the old body and each of those
+sections, verbatim, to `docs/roadmap-history.md`. It never touches `## Decisions` or any other
+section, refuses a body that contains a heading, and prints the title of every section it moved:
+Step 7 names them. **Why a script, and why the copies go too.** Both downstream skills define exactly
+two sections in this file, `## Decisions` and `## Handoff`, so a section named after the Handoff is a
+copy of it that some run kept rather than overwrite. The rule this replaced said to replace the body
+and never said where the old one goes — so replacing it read as destroying someone's notes, and on a
+real project run after run kept them instead: 72,899 of that file's 82,586 bytes were old Handoffs and
+their addenda, which the downstream skill reads on every resume. A copy describes a Handoff that is
+being replaced, so it leaves with it — to a log, verbatim, never deleted.
+
+Never touch `## Decisions`. If the file does not exist, create it first in the shape the
 downstream skill prescribes — for `tlc-spec-driven`, an H1 `# STATE`, then `## Decisions` with an
 empty body, then `## Handoff`; for `tlc-spec-lean`, an H1 `# Project state`, then `## Decisions` with
 only its table header (`| ID | Decision | Rationale | Status | Date |` and the separator row), then
-`## Handoff`.
+`## Handoff` — and then run the script, which refuses a file that is not there.
+
+**No code-execution tool?** Apply the same rule by hand: append the old body and each copy, each under
+its own dated `##` heading, to `docs/roadmap-history.md`; then replace the body and remove the copies;
+touch nothing else — and say in Step 7 that the degraded path ran.
 
 Emit **only** the fields that skill defines, and pick the block by the profile Phase 0 confirmed. Do
 not mix them: a `**Where**` line in a `tlc-spec-driven` Handoff, or a bulleted `Completed` in a
@@ -897,7 +926,14 @@ Tell the user, plainly:
   backlog;
 - any **provisional producers** Step 4 recorded, and which sections have to be decomposed before
   those names are firm;
+- the sections Step 6's script moved out of `.specs/STATE.md`, by title, and that they are in
+  `docs/roadmap-history.md` word for word — somebody wrote them, and they should hear where they went;
 - that construction from here on is the downstream skill's own job, through its own triggers.
+
+**When Step 8 follows, the report is not the end of the turn** — the same reply carries Step 8's
+question, so the user never has to guess that a choice exists. When Steps 1-7 ran in a sub-agent, its
+report's last line is `Next: Step 8 — ask the user how to build (handover-prompt.md)`, and the session
+that delegated asks it. Step 6's script prints the same reminder, for the same reason.
 
 Then go to Step 8 — **unless** any of these hold, in which case there is no prompt to hand over and
 this procedure ends here:

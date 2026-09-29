@@ -41,11 +41,13 @@ upgrade: say so, and offer the normal first run (Phase 0).
    and report failures and warnings as questions for the user, as SKILL.md's "Checking an existing
    roadmap" says. Fix nothing here.
 3. **Note the size of what agents are pointed at**: the bytes of `<STATUS-PATH>` (handoff-seed.md Step
-   6's table) and of each `docs/ROADMAP*.md`. The report compares them afterwards.
+   6's table), of `.specs/STATE.md` and of each `docs/ROADMAP*.md`. The report compares them afterwards.
 4. **Run the seed** — handoff-seed.md Steps 1-7, entering by its third trigger (artifacts brought up to
    date). It rewrites `## Status` through `scripts/status-block.py`, which moves whatever older runs
    wrote into it — narrative, `###` sub-headings — to `docs/roadmap-history.md`, verbatim; and it
-   rewrites the Handoff in the confirmed downstream skill's schema unless work is in flight.
+   rewrites the Handoff in the confirmed downstream skill's schema unless work is in flight, through
+   the same script — which moves every older copy of the Handoff that runs kept in that file
+   (`Handoff (superseded …)`, `Handoff addendum …`) to the same history, verbatim.
 5. **The bridge lines.** Read the project's `CLAUDE.md` (or the file its agent auto-loads). If it holds
    bridge lines an earlier version offered — lines that send an agent to read a `docs/ROADMAP*.md`
    section before specifying a feature — show the current lines (handover-prompt.md, "Optional
@@ -60,8 +62,8 @@ upgrade: say so, and offer the normal first run (Phase 0).
 ## Report
 
 In the user's language, short: the version now on disk; the baseline's headline (or that none could
-be taken); what the lint asked; `<STATUS-PATH>` bytes before and after, and that the old text is in
-`docs/roadmap-history.md`; what happened to the bridge lines; which option they chose, if any. Then
+be taken); what the lint asked; `<STATUS-PATH>` and `.specs/STATE.md` bytes before and after, and that
+the old text is in `docs/roadmap-history.md`; what happened to the bridge lines; which option they chose, if any. Then
 the one step that is theirs: once the next features are built, ask *"measure my agent cost"* again —
 the comparison against the baseline is the only evidence the upgrade saved anything. When Step 10
 ran, its own output — the prompt block and the session warning — closes the report verbatim; the

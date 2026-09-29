@@ -9,6 +9,85 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.30.0 — 2026-09-28
+
+**A delegated seed now reaches Step 8, and the Handoff it replaces leaves `.specs/STATE.md` instead of
+piling up in it.** Both were found in real use, in one run on the user's Sales-ai project, after 3.29.1.
+The transcript showed a single cause for both. The session read `handoff-seed.md` and delegated to a
+sub-agent "Steps 1-7 ONLY", which is the wording `SKILL.md`'s table used. It relayed the report and
+stopped, so nobody asked the user how to build. In the same delegation prompt it wrote that replacing
+the Handoff means "the old content is lost", and it told the sub-agent to keep the old Handoff under a
+new `## Handoff (superseded …)` heading, as earlier runs had. The seed said to replace the body and
+never said where the old one goes. That file had reached 82,586 bytes, of which 72,899 were old
+Handoffs and addenda, and the downstream skill reads it on every resume.
+
+- **`scripts/status-block.py --handoff`** (shipped). This is the seed's Step 6 write.
+  - It replaces `## Handoff`'s body and moves out of the file every other level-two section whose title
+    starts with the word `Handoff`. Both downstream skills define only `## Decisions` and `## Handoff`, so
+    such a section is a copy.
+  - Everything it moves is appended to `docs/roadmap-history.md` first, verbatim, one entry per section.
+  - It never touches `## Decisions` or any other section, refuses a body that holds a heading, and
+    refuses a missing file.
+  - It prints what it moved, then a reminder of Step 8.
+  - `docs/roadmap-history.md` keeps a single writer. The Status and Handoff writes are now the same
+    script.
+- **Step 8 cannot be delegated.** `SKILL.md`'s seed row, `handoff-seed.md` (Goal, Step 7) and
+  `handover-prompt.md` now say it:
+  - Steps 1-7 may run in a sub-agent. Step 8 is a question, so the session the user talks to asks it
+    when the report comes back.
+  - Step 7's report no longer ends the turn when Step 8 follows.
+  - A delegated report's last line is `Next: Step 8 — ask the user how to build (handover-prompt.md)`,
+    and the script prints the same line.
+  - The words "Steps 1-7 only" are gone from the seed row.
+- **`check-consistency.py`: 40 checks.** The new one holds the script's reminder and the line Step 7
+  prescribes word for word.
+- **Other files that describe the seed:**
+  - `upgrade-project.md` now measures `.specs/STATE.md` before and after the upgrade.
+  - README, the guide and CLAUDE.md, in three languages, now say the Handoff goes to the history file.
+- **Benchmark changes:**
+  - `state-lean`'s fixture now carries two copies of the Handoff, one of them with lean's fields for a
+    finished feature, as a trap for Step 1. Two new scorer checks bring the scorer to 16.
+  - `expected.md` says how the run must end, which is read by hand because nothing on disk records it.
+
+**Executed.** All agents were blind, ran on Sonnet 5.5 and had one copy each. None was told what
+changed.
+
+- **The script on real data.** Run on a scratch copy of the Sales-ai `STATE.md` as it stood before
+  (`fc7566ef`):
+  - 80,798 → 8,213 bytes, with 5 sections moved.
+  - Everything above `## Handoff` stayed byte-identical.
+  - All 547 lines that left the file are in the history.
+- **The self-test.** 12 new assertions. Three mutants were caught, with 5, 3 and 1 failures.
+- **Four seed runs on `state-lean`.** Two were asked as a user would ask, and two were given the
+  Sales-ai delegation prompt ("Steps 1-7 ONLY").
+  - All four scored **16/16**, used the script for both writes, and named both moved sections.
+  - The two user runs ended with the A/B/C question.
+  - The two delegated runs ended their report with the exact reminder line.
+- **Two runs as the delegating session.** Each was handed a delegated report and asked to reply to the
+  user.
+  - Both asked A/B/C in the same reply, and neither wrote a file.
+  - One wrote that "relaying the report and stopping is exactly the failure the seed warns about".
+- **Not tested:** a delegating session whose sub-agent's report lacks the reminder line, as a report
+  from an older install would.
+- **For comparison:** 3.29.1's own blind run stopped before Step 8 (its entry, below). The Sales-ai
+  run did the same in a real Opus session.
+
+**Found while testing, and fixed in the procedure for running tests.** A sub-agent inherits the
+scratchpad of the session that launched it. Two parallel blind agents wrote `status-body.md` to the
+same path within the same second. Their trees came out different, so each had read its own file, but
+that was luck. `benchmark/README.md`, CLAUDE.md and `run-benchmark.py setup` now say to keep scratch
+files inside each agent's own copy.
+
+**Friction recorded, not fixed:**
+- Three of the four seed runs improvised lean's `Where` lead. The schema wants the id of the refused
+  check, and a surviving mutant is a fault row, which has none.
+- `handoff-seed.md` no longer fits in one read.
+- One delegating session found no "confirmed output language" on a run with no Phase 0.
+
+No rule, Handoff schema or Step 10 template changed.
+
+---
+
 ## 3.29.1 — 2026-09-28
 
 **"Update the roadmap status" now runs the seed instead of an edit.** Found in real use, on the user's

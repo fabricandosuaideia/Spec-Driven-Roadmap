@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.29.1"
+  version: "3.30.0"
 ---
 
 # Spec-Driven Roadmap
@@ -30,7 +30,7 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 | 0 | [references/scope-phase.md](references/scope-phase.md) | Locate a source doc (0a), interview to create one (0b), or derive one from the codebase (0c). Confirms the downstream skill, output language, and single-vs-multi mode. |
 | 1 | [references/index-phase.md](references/index-phase.md) | Multi-section mode only: section map, dependency graph, boundary contracts. |
 | 2 | [references/decompose-phase.md](references/decompose-phase.md) | Slice into vertical features with full coverage, open questions, and a build order. Then pre-empt the cross-cutting gray areas, and record the ones left to the downstream skill. |
-| Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`. Steps 1-7 only; it ends there whenever nothing was seeded. **Also its own entry, on a project with a roadmap:** *"update the roadmap status"*, *"refresh the status"*, *"re-seed"*, *"what's next"* after work was done — run Steps 1-7 from its third trigger, then Step 8's question whenever Step 7 allows — asking how to build is part of the seed, and the user may decline it. Never answer such a request by editing `## Status` yourself. |
+| Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`, both through `scripts/status-block.py`. Its report (Step 7) ends the procedure only when nothing was seeded; otherwise the same reply asks Step 8's question. **Also its own entry, on a project with a roadmap:** *"update the roadmap status"*, *"refresh the status"*, *"re-seed"*, *"what's next"* after work was done — run it from its third trigger through to Step 8's question whenever Step 7 allows — asking how to build is part of the seed, and the user may decline it. Steps 1-7 may be handed to a sub-agent; Step 8 never — it is a question, so the session the user talks to asks it when the report comes back. Never answer such a request by editing `## Status` yourself. |
 | Upgrade | [references/upgrade-project.md](references/upgrade-project.md) | Its own entry, for a project a previous version already planned: baseline the cost, lint, re-run the seed (which empties `## Status` into `docs/roadmap-history.md`), offer the current bridge lines, then Steps 8-10 as usual. Never regenerates the roadmap; never installs the skill itself. |
 | Handover | [references/handover-prompt.md](references/handover-prompt.md) | Reached only from the seed's Step 7. Asks which implementation prompt the user wants — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed) — and emits it. The `/loop` template for the confirmed profile is in [loop-tlc-spec-lean.md](references/loop-tlc-spec-lean.md) or [loop-tlc-spec-driven.md](references/loop-tlc-spec-driven.md); read only that one, and only for a loop. |
 
@@ -182,7 +182,8 @@ nothing was measured (no transcripts, or none in the window) — say that, never
 **`## Status` is written only by `scripts/status-block.py`, from the seed's Step 5 (or its `--last-run`
 from a loop) — never by hand, whatever the request says.** A hand edit is what bloated it to 120 KB on
 one project and is what the script exists to prevent; a request to "update the status" is a request to
-run the seed.
+run the seed. The seed's `## Handoff` goes through the same script (`--handoff`), which archives what it
+replaces, so no run has a reason to keep an old Handoff beside the new one.
 
 - `docs/PROJECT.md` — Phase 0b only, when an interview created the scope.
 - `docs/CODEBASE-SUMMARY.md` — Phase 0c only, when the codebase was the source.
@@ -197,11 +198,13 @@ run the seed.
   their effort and context budget. Never overwrites a file the user changed.
 - `docs/process/pipeline.json` — Step 10, option C only, through `scripts/plan-pipeline.py --init`: the
   pipeline's config. Its full gate command is confirmed by the user, never by this skill.
-- `docs/roadmap-history.md` — append-only, through `scripts/status-block.py`: every `## Status` body
-  the seed replaces, and each loop run's account. A log for people; no prompt points an agent at it.
+- `docs/roadmap-history.md` — append-only, through `scripts/status-block.py`: every `## Status` and
+  `## Handoff` body the seed replaces, every older copy of the Handoff it moves out of `.specs/STATE.md`,
+  and each loop run's account. A log for people; no prompt points an agent at it.
   That is what keeps `## Status` small, and `## Status` is what every handoff points agents at.
 - `.specs/STATE.md` `## Handoff` — the only write into that namespace, in the downstream skill's
-  schema, always a full overwrite of that section's body, and **only when Phase 0 confirmed a skill
+  schema, through `scripts/status-block.py --handoff`: always a full overwrite of that section's body,
+  and every other section titled after it (`Handoff (superseded …)`) leaves with the old body, and **only when Phase 0 confirmed a skill
   whose schema is readable**; otherwise nothing under `.specs/` is created at all. Never an entry
   under `## Decisions` (the empty header may be created once, only when creating `STATE.md` from
   scratch); never `.specs/features/*`.

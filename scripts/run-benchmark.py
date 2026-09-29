@@ -224,7 +224,8 @@ def cmd_setup(args):
         print("           score: %s" % ", ".join(pre))
     print("\nGive the agent that path and nothing else. benchmark/README.md has the")
     print("launch rules — fresh agent, follow literally, friction is the output,")
-    print("never say what changed.")
+    print("never say what changed. Tell it to keep scratch files inside that path:")
+    print("sub-agents inherit the launcher's scratchpad, so parallel agents share one.")
     return 0
 
 
@@ -480,6 +481,17 @@ def score_state(proj, scenario, before):
         ck("notes-list is not described as unstarted (it has a plan, checks and a report)",
            bool(where) and not re.match(r"\s*not started", where.group(1), re.I),
            "Where = %s" % (where.group(1) if where else None))
+        # Since 3.30.0 the fixture carries two copies a past run kept beside the Handoff
+        # (a real project's file was 88% such copies). The seed moves them out with the
+        # body it replaces, verbatim, to the history -- never deletes them.
+        named = re.findall(r"^##\s+Handoff\b.*$", state, re.M)
+        ck("no section named after the Handoff is left beside it in STATE.md", named == ["## Handoff"],
+           "found %s" % named)
+        ck("the copies it moved out are in docs/roadmap-history.md, verbatim",
+           "Sessão de 2026-09-04" in read(os.path.join(proj, "docs", "roadmap-history.md"))
+           and "O dono pediu mensagens de erro" in read(os.path.join(proj, "docs", "roadmap-history.md")),
+           "a copy's text is in neither STATE.md nor the history" if "Sessão de 2026-09-04" not in state
+           else "still in STATE.md")
         ck("the seed did not write a driven-format spec.md or validation.md",
            not any(os.path.exists(os.path.join(proj, ".specs", "features", f, x))
                    for f in now["feature_dirs"] for x in ("spec.md", "validation.md")),
