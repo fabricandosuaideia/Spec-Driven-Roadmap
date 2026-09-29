@@ -493,8 +493,11 @@ def score_state(proj, scenario, before):
         hist = read(os.path.join(proj, "docs", "roadmap-history.md"))
         ck("the old block was archived to docs/roadmap-history.md, not lost",
            "Encerramento" in hist and "Execução autônoma" in hist, "docs/roadmap-history.md lacks it")
-        ck("the loop's **Last run** line survived the rewrite, once",
-           body_s.count("**Last run**:") == 1, "found %d" % body_s.count("**Last run**:"))
+        # Count the field, not the phrase: Step 5 asks for a sub-bullet saying which feature
+        # the Last run line misstates, and that sub-bullet names the line. A substring count
+        # failed a correct run for obeying the reference (3.29.1).
+        runs = len(re.findall(r"^\*\*Last run\*\*:", body_s, re.M))
+        ck("the loop's **Last run** line survived the rewrite, once", runs == 1, "found %d" % runs)
         ck("`## Status` names notes-list as next", bool(sm) and "notes-list" in sm.group(1)
            and re.search(r"Next feature\*\*:[^\n]*notes-list", sm.group(1)) is not None,
            "Status block: %s" % (sm.group(1).strip()[:200] if sm else "missing"))

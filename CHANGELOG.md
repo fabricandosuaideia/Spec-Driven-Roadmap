@@ -9,6 +9,33 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.29.1 — 2026-09-28
+
+**"Update the roadmap status" now runs the seed instead of an edit.** Found in real use, on the user's
+Sales-ai project: asked `/spec-driven-roadmap atualize o status do roadmap`, an agent loaded this skill,
+never opened `handoff-seed.md`, and edited `## Status` and its `**Last run**:` line by hand — no
+`status-block.py`, no Handoff, no build choice. The transcript shows the skill loaded and the seed
+never read. The cause was routing: the phrase that maps a status refresh to the seed (the seed's third
+trigger) lived only inside `handoff-seed.md`, which an agent reaches only after deciding to run the seed.
+
+- `SKILL.md`'s table now gives the seed its own entry — *"update the roadmap status"*, *"refresh the
+  status"*, *"re-seed"*, *"what's next"* after work — with Step 8's question as part of it (the user may
+  decline), and "Where this writes" says outright that `## Status` is written only by
+  `status-block.py`, never by hand, whatever the request says. The description gains the trigger (978
+  characters of 1,024).
+- `run-benchmark.py`'s `state-lean` scorer counted the phrase `**Last run**:` anywhere in the block, and
+  failed a correct run whose sub-bullet — the one Step 5 asks for — named that line. It now counts the
+  field at the start of a line.
+
+**Executed.** A blind agent (Sonnet 5.5) given exactly `/spec-driven-roadmap atualize o status do
+roadmap` on `state-lean`: it went from `SKILL.md` to the seed, wrote `## Status` through the script (the
+old narrative to the history), rewrote the lean Handoff toward the partly built feature, and linted
+clean; **14/14** once the scorer was fixed. It stopped before Step 8, reading "update the status" as not
+asking for the prompt — the wording that says the question is part of the seed was added after it and
+not re-run.
+
+---
+
 ## 3.29.0 — 2026-09-28
 
 **Upgrading a project that already uses the skill is now one request, and the human docs say what the
