@@ -201,9 +201,11 @@ caminhos já resolvidos. Cole-o em uma sessão nova.
   `.claude/agents/roadmap-*.md` para que cada papel rode com o próprio esforço. Toda pergunta aberta
   desse roadmap é fechada com você antes, porque depois não haverá ninguém para responder.
 - **C — uma execução da esteira, só no Claude Code.** Um script de Workflow que a skill traz constrói o
-  roadmap com um agente novo por papel — construtor, um provador que roda o seu gate completo uma vez,
-  o verificador, um revisor para o nível de risco A, um mesclador — e devolve uma linha por feature.
-  Você confirma o comando do gate completo uma vez; o `bench-gate.py` pode cronometrá-lo para você.
+  roadmap com um agente novo por papel — construtor, um provador que roda o seu gate uma vez, o
+  verificador, um revisor para o nível de risco A, um mesclador, e a sua barreira do lote
+  (`barrierGate`) se você deixa a suíte inteira para ela — e devolve uma linha por feature. Você
+  confirma os comandos de gate uma vez; um gate mais longo que os 10 minutos de um comando roda
+  desanexado e é esperado; o `bench-gate.py` pode cronometrá-lo para você.
 
 O [guia](guide/HOW-IT-WORKS.pt-BR.md) explica o que cada opção troca.
 

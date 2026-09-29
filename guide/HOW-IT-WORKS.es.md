@@ -295,9 +295,12 @@ completo una vez y escribe un recibo, el verificador de tu skill de build — qu
 en vez de volver a ejecutar la suite —, un revisor para las features de nivel de riesgo A, y un
 integrador que ejecuta el gate sobre el árbol exacto antes de hacer el merge. Los intentos tienen un
 tope según el nivel, y al tercero se le pide nombrar el invariante que sus predecesores seguían
-pasando por alto antes de escribir código. La skill te pide una sola vez el comando que ejecuta todo
-tu gate, porque cada PASS que registra el pipeline se apoya en él, y puede medir el tiempo de ese
-comando por ti. Misma precondición que B: cero preguntas abiertas.
+pasando por alto antes de escribir código. La skill te pide una sola vez el gate que toda feature debe
+pasar — tu gate entero, o, si tu proyecto deja la suite entera para una barrera del lote, el gate por
+feature más esa barrera (`barrierGate`), que entonces se ejecuta en la rama principal integrada y
+detiene todo merge siguiente cuando queda en rojo —, porque cada PASS que registra el pipeline se
+apoya en él, y puede medir el tiempo de ese comando por ti. Un gate más largo que los 10 minutos de un
+comando se ejecuta desacoplado y se espera. Misma precondición que B: cero preguntas abiertas.
 
 ⚠️ **En cualquier caso, ejecuta ese prompt en una sesión de chat nueva, con contexto limpio** — no en la
 sesión que generó el roadmap. La propia skill te lo va a advertir. En una sesión nueva **el prompt

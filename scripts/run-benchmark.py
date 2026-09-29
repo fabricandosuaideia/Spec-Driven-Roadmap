@@ -74,6 +74,9 @@ SCENARIOS = {
     # `.claude/skills/` — which the .gitignore forbids shipping, so it has to
     # happen at setup or not at all.
     "loop-build": ("the loop prompt's project, with a test that cannot pass", ["loop-fixture"]),
+    # Option C with real agents: the harness relays the launch request to every agent, and a gate
+    # can outlast one command — neither is visible to check-pipeline.mjs's stubbed agents.
+    "pipeline-build": ("the pipeline's project: two small features, a gate longer than one wait", ["pipeline-fixture"]),
 }
 
 # Scenarios that must NOT get the downstream skill: their whole point is the
@@ -83,7 +86,7 @@ NO_DOWNSTREAM = {"0b-interview"}
 # Scenarios whose downstream is tlc-spec-lean rather than tlc-spec-driven. Every
 # other scenario keeps the driven skill only, so that Phase 0 finds exactly one
 # candidate and never has to ask which — that question is its own test.
-LEAN_DOWNSTREAM = {"state-lean"}
+LEAN_DOWNSTREAM = {"state-lean", "pipeline-build"}
 
 # The seven, keyed to how they surface in a roadmap. Each pattern list is
 # alternatives in the languages the skill may write in — it follows the source
@@ -179,8 +182,8 @@ def cmd_setup(args):
             copy_tree(os.path.join(FIXTURE, "state"), proj)
             copy_tree(os.path.join(FIXTURE, want.split(":", 1)[1]), proj)
             continue
-        if want == "loop-fixture":
-            copy_tree(os.path.join(REPO, "benchmark", "loop-fixture"), proj)
+        if want in ("loop-fixture", "pipeline-fixture"):
+            copy_tree(os.path.join(REPO, "benchmark", want), proj)
             os.remove(os.path.join(proj, "README.md"))
             continue
         src = os.path.join(FIXTURE, want)
@@ -204,8 +207,21 @@ def cmd_setup(args):
     # reads it. Record the baseline here so the score can subtract it.
     installed = install_skills(proj, args.scenario)
 
-    if any(w.startswith("state:") or w == "state-lean" for w in wants) or "loop-fixture" in wants:
+    if any(w.startswith("state:") or w == "state-lean" for w in wants) or "loop-fixture" in wants \
+            or "pipeline-fixture" in wants:
         git_init(proj)
+        if "pipeline-fixture" in wants:
+            # The fixture's config names the branch features merge into; git's default decides it.
+            cfg_path = os.path.join(proj, "docs", "process", "pipeline.json")
+            cfg = json.load(open(cfg_path, encoding="utf-8"))
+            branch = subprocess.run(["git", "branch", "--show-current"], cwd=proj, capture_output=True,
+                                    text=True).stdout.strip()
+            if branch and cfg.get("mainBranch") != branch:
+                cfg["mainBranch"] = branch
+                json.dump(cfg, open(cfg_path, "w", encoding="utf-8"), indent=1)
+                subprocess.run(["git", "commit", "-qam", "fixture: main branch"], cwd=proj,
+                               env=dict(os.environ, GIT_AUTHOR_NAME="benchmark", GIT_AUTHOR_EMAIL="b@example.invalid",
+                                        GIT_COMMITTER_NAME="benchmark", GIT_COMMITTER_EMAIL="b@example.invalid"))
         os.makedirs(BASELINES, exist_ok=True)
         with open(os.path.join(BASELINES, stamp + ".snapshot.json"), "w",
                   encoding="utf-8") as fh:

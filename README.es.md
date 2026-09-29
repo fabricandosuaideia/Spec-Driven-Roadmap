@@ -202,10 +202,11 @@ nombres y rutas ya resueltos. Pégalo en una sesión nueva.
   `.claude/agents/roadmap-*.md` para que cada rol corra con su propio esfuerzo. Toda pregunta abierta
   de ese roadmap se cierra contigo antes, porque después nadie estará ahí para responder.
 - **C — una ejecución en pipeline, solo Claude Code.** Un script de Workflow que la skill incluye
-  construye el roadmap con un agente nuevo por rol — constructor, un probador que ejecuta tu gate
-  completo una vez, el verificador, un revisor para el nivel de riesgo A, un integrador — y devuelve
-  una línea por funcionalidad. Confirmas el comando del gate completo una sola vez; `bench-gate.py`
-  puede medir su tiempo por ti.
+  construye el roadmap con un agente nuevo por rol — constructor, un probador que ejecuta tu gate una
+  vez, el verificador, un revisor para el nivel de riesgo A, un integrador, y tu barrera del lote
+  (`barrierGate`) si dejas la suite entera para ella — y devuelve una línea por funcionalidad.
+  Confirmas los comandos de gate una sola vez; un gate más largo que los 10 minutos de un comando se
+  ejecuta desacoplado y se espera; `bench-gate.py` puede medir su tiempo por ti.
 
 La [guía](guide/HOW-IT-WORKS.es.md) explica qué cede cada opción a cambio.
 

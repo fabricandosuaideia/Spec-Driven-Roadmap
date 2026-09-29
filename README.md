@@ -196,9 +196,10 @@ paths already resolved. Paste it into a fresh session.
   `.claude/agents/roadmap-*.md` so each role runs at its own effort. Every open question in that
   roadmap is closed with you first, because nobody is there to answer later.
 - **C — a pipeline run, Claude Code only.** A Workflow script the skill ships builds the roadmap with a
-  fresh agent per role — builder, a prover that runs your full gate once, the verifier, a reviewer for
-  risk tier A, a merger — and returns one line per feature. You confirm the full gate command once;
-  `bench-gate.py` can time it for you.
+  fresh agent per role — builder, a prover that runs your gate once, the verifier, a reviewer for
+  risk tier A, a merger, and your batch barrier (`barrierGate`) if you keep the whole suite for one —
+  and returns one line per feature. You confirm the gate commands once; a gate longer than one
+  command's 10 minutes is run detached and waited for; `bench-gate.py` can time it for you.
 
 The [guide](guide/HOW-IT-WORKS.md) explains what each option trades away.
 

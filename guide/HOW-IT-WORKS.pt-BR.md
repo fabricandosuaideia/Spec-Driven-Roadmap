@@ -296,8 +296,11 @@ vez e escreve um recibo, o verificador da sua skill de build — que reaproveita
 rodar a suíte de novo —, um revisor para as features de nível de risco A, e um mesclador que roda o gate
 na árvore exata antes de mesclar. As tentativas têm teto por nível, e a terceira é instruída a nomear a
 invariante que suas antecessoras continuaram deixando passar antes de escrever código. A skill te pede
-uma vez o comando que roda o seu gate inteiro, porque todo PASS que a esteira registra se apoia nele, e
-pode cronometrar esse comando para você. Mesma precondição da B: zero perguntas em aberto.
+uma vez o gate que toda feature precisa passar — o seu gate inteiro, ou, se o seu projeto deixa a suíte
+inteira para uma barreira do lote, o gate por feature mais essa barreira (`barrierGate`), que então roda
+na branch principal mesclada e para todo merge seguinte quando fica vermelha —, porque todo PASS que a
+esteira registra se apoia nele, e pode cronometrar esse comando para você. Um gate mais longo que os 10
+minutos de um comando roda desanexado e é esperado. Mesma precondição da B: zero perguntas em aberto.
 
 ⚠️ **Em qualquer caso, rode esse prompt em uma nova sessão de chat, com contexto limpo** — não na
 sessão que gerou o roadmap. A própria skill vai te avisar disso. Numa sessão nova, **o canal é o

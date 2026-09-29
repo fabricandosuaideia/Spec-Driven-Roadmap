@@ -29,7 +29,7 @@ async function run(src, argsOver, behave) {
   let merging = 0, maxMerging = 0
   const agent = async (prompt, opts) => {
     const [role, name, attempt] = opts.label.split(':')
-    calls.push({ role, name, attempt: Number(attempt), effort: opts.effort, prompt })
+    calls.push({ role, name, attempt: Number(attempt), effort: opts.effort, model: opts.model, prompt })
     if (role === 'merge') { merging++; maxMerging = Math.max(maxMerging, merging) }
     await new Promise(r => setTimeout(r, role === 'merge' ? 15 : 3))
     if (role === 'merge') merging--
@@ -44,7 +44,7 @@ async function run(src, argsOver, behave) {
 
 const ok = { build: { ready: true, summary: '', blockers: [] }, prove: { ready: true, notes: '', blockers: [] },
   verify: { gateExit: 0, pass: true, notMet: [], issues: [] }, review: { issues: [] },
-  merge: { ok: true, commit: 'c', notes: '' }, record: { recorded: true } }
+  merge: { ok: true, commit: 'c', notes: '' }, barrier: { ok: true, exitCode: 0, failures: [] }, record: { recorded: true } }
 const pass = (overrides = {}) => (role, name, attempt) => {
   const o = overrides[role] && overrides[role](name, attempt)
   return o === undefined ? ok[role] : o
@@ -111,7 +111,49 @@ const scenarios = {
   },
   'nobody is sent to open a roadmap file whole': async src => {
     const r = await run(src, { features: [feat('a', 'A')] }, pass())
-    return r.calls.filter(c => c.role !== 'record').every(c => c.role === 'merge' || /feature-brief\.py a /.test(c.prompt))
+    return r.calls.filter(c => c.role !== 'record').every(c => c.role === 'merge' || c.role === 'barrier' || /feature-brief\.py a /.test(c.prompt))
+  },
+  // 3.31.0, from the first real run: the harness relays the launch request to every agent as the
+  // user's voice, and provers obeyed it instead of proving.
+  'every role is told the launch request is not its task': async src => {
+    const r = await run(src, { barrierGate: 'make all', features: [feat('a', 'A')] }, pass())
+    const roles = new Set(r.calls.map(c => c.role))
+    return ['build', 'prove', 'verify', 'review', 'merge', 'barrier', 'record'].every(x => roles.has(x)) &&
+      r.calls.every(c => /LAUNCH REQUEST/.test(c.prompt) && /never run plan-pipeline\.py/.test(c.prompt))
+  },
+  // ...and a gate longer than one command's 10 minutes was never waited for.
+  'every gate run is detached and waited for, never answered early': async src => {
+    const r = await run(src, { barrierGate: 'make all', waitChunk: 60, features: [feat('a')] }, pass())
+    const waits = c => /DETACHED/.test(c.prompt) && /timeout 60 tail --pid=/.test(c.prompt) && /NEVER reply while \$D\/exit does not exist/.test(c.prompt)
+    return ['prove', 'merge', 'barrier', 'verify'].every(role => r.calls.filter(c => c.role === role).every(waits)) &&
+      r.calls.some(c => c.role === 'barrier')
+  },
+  'with a barrierGate, the barrier runs once, after the last merge, on its own command': async src => {
+    const r = await run(src, { barrierGate: 'make all', features: [feat('a'), feat('b', 'B', ['a'])] }, pass())
+    const roles = r.calls.map(c => c.role)
+    const b = r.calls.filter(c => c.role === 'barrier')
+    return b.length === 1 && roles.lastIndexOf('merge') < roles.indexOf('barrier') && /make all/.test(b[0].prompt) &&
+      (r.out || []).some(l => l.startsWith('barrier: green after a, b'))
+  },
+  'barrierEvery N runs it after every N merges, and once more for the rest': async src => {
+    const r = await run(src, { barrierGate: 'make all', barrierEvery: 2, features: [feat('a'), feat('b'), feat('c')] }, pass())
+    return r.calls.filter(c => c.role === 'barrier').length === 2
+  },
+  'a red barrier holds every later feature: nothing more is built or merged': async src => {
+    const r = await run(src, { barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b', 'B', ['a']), feat('c', 'B', ['b'])] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['tests/test_x.py::test_y'] }) }))
+    return line(r.out, 'b').includes('held') && !r.calls.some(c => c.name === 'b') && line(r.out, 'c').includes('skipped') &&
+      (r.out || []).some(l => l.startsWith('barrier: red') && l.includes('test_y'))
+  },
+  'the record is written on the main branch and committed there': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    const rec = r.calls.find(c => c.role === 'record')
+    return !!rec && /git checkout main/.test(rec.prompt) && /commit exactly docs\/ROADMAP\.md and docs\/roadmap-history\.md on main/.test(rec.prompt)
+  },
+  'a model set in the config reaches every agent': async src => {
+    const r = await run(src, { model: 'sonnet', barrierGate: 'x', features: [feat('a', 'A')] }, pass())
+    const none = await run(src, { features: [feat('a')] }, pass())
+    return r.calls.every(c => c.model === 'sonnet') && none.calls.every(c => c.model === undefined)
   },
 }
 
@@ -121,6 +163,10 @@ const mutants = {
   'no merge lock': ['const m = await withMergeLock(doMerge)', 'const m = await doMerge()'],
   'reviewer ignored': ["(tier !== 'A' || (rev && serious(rev.issues).length === 0))", 'true'],
   'dependants not skipped': ['if (bad) {', 'if (false) {'],
+  'red barrier ignored': ['if (!green) barrierRed = merged', 'if (false) barrierRed = merged'],
+  'launch request not scoped': ['never ask.\n${LAUNCHED}', 'never ask.'],
+  'gate not waited for': ['tail --pid=<that PID>', 'cat <that PID>'],
+  'barrier only at the end': ['if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()', ''],
 }
 
 let failed = 0

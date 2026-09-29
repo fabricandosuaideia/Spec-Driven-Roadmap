@@ -9,6 +9,92 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.31.0 — 2026-09-29
+
+**Option C's first real run built one feature and proved nothing. It now proves.** Found on the user's
+Sales-ai project. The run built `reply-quiet-hours-first-contact` and blocked it after 5 attempts; the
+other 9 features were skipped behind it; it used 1.25 M tokens in 94 minutes. The agents' transcripts
+show three causes, two in the pipeline and one in the advice given around it.
+
+- **The launch request reached every agent as the user's voice.** The Workflow harness relays the
+  request that launched a run to every agent it starts, marked "the only user voice", winning over
+  the task the script computed. The option C prompt is an order: "run plan-pipeline, launch the
+  Workflow tool". Every prover obeyed it and searched for a Workflow tool before doing anything else.
+  In attempts 1 and 5 it never ran the gate at all.
+- **No gate was ever waited for.** A command is cut off at 10 minutes, and the project's gate took
+  about 13. So provers started it in the background. They then replied `ready=false`, "in progress,
+  not a final answer", to have something to return, and replying ends a workflow agent. The harness
+  also refuses `sleep` as a way of waiting.
+- **The per-feature gate was the project's batch barrier.** The whole-suite command (`gate.sh
+  --completo`) was confirmed as the gate every feature runs twice. The project's own rules keep the
+  whole suite for a batch barrier and gate each feature on its affected tests (`gate.sh --afetado`).
+  That advice came from the maintainer's session, not from the skill, but the skill had no way to
+  say otherwise: the pipeline knew one gate.
+
+**What changed:**
+- **`roadmap-pipeline.js`:**
+  - Every role (builder, prover, verifier, reviewer, merger, barrier, recorder) now carries a
+    `LAUNCH REQUEST` line. It says the relayed request started the pipeline and is not the agent's
+    task: never run `plan-pipeline.py`, never look for a Workflow tool.
+  - Every gate run (prover, merger, the verifier's fallback, the barrier) is started detached. The
+    exit code goes to a file, the agent waits with `timeout N tail --pid`, repeated, and it must not
+    reply before the exit file exists.
+  - New optional `barrierGate`/`barrierEvery`. The barrier runs on the merged main branch inside the
+    merge lock, and a red barrier holds every later build and merge.
+  - New optional `model` for every agent. Left null, agents inherit the session's model, which is how
+    the Sales-ai run went out on the machine's default, `claude-sonnet-5`.
+  - The Record agent now checks out the main branch and commits the `**Last run**:` line and the
+    history there. In Sales-ai the record had been left uncommitted on a blocked feature's branch.
+- **`plan-pipeline.py`:** carries the new keys, and `--init` asks for them.
+- **`handover-prompt.md` Step 10**, option C:
+  - It now asks three things: the per-feature gate (read against the project's own rules first), the
+    barrier, and the model.
+  - **The option C template gained a closing paragraph** that scopes the request to the launching
+    session. This is one of the Step 10 templates that are never touched silently, so it is named
+    here.
+  - Step 8's description of option C and the README and guide, in three languages, now say the same.
+
+**Executed:**
+- **`check-pipeline.mjs`:** 21 scenarios, 7 of them new, and 8 planted defects, 4 of them new. All
+  pass, and every mutant is caught.
+- **The detach command on four gates:** `exit 3` inside the command, success, failure, and a `cd`
+  that fails. Each wrote its exit code. The first version grouped the command in `{ }`, so an `exit`
+  in the gate killed the wrapper before it wrote the exit file; that was found by this test and fixed
+  with `( )`.
+- **`plan-pipeline.py --selftest`:** 3 new assertions.
+- **A real Workflow run on the new `benchmark/pipeline-fixture`** (scenario `pipeline-build`). It ran
+  on Sonnet 5.5, set by the new `model` key.
+  - The setup:
+    - two tier-C features;
+    - a gate of 100 seconds against waits of 45;
+    - a separate barrier;
+    - a launch request that was not the pipeline's task. The harness relayed the maintainer
+      session's own request, "do the fix", to every agent.
+  - **Result: both features merged at attempt 1, and the barrier was green.** 10 agents, 469 k
+    tokens, 11 minutes.
+  - **The launch request.** None of the 10 agents ran `plan-pipeline.py` or searched for a Workflow
+    tool.
+  - **The gate waits.** Every gate-running agent (2 provers, 2 mergers, the barrier) started its
+    gate with `nohup`, waited with `tail --pid` (three waits for the 100-second gate, one for the
+    barrier), read the exit code, and only then replied.
+  - **Not exercised:** a red gate, a red barrier and a retry. The stub scenarios cover those; this
+    run was all green.
+  - **Two findings from it:**
+    - The fixture needed a `.gitignore`: a builder committed `__pycache__`, and the verifiers flagged
+      it.
+    - The Record change above.
+- **The Record change**, run by a blind agent (Sonnet 5.5) on a copy of the finished tree, left on a
+  feature branch as Sales-ai's was, with the exact prompt the pipeline renders for one blocked and one
+  skipped feature:
+  - It checked out `master` and wrote the line (`0 merged, 1 blocked, 1 skipped; first blocked:
+    calc-mul`).
+  - It committed exactly the two files, with the prescribed message, and left the feature branch
+    untouched.
+  - Its reply text came back as the single word "placeholder", so the evidence is the tree, not the
+    reply.
+
+---
+
 ## 3.30.0 — 2026-09-28
 
 **A delegated seed now reaches Step 8, and the Handoff it replaces leaves `.specs/STATE.md` instead of

@@ -234,6 +234,26 @@ Claude Code). Run as a delegated sub-agent, its report's last line is
 `Next: Step 8 — ask the user how to build (handover-prompt.md)`. A run that ends with only the next
 feature's trigger has done the seed and dropped the choice — the defect 3.30.0 was cut for.
 
+## `pipeline-build` — option C with real agents
+
+`benchmark/pipeline-fixture/`: `calc-add`, then `calc-sub` (which depends on it), both tier C, with
+`tlc-spec-lean` installed and `docs/process/pipeline.json` pre-confirmed: `gate` is `bash gate.sh`,
+100 seconds against waits of 45 (`waitChunk`), and `barrierGate` is `bash barrier.sh`, once at the
+end. The run is launched with the Workflow tool, the scriptPath and the args `plan-pipeline.py` prints —
+the launching session's own request is what the harness relays to every agent, and on this fixture it
+is never the pipeline's task.
+
+What a correct run shows — read from the Workflow's result and its agents' transcripts; no scorer
+reads them yet:
+
+- every agent does its role: no transcript runs `plan-pipeline.py` or searches for a Workflow tool;
+- every prover, merger and the barrier run their gate detached, wait for it in several waits, and
+  reply only after its exit code exists — none replies "not ready" while the gate still runs;
+- both features merge into the main branch in order, the barrier runs once after the second merge and
+  is green, and the Record agent writes one `**Last run**:` line.
+
+A run where a prover replies before its gate finished is the defect 3.31.0 was cut for.
+
 ## Friction: the second number
 
 Agent-reported, not scriptable, and worth recording anyway. Classify each point as `travou`,

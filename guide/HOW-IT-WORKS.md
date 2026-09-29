@@ -279,9 +279,12 @@ ships: per feature a builder, a fresh prover that runs your full gate once and w
 build skill's verifier — which reuses that receipt instead of re-running the suite — a reviewer for
 risk-tier A features, and a merger that runs the gate on the exact tree before merging. Attempts are
 capped by tier, and the third is told to name the invariant its predecessors kept missing before it
-writes code. The skill asks you once for the command that runs your whole gate, because every PASS the
-pipeline records rests on it, and can time that command for you. Same precondition as B: zero open
-questions.
+writes code. The skill asks you once for the gate every feature must pass — your whole gate, or, if
+your project keeps its whole suite for a batch barrier, your per-feature gate plus that barrier
+(`barrierGate`), which then runs on the merged main branch and stops every later merge when it is
+red — because every PASS the pipeline records rests on it, and can time that command for you. A gate
+longer than one command's 10 minutes is run detached and waited for. Same precondition as B: zero
+open questions.
 
 ⚠️ **Either way, run that prompt in a new chat session, with clean context** — not in the session
 that generated the roadmap. The skill will tell you this too. In a fresh session **the prompt itself

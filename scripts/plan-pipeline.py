@@ -5,9 +5,15 @@ Why this exists: a pipeline run spends the owner's quota for hours, and three of
 must never be guessed. WHICH features are pending is decided by the downstream skill's own
 completion gate, the same one the seed trusts — never by a report merely existing. HOW MUCH
 verification each gets is the feature's risk tier, derived by the rule check-roadmap.py uses.
-And the FULL GATE COMMAND is the pipeline's authority on "done"; a command this script guessed
+And the GATE COMMAND is the pipeline's authority on "done"; a command this script guessed
 would make every PASS a guess, so it reads it from docs/process/pipeline.json and refuses until
 a person has confirmed it there.
+
+`gate` is what every feature must pass before it merges. A project that runs its whole suite only
+at a batch barrier (its feature gate being the affected tests) sets `barrierGate` too: the pipeline
+runs it on the merged main branch every `barrierEvery` merges (0 = once, at the end), and a red
+barrier stops every later merge. `model` sets the model of every agent the pipeline starts; left
+null they inherit the session's, which is how a run went out on a model nobody chose.
 
     python3 plan-pipeline.py --root <project> --init          # write pipeline.json to confirm
     python3 plan-pipeline.py --root <project> [--roadmap docs/ROADMAP-x.md] > args.json
@@ -48,6 +54,9 @@ PROFILES = {  # downstream skill -> (report, completion gate script)
 DEFAULT_CONFIG = {
     "confirmed": False,
     "gate": "",
+    "barrierGate": None,
+    "barrierEvery": 0,
+    "model": None,
     "testHint": "",
     "setup": "",
     "push": False,
@@ -167,11 +176,15 @@ def plan(root, roadmap_rel, cfg):
     args = {
         "project": root, "skillDir": SKILL_DIR, "downstream": ds, "downstreamDir": ds_dir,
         "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main", "gate": cfg["gate"],
+        "barrierGate": cfg.get("barrierGate") or None, "barrierEvery": int(cfg.get("barrierEvery") or 0),
+        "model": cfg.get("model") or None,
         "testHint": cfg.get("testHint") or "", "setup": cfg.get("setup") or "", "push": bool(cfg.get("push")),
         "lanes": lanes, "worktreeRoot": root.rstrip("/") + ".lanes", "checklist": cfg.get("checklist"),
         "effort": cfg.get("effort") or DEFAULT_CONFIG["effort"],
         "maxAttempts": cfg.get("maxAttempts") or DEFAULT_CONFIG["maxAttempts"], "features": feats,
     }
+    if cfg.get("waitChunk"):  # seconds per wait on a detached gate; only tests set it lower
+        args["waitChunk"] = int(cfg["waitChunk"])
     return args, {"done": done, "discharged": discharged, "pending": pending, "downstream": ds}
 
 
@@ -258,12 +271,20 @@ x
                and by["n-big"]["lane"] == by["n-fail"]["lane"])
         expect("an independent feature goes to the least-loaded lane", by["n-next"]["lane"] != by["n-fail"]["lane"])
         expect("the gate comes from the confirmed config", args["gate"] == "make check" and args["downstream"] == "tlc-spec-lean")
+        expect("no barrier and no model unless the config sets them",
+               args["barrierGate"] is None and args["barrierEvery"] == 0 and args["model"] is None)
+        args2, _ = plan(root, os.path.join("docs", "ROADMAP.md"),
+                        dict(cfg, barrierGate="make all", barrierEvery=3, model="sonnet"))
+        expect("the barrier and the model reach the args",
+               args2["barrierGate"] == "make all" and args2["barrierEvery"] == 3 and args2["model"] == "sonnet")
         rc = main(["--root", root])
         expect("without a confirmed pipeline.json nothing is printed", rc == 1)
         rc = main(["--root", root, "--init"])
         written = json.load(open(os.path.join(root, CONFIG)))
         expect("--init writes an unconfirmed config", rc == 0 and written["confirmed"] is False)
         expect("--init detects the real main branch", written["mainBranch"] == "master")
+        expect("--init leaves the barrier and the model for the user to set",
+               written["barrierGate"] is None and written["model"] is None)
         written.update(confirmed=True, gate="make check", mainBranch="main")
         json.dump(written, open(os.path.join(root, CONFIG), "w"))
         import io
@@ -306,16 +327,21 @@ def main(argv=None):
         os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
         with open(cfg_path, "w", encoding="utf-8") as fh:
             json.dump(cfg, fh, indent=1)
-        print("wrote %s with gate %r — confirm the full gate command (typecheck, lint, the whole suite) "
-              "and set \"confirmed\": true before planning" % (CONFIG, cfg["gate"]), file=sys.stderr)
+        print("wrote %s with gate %r — confirm the command every feature must pass before it merges "
+              "(typecheck, lint, the whole suite — or the affected tests, when the project keeps its whole "
+              "suite for a batch barrier, which then goes in \"barrierGate\"), and set \"confirmed\": true "
+              "before planning" % (CONFIG, cfg["gate"]), file=sys.stderr)
         return 0
     if not os.path.isfile(cfg_path):
         print("no %s: run with --init, then confirm it" % CONFIG, file=sys.stderr)
         return 1
     cfg = json.load(open(cfg_path, encoding="utf-8"))
     if cfg.get("confirmed") is not True or not cfg.get("gate"):
-        print("%s is not confirmed: the full gate command decides every PASS the pipeline records, so a "
+        print("%s is not confirmed: the gate command decides every PASS the pipeline records, so a "
               "person confirms it (set \"confirmed\": true) before anything runs" % CONFIG, file=sys.stderr)
+        return 1
+    if cfg.get("barrierGate") is not None and not isinstance(cfg.get("barrierGate"), str):
+        print("%s: barrierGate must be a command or null" % CONFIG, file=sys.stderr)
         return 1
     main_branch = cfg.get("mainBranch") or "main"
     if git(root, "rev-parse", "--verify", "--quiet", "refs/heads/" + main_branch) is None:

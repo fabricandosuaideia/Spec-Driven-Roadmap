@@ -61,11 +61,12 @@ default to the loop because it looks faster.** Ask, in the confirmed output lang
 
 - **Option C — a pipeline run, Claude Code only.** The same one roadmap, built by a Workflow script
   this skill ships (`scripts/roadmap-pipeline.js`) instead of one long conversation: per feature a
-  builder, a fresh prover that runs the full gate once and writes a receipt, the downstream skill's
+  builder, a fresh prover that runs the project's gate once and writes a receipt, the downstream skill's
   verifier — plus an independent reviewer for risk tier A — and a serialized merge; efforts set per
-  role and tier; up to 5/4/3 attempts by tier, the third told to write the invariant first. Offer it
-  only when the session is Claude Code (the Workflow tool exists nowhere else) and name what it
-  costs to set up: the project's full gate command has to be confirmed once, because every PASS the
+  role and tier; up to 5/4/3 attempts by tier, the third told to write the invariant first; and, for
+  a project that keeps its whole suite for a batch barrier, that barrier on the merged main branch.
+  Offer it only when the session is Claude Code (the Workflow tool exists nowhere else) and name what
+  it costs to set up: the project's gate command has to be confirmed once, because every PASS the
   pipeline records rests on it. Same precondition as B — zero open questions — and the same scope,
   one roadmap. Say why it spends less than a loop without sub-agents: every role is a short fresh
   conversation, the verifier reuses the prover's receipt instead of re-running the suite, and this
@@ -567,11 +568,26 @@ them for an unattended run:
    python3 <this-skill-dir>/scripts/plan-pipeline.py --root <project-root> --init
    ```
 
-   It writes `docs/process/pipeline.json` with a guessed full gate command and `"confirmed": false`.
-   Show the user the guess and ask for the command that runs **everything** their merges must pass —
-   typecheck, lint and the whole suite. Write their answer and `"confirmed": true` into the file.
+   It writes `docs/process/pipeline.json` with a guessed gate command and `"confirmed": false`.
+   Show the user the guess and ask three things, in this order:
+   - **The command every feature must pass before it merges** (`"gate"`) — typecheck, lint and the
+     whole suite, unless the project runs its whole suite only at a batch barrier, in which case this
+     is the project's own per-feature gate (its affected tests). Read the project's own rules
+     (`CLAUDE.md`, its test conventions) before asking, and ask about what they already say rather
+     than proposing the whole suite over it: a real run confirmed a 13-minute whole-suite command as
+     the per-feature gate of a project whose own rules keep it for the barrier.
+   - **The barrier, if the project has one** (`"barrierGate"`, and `"barrierEvery"`: how many merges
+     between barriers, `0` for once at the end). The pipeline runs it on the merged main branch, and a
+     red barrier stops every later merge. Leave it `null` when every feature already passes the whole
+     suite.
+   - **The model** (`"model"`), for every agent the pipeline starts. Left `null`, they all inherit the
+     session's model — say so, and say which one that is: a real run went out on a model nobody chose.
+
+   Write their answers and `"confirmed": true` into the file.
    Never confirm it yourself: `plan-pipeline.py` refuses an unconfirmed config because every PASS the
-   pipeline records is that command's verdict. Then offer, once, to time it:
+   pipeline records is that command's verdict. A gate may take longer than one command's 10 minutes:
+   the pipeline runs every gate detached and waits for it, so that is not a reason to pick a shorter
+   one. Then offer, once, to time it:
    `python3 <this-skill-dir>/scripts/bench-gate.py --root <project-root>` runs the confirmed gate as
    written and, when it is `a && b && c`, with its parts at once, alternating the order, recording the
    machine's load and refusing to compare a run that failed. The gate runs twice per feature, so its
@@ -590,7 +606,16 @@ command printed as args. I am asking you to
 run this workflow. Do not arm a monitor on its events and do not comment on them while it runs — each
 notification you answer re-reads this whole conversation. When it returns, report its lines, and
 for every blocked feature name the issue it was blocked on.
+This request is for the session that launches the workflow. Every agent the workflow starts —
+builder, prover, verifier, reviewer, merger, barrier, recorder — has already been launched by it:
+it does the role task it was given, and never runs plan-pipeline.py or looks for a Workflow tool.
 ```
+
+**Why the prompt ends with that paragraph.** The Workflow harness relays the request that launched a
+run to every agent it starts, as the user's own voice, winning over the task the script computed. On
+the first real run this prompt had no such paragraph, and every prover ran `plan-pipeline.py` and
+searched for a Workflow tool instead of proving; the pipeline's own prompts now say the same thing, so
+neither side depends on the other.
 
 Say, beside it: the pipeline merges into the main branch locally and pushes only if `pipeline.json`
 says `"push": true`; blocked features and their last issues land in `docs/roadmap-history.md` through

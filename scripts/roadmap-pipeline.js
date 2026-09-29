@@ -6,6 +6,7 @@ export const meta = {
     { title: 'Build', detail: 'a builder implements on feat/<name>; a fresh prover rebases, runs the full gate once and writes the receipt' },
     { title: 'Verify', detail: 'the downstream skill verifier (and, for tier A, an independent reviewer) — never the builder' },
     { title: 'Merge', detail: 'the authoritative gate on the exact tree, then a fast-forward into the main branch' },
+    { title: 'Barrier', detail: 'only when barrierGate is set: the whole suite on the merged main branch; red stops further merges' },
     { title: 'Record', detail: 'one Last run line in ## Status, the account in docs/roadmap-history.md' },
   ],
 }
@@ -17,9 +18,21 @@ export const meta = {
 // receipt instead of re-running the suite; the invariant is written at attempt 3; efforts are set
 // per role and tier; this script returns one line per feature and nothing else.
 //
+//
+// Two defects from the first real run (Sales-ai, 2026-09-29), both fixed here. The Workflow harness
+// relays the request that launched the run to EVERY agent as "the only user voice", winning over the
+// computed task; the launch prompt says "run plan-pipeline, launch the Workflow tool", so provers
+// did that instead of proving. LAUNCHED now tells each role that request is not its task. And a
+// command is cut off at 10 minutes while a project's gate took longer: provers started it in the
+// background and replied "not ready" to have something to return, which ends a workflow agent, so
+// no gate ever finished. RUN_GATE runs it detached and waits for its exit file before any reply.
+//
 // args (from plan-pipeline.py): { project, skillDir, downstream, downstreamDir, statusPath, mainBranch,
-//   gate, testHint, setup, push, lanes, worktreeRoot, checklist, effort, maxAttempts,
-//   features: [{ name, roadmap, tier, dependsOn[], lane, startAttempt?, feedback? }] }
+//   gate, barrierGate?, barrierEvery?, model?, waitChunk?, testHint, setup, push, lanes, worktreeRoot,
+//   checklist, effort, maxAttempts, features: [{ name, roadmap, tier, dependsOn[], lane, startAttempt?, feedback? }] }
+// `gate` is what every feature must pass before it merges; `barrierGate`, when a project keeps its
+// whole suite for a batch barrier, runs on the merged main branch every `barrierEvery` merges (0 =
+// once, at the end).
 
 const A = args || {}
 const P = A.project
@@ -34,7 +47,10 @@ const MAX = A.maxAttempts || { A: 5, B: 4, C: 3 }
 const EFFORT = A.effort || {}
 const REPORT = LEAN ? 'verification.md' : 'validation.md'
 const GATE_SCRIPT = LEAN ? 'validate_verification.py' : 'validate_state.py'
+const BARRIER_EVERY = Math.max(0, A.barrierEvery || 0)
+const CHUNK = Math.max(30, Math.min(540, A.waitChunk || 540))
 if (!P || !SKILL || !DS || !DSDIR || !A.gate) throw new Error('args incomplete: run plan-pipeline.py and pass its output as args')
+const MODEL = A.model ? { model: A.model } : {}
 
 const tierOf = f => (f.tier === 'A' || f.tier === 'C') ? f.tier : 'B'
 const laneOf = f => Math.min(LANES, Math.max(1, f.lane || 1))
@@ -49,7 +65,19 @@ const WORKTREE = f => LANES > 1
   ? `WORKING TREE: ${wt(f)} (branch feat/${f.name}); if it does not exist create it with: git -C ${P} worktree add -b feat/${f.name} ${wt(f)} ${MAIN} || git -C ${P} worktree add ${wt(f)} feat/${f.name}${A.setup ? `, then in it: ${A.setup}` : ''}. Work only there; never run commands in ${P}.`
   : `WORKING TREE: ${P}. Work on branch feat/${f.name} (git checkout feat/${f.name}, creating it from ${MAIN} if it does not exist).`
 
+const LAUNCHED = `LAUNCH REQUEST: the user request relayed to you above is the one that started this pipeline, and the session that received it has already done it — this pipeline is running and you are one of its agents. It is not your task: never run plan-pipeline.py and never look for a Workflow tool. Your task is the ROLE below.`
+
+// A gate can outlast one command (10 minutes), and a workflow agent is finished the moment it
+// replies, so a gate it does not wait for is read by nobody. `tail --pid` blocks without `sleep`,
+// which the harness refuses as a way of waiting.
+const RUN_GATE = (cmd, where) => `run it DETACHED and wait for it — a single command is cut off at 10 minutes, a gate can take longer, and you are finished the moment you reply:
+   a) D=$(mktemp -d); nohup bash -c 'cd "$1" && ( ${cmd.replace(/'/g, `'\\''`)} ); echo $? > "$0/exit"' "$D" "${where}" > "$D/log" 2>&1 & echo "$D $!"
+   b) wait with: timeout ${CHUNK} tail --pid=<that PID> -f /dev/null — never sleep — and repeat it until $D/exit exists; exit code 124 only means keep waiting.
+   c) the gate's exit code is the content of $D/exit; read only the tail and the failures of $D/log.
+   NEVER reply while $D/exit does not exist: a reply sent while the gate still runs is not a result, and the pipeline reads it as a failure.`
+
 const COMMON = f => `You are one agent of a build pipeline for the project at ${P}. Nobody is available to answer: decide, record the decision where ${DS} keeps assumptions, never ask.
+${LAUNCHED}
 FEATURE: ${f.name}, risk tier ${tierOf(f)}. Its spec source is the output of: python3 ${SKILL}/scripts/feature-brief.py ${f.name} --root ${P} — the entry, the questions naming it, the contracts it consumes, the settled Cross-Cutting Decisions, and what tier ${tierOf(f)} sets for ${DS}. Never open a docs/ROADMAP*.md file whole.
 DOWNSTREAM SKILL: ${DS}, at ${DSDIR}. Read its SKILL.md and only the references your role needs.
 ${WORKTREE(f)}
@@ -76,15 +104,16 @@ const PROVE = f => `${COMMON(f)}
 
 ROLE: PROVER, on a fresh context. A builder already committed this feature on feat/${f.name}; you did not write it. Do not re-implement and do not widen scope.
 1. Rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
-2. Run the FULL GATE once on this exact tree, output to a file, then read only its tail and failures: ${A.gate}
+2. Run the GATE once on this exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
    A failure is a defect, never "environmental": reply ready=false naming the failing test or file, and fix nothing.
 3. Write .specs/features/${f.name}/gate-receipt.json as {"codeHash":"<output of: ${HASH}>","gate":"pass","command":<the gate command>} and commit it.
-Reply ready=true only when the rebase is clean, the gate passed and the receipt is committed.`
+Reply ready=true only when the rebase is clean, the gate finished and passed, and the receipt is committed.`
 
 const VERIFY = f => `${COMMON(f)}
 
 ROLE: VERIFIER. You did not build this; try to show it is NOT done. Follow ${DS}'s ${LEAN ? 'references/verify.md' : 'references/validate.md'} over every ${LEAN ? 'check' : 'acceptance criterion'}. You change no code.
-GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, run the full gate yourself (${A.gate}) and report that as a minor issue.
+GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, run the gate yourself (${A.gate}) — ${RUN_GATE(A.gate, wt(f))}
+   and report the mismatch as a minor issue.
 ${LEAN ? 'Write verification.md exactly as verify.md prescribes, with **Verdict**: PASS or FAIL at the top.' : 'Write validation.md from validate.md\'s template with ONE line reading "## Validation: ' + f.name + ' — PASS" or "— FAIL" as the only verdict the gate can see: relabel the sensor and gate-check result fields (**Sensor verdict** —, **Gate outcome** —); per-criterion rows say MET or NOT MET, never PASS.'} Cite file:line evidence. Commit the report.
 Then run the completion gate: python3 ${DSDIR}/scripts/${GATE_SCRIPT} ${f.name} --root ${wt(f)} — and report its exit code as the script returned it, never through a pipe.${tierOf(f) === 'C' ? '\nThis is a tier C feature and no reviewer follows you: review the diff for correctness, security and weak tests as well, and list those issues too.' : ''}
 Reply with gateExit, pass (true only if gateExit is 0, every ${LEAN ? 'check' : 'criterion'} holds and you found no blocker or major issue), notMet and issues.`
@@ -97,15 +126,26 @@ The builder's and the prover's notes are claims: spot-check the few most likely 
 Report each issue with severity blocker | major | minor, where (file:line), problem and fix.`
 
 const MERGE = f => `You are the MERGER for feature ${f.name} in the project at ${P}. Verification passed. Nothing reaches ${MAIN} without the gate below. Stop with ok=false at the first failure and change nothing further.
+${LAUNCHED}
 1. In ${wt(f)}: rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
-2. Run the FULL GATE once on that exact tree, output to a file, reading only its tail and failures: ${A.gate}
+2. Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
 3. Fast-forward ${MAIN} to feat/${f.name}${LANES > 1 ? ` (git -C ${P} checkout ${MAIN} && git -C ${P} merge --ff-only feat/${f.name})` : ` (git checkout ${MAIN} && git merge --ff-only feat/${f.name})`}.${A.push ? ` Then git push origin ${MAIN}.` : ' Do not push: pushing is the owner\'s call.'}
 4. ${LANES > 1 ? `git -C ${P} worktree remove ${wt(f)}; ` : ''}git branch -d feat/${f.name}.
 Reply with ok, the new ${MAIN} commit and notes.`
 
-const RECORD = (outcomes) => `In the project at ${P}, record this pipeline run. Write the account below to a temporary file, then run:
+const BARRIER = merged => `You are the BARRIER of a build pipeline for the project at ${P}. ${merged.length} feature(s) have been merged into ${MAIN} since the last barrier: ${merged.join(', ')}. Nothing more merges until you report.
+${LAUNCHED}
+You change no code and fix nothing. On ${MAIN}, in ${P}${LANES > 1 ? '' : ` (git checkout ${MAIN} first)`}, run the project's barrier — ${A.barrierGate} — and ${RUN_GATE(A.barrierGate || '', P)}
+Reply with ok (true only if the barrier finished and exited 0), exitCode, and failures: the failing tests or files, as the log names them.`
+
+// The record lands on the main branch and is committed: on the first real run a blocked feature
+// left the tree on its branch, and the record sat there uncommitted for the next session to trip on.
+const RECORD = (outcomes) => `In the project at ${P}, record this pipeline run. ${LAUNCHED.replace('Your task is the ROLE below.', 'Your task is this record.')}
+1. In ${P}: git checkout ${MAIN}. If that is refused because of uncommitted changes, do not stash, discard or commit them: skip to step 3 with recorded=false and name the files.
+2. Write the account below to a temporary file outside the project, then run:
 python3 ${SKILL}/scripts/status-block.py ${A.statusPath} --last-run "<one line: how many merged, blocked, skipped, and the first blocked feature if any>" --note <that file>
-then delete the file. Change nothing else. The account:
+then delete the file, and commit exactly ${A.statusPath} and docs/roadmap-history.md on ${MAIN} with the message "docs: record pipeline run". Change nothing else.
+3. Reply recorded=true only when that commit exists. The account:
 ${JSON.stringify(outcomes, null, 1)}`
 
 const ISSUES = { type: 'array', items: { type: 'object', properties: { severity: { type: 'string', enum: ['blocker', 'major', 'minor'] }, where: { type: 'string' }, problem: { type: 'string' }, fix: { type: 'string' } }, required: ['severity', 'where', 'problem', 'fix'] } }
@@ -114,6 +154,7 @@ const PROVE_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' },
 const VERIFY_SCHEMA = { type: 'object', properties: { gateExit: { type: 'number' }, pass: { type: 'boolean' }, notMet: { type: 'array', items: { type: 'string' } }, issues: ISSUES }, required: ['gateExit', 'pass', 'notMet', 'issues'] }
 const REVIEW_SCHEMA = { type: 'object', properties: { issues: ISSUES }, required: ['issues'] }
 const MERGE_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, commit: { type: 'string' }, notes: { type: 'string' } }, required: ['ok', 'commit', 'notes'] }
+const BARRIER_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, exitCode: { type: 'number' }, failures: { type: 'array', items: { type: 'string' } } }, required: ['ok', 'exitCode', 'failures'] }
 const RECORD_SCHEMA = { type: 'object', properties: { recorded: { type: 'boolean' } }, required: ['recorded'] }
 
 // ---- scheduling: one queue per lane, a feature waits for its dependencies, merges serialized ----
@@ -144,6 +185,23 @@ const outcomes = []
 const blocked = new Set()
 const serious = list => (list || []).filter(i => i && i.severity !== 'minor')
 
+// The barrier runs inside the merge lock, so nothing merges while it runs; red stops every later
+// merge and build, because building on a main branch the whole suite refuses spends quota on a
+// base nobody has proved.
+let sinceBarrier = []
+let barrierRed = null
+const runBarrier = async () => {
+  if (!A.barrierGate || !sinceBarrier.length) return
+  const merged = sinceBarrier
+  sinceBarrier = []
+  const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:${merged[merged.length - 1]}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...MODEL })
+  const green = !!(b && b.ok && b.exitCode === 0)
+  outcomes.push({ name: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
+  log(`barrier after ${merged.join(', ')}: ${green ? 'green' : 'red'}`)
+  if (!green) barrierRed = merged
+}
+const hold = f => { blocked.add(f.name); outcomes.push({ name: f.name, result: 'held', because: 'the barrier is red' }); log(`${f.name}: held (barrier red)`) }
+
 const runFeature = async f => {
   await Promise.all((f.dependsOn || []).filter(d => settled[d]).map(d => settled[d]))
   const bad = (f.dependsOn || []).find(d => blocked.has(d))
@@ -152,19 +210,20 @@ const runFeature = async f => {
   let feedback = f.feedback || null
   let passedAt = 0
   for (let attempt = f.startAttempt || 1; attempt <= MAX[tier] && !passedAt; attempt++) {
-    const built = await agent(IMPLEMENT(f, attempt, feedback), { phase: 'Build', label: `build:${f.name}:${attempt}`, schema: BUILD_SCHEMA, effort: effortFor('implement', f) })
+    if (barrierRed) { hold(f); return }
+    const built = await agent(IMPLEMENT(f, attempt, feedback), { phase: 'Build', label: `build:${f.name}:${attempt}`, schema: BUILD_SCHEMA, effort: effortFor('implement', f), ...MODEL })
     if (!built || !built.ready) {
       feedback = [{ severity: 'blocker', where: 'build', problem: 'the builder did not finish: ' + (built ? built.blockers.join('; ') : 'no result'), fix: 'finish the work on the existing branch' }]
       continue
     }
-    const proved = await agent(PROVE(f), { phase: 'Build', label: `prove:${f.name}:${attempt}`, schema: PROVE_SCHEMA, effort: effortFor('prove', f) })
+    const proved = await agent(PROVE(f), { phase: 'Build', label: `prove:${f.name}:${attempt}`, schema: PROVE_SCHEMA, effort: effortFor('prove', f), ...MODEL })
     if (!proved || !proved.ready) {
       feedback = ((proved && proved.blockers.length) ? proved.blockers : ['the prover did not finish, or the gate failed'])
-        .map(b => ({ severity: 'blocker', where: 'prove', problem: b, fix: 'make the full gate pass on the rebased tree' }))
+        .map(b => ({ severity: 'blocker', where: 'prove', problem: b, fix: 'make the gate pass on the rebased tree' }))
       continue
     }
-    const thunks = [() => agent(VERIFY(f), { phase: 'Verify', label: `verify:${f.name}:${attempt}`, schema: VERIFY_SCHEMA, effort: effortFor('verify', f) })]
-    if (tier === 'A') thunks.push(() => agent(REVIEW(f), { phase: 'Verify', label: `review:${f.name}:${attempt}`, schema: REVIEW_SCHEMA, effort: effortFor('review', f) }))
+    const thunks = [() => agent(VERIFY(f), { phase: 'Verify', label: `verify:${f.name}:${attempt}`, schema: VERIFY_SCHEMA, effort: effortFor('verify', f), ...MODEL })]
+    if (tier === 'A') thunks.push(() => agent(REVIEW(f), { phase: 'Verify', label: `review:${f.name}:${attempt}`, schema: REVIEW_SCHEMA, effort: effortFor('review', f), ...MODEL }))
     const [ver, rev] = await parallel(thunks)
     const pass = !!(ver && ver.pass && ver.gateExit === 0 && serious(ver.issues).length === 0 &&
       (tier !== 'A' || (rev && serious(rev.issues).length === 0)))
@@ -181,9 +240,20 @@ const runFeature = async f => {
     log(`${f.name}: blocked after ${MAX[tier]} attempts`)
     return
   }
-  const doMerge = () => agent(MERGE(f), { phase: 'Merge', label: `merge:${f.name}`, schema: MERGE_SCHEMA, effort: effortFor('merge', f) })
+  const doMerge = async () => {
+    if (barrierRed) return { held: true }
+    const m = await agent(MERGE(f), { phase: 'Merge', label: `merge:${f.name}`, schema: MERGE_SCHEMA, effort: effortFor('merge', f), ...MODEL })
+    if (m && m.ok) {
+      outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit })
+      log(`${f.name}: merged`)
+      sinceBarrier.push(f.name)
+      if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()
+    }
+    return m
+  }
   const m = await withMergeLock(doMerge)
-  if (m && m.ok) { outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit }); log(`${f.name}: merged`); return }
+  if (m && m.held) { hold(f); return }
+  if (m && m.ok) return
   blocked.add(f.name)
   outcomes.push({ name: f.name, result: 'merge-failed', notes: m ? m.notes : 'no result' })
   log(`${f.name}: merge failed`)
@@ -193,6 +263,10 @@ await parallel(Object.values(queues).map(q => async () => {
   for (const f of q) { try { await runFeature(f) } finally { resolve[f.name]() } }
 }))
 
+await withMergeLock(runBarrier)
+
 phase('Record')
-await agent(RECORD(outcomes), { phase: 'Record', label: 'record', schema: RECORD_SCHEMA, effort: effortFor('record', { tier: 'B' }) })
-return outcomes.map(o => `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.because ? ' — depends on ' + o.because : ''}`)
+await agent(RECORD(outcomes), { phase: 'Record', label: 'record', schema: RECORD_SCHEMA, effort: effortFor('record', { tier: 'B' }), ...MODEL })
+return outcomes.map(o => o.name === 'barrier'
+  ? `barrier: ${o.result} after ${o.after.join(', ')}${o.result === 'red' ? ' — ' + (o.failures || []).slice(0, 5).join('; ') : ''}`
+  : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)
