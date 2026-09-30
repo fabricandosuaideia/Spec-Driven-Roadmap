@@ -216,7 +216,9 @@ abertas e marcando cada decisão como `Decided by the manager`** para você revi
 a esteira da opção C. Ele só roda com a sua delegação por escrito (`manager.delegation` em
 `docs/process/pipeline.json`), para antes das seções que você reservar (`stopAt`), numa barreira
 vermelha, e nunca constrói sobre uma seção que não terminou. Fora do modo gestor, a skill nunca
-decide por você.
+decide por você. Dois níveis, como permissões mais estreitas ou mais amplas: `decide` para quando algo
+quebra e espera você; `unblock` também faz a triagem de uma barreira vermelha por script e a conserta,
+com um conferente independente antes de qualquer merge. Experimental.
 
 ## Atualizando um projeto que já usa a skill
 

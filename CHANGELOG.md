@@ -9,6 +9,79 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.35.0 — 2026-09-30
+
+**Manager mode gets two levels, `decide` and `unblock`, and the second repairs what used to stop
+it.** The owner asked why the maintainer's session could fix what stopped the manager and the
+manager could not. There were three kinds of stop. Skill defects are the maintainer's, and a system
+that rewrites its own rules to unblock itself loses the guarantees it exists for. Owner-authority
+stops were already delegated in 3.33.0. Diagnosis stops were the gap: a red barrier three times on
+one test whose inputs were identical to a green run's. What settled it each time was a comparison
+between two trees, plus the time to reproduce the failure and fix its cause, and no role in the
+pipeline owned that. The owner framed the result as permission levels, like running an agent with
+narrower or wider permissions, and asked for option D to say so.
+
+- **`manager.autonomy`:**
+  - `decide` (level 1, the default) is what manager mode was: it decides the open questions and
+    stops when something breaks.
+  - `unblock` (level 2) also repairs, in two places:
+    - **A red barrier is triaged.** `scripts/triage-probe.py` (new, shipped) runs each failing test on
+      the main branch before the merges being judged and after them, in temporary worktrees. It says
+      *regression*, bisected to the commit and the merged feature that owns it, or *preexisting*, or
+      *not reproduced*. That classification is the script's, never an agent's.
+    - A fresh repairer fixes each at the root: a regression in the feature's code, never in its test;
+      a preexisting failure at its cause, with no timeout raised, no assertion loosened, and no skip or
+      retry. It proves each fix with ten passes in a row.
+    - An independent checker refuses anything loosened. The repair merges through the gate, and the
+      barrier runs again. There are at most two cycles, and "not reproduced" stops the run as level 1
+      would.
+    - **A feature the gate cannot decide is classified.** A fresh agent reads its report and decides
+      done or build, writing the decision to `featureStatus`. When in doubt it builds, because
+      rebuilding finished work is a visible attempt and calling unfinished work done is a silent hole.
+  - Merges now report `before`, so triage knows the base.
+- **Manager mode runs on a single-section project too.** `docs/ROADMAP.md` is its one section, with
+  the same autonomy and no decomposing.
+- **Step 8 now describes option D and its two levels** as experimental, Claude Code only, with the
+  price of each level. `manager-mode.md` gains "Two levels — how much permission the owner gives" and
+  asks the level before the first run. SKILL.md, CLAUDE.md, the READMEs and the guide (three
+  languages) now say it.
+
+**Executed:**
+- **`triage-probe.py --selftest`:** 6 assertions against real git: a regression, the bisected commit,
+  the owning feature, preexisting, not reproduced, and the worktrees removed. Three planted mutants
+  were each caught.
+- **`check-pipeline.mjs`:** 11 new scenarios.
+  - Level `decide` never triages, and nothing outside manager mode does either.
+  - At `unblock`: the full cycle; the probe's base and ranges; not-reproduced stops; a checker refusal
+    never merges; at most two cycles; the repairer's and checker's no-loosening rules.
+  - The level reaches every child, and doubtful sections are classified only at `unblock`.
+  - 6 new mutants, all caught.
+- **`plan-pipeline.py --selftest`:** 4 new assertions: the default level, `unblock` passed through, a
+  bad level refused, and single-section as one section.
+- **Real runs on the new `benchmark/unblock-fixture`** (scenario `manager-unblock`; single-section, so
+  the one-section path ran for real). There is one feature and a defect older than it: `unique_tags()`
+  returns `list(set(...))` while promising alphabetical order, and the barrier runs under
+  `PYTHONHASHSEED=2`.
+  - **First run** (13 agents, 630 k tokens, 5 minutes):
+    - `calc-add` merged, and the barrier went red on `test_distinct_and_alphabetical`.
+    - Triage ran `triage-probe.py`, which classified the failure **preexisting** (it failed before
+      the merge too).
+    - The repairer changed one line of `src/tags.py` to `sorted(set(tags))`, noting it "failed on 6
+      of 10 seeds before the fix". The test was untouched.
+    - The checker passed it, it merged through the gate, and the barrier ran again green.
+    - **Then the manager stopped anyway.** It had read the child's *first* barrier line (the red one)
+      instead of its last. That is fixed here: the last barrier line decides, and the child's triage
+      lines appear in the manager's result. A scenario reproduces the real run's exact line sequence,
+      and a mutant restores the old reading and is caught.
+  - **Second run, on a fresh copy** (13 agents, 612 k tokens, 5 minutes): the same cycle, and the run
+    ended "every section was built; triage repaired one preexisting failure" with no stop. The test
+    was untouched, the barrier green and the tree clean.
+  - **Not exercised for real:** a regression repair (the probe's bisection is proved against real
+    git in its self-test, and the cycle on stubs) and the classification of doubtful features (stubs
+    only).
+
+---
+
 ## 3.34.0 — 2026-09-29
 
 **Speed, as choices the user makes with the price named: small units grouped, lanes measured before

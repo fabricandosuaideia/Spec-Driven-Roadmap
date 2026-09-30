@@ -209,7 +209,9 @@ one just before building it — **deciding the open questions itself and marking
 `Decided by the manager`** for you to review — and builds it with option C's pipeline. It runs only
 on your written delegation (`manager.delegation` in `docs/process/pipeline.json`), stops before the
 sections you reserve (`stopAt`), on a red barrier, and never builds on a section that did not finish.
-Outside manager mode the skill never decides for you.
+Outside manager mode the skill never decides for you. Two levels, like narrower or wider
+permissions: `decide` stops when something breaks and waits for you; `unblock` also triages a red
+barrier by script and repairs it, with an independent checker before anything merges. Experimental.
 
 ## Upgrading a project that already uses the skill
 

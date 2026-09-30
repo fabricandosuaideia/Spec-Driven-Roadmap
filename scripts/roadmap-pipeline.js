@@ -56,6 +56,9 @@ const MODEL = A.model ? { model: A.model } : {}
 // tests asserting behaviour the owner had revoked; the owner authorised the same correction by hand
 // both times. MANAGED lets the builder make that one correction and makes the verifier check it.
 const MANAGED = !!A.managerMode
+// Manager mode's second level (manager.autonomy "unblock"): a red barrier is triaged and repaired
+// instead of stopping the run. Only the manager sets it; a person running option C never gets it.
+const UNBLOCK = MANAGED && A.autonomy === 'unblock'
 
 const tierOf = f => (f.tier === 'A' || f.tier === 'C') ? f.tier : 'B'
 const laneOf = f => Math.min(LANES, Math.max(1, f.lane || 1))
@@ -137,11 +140,46 @@ Report each issue with severity blocker | major | minor, where (file:line), prob
 
 const MERGE = f => `You are the MERGER for feature ${f.name} in the project at ${P}. Verification passed. Nothing reaches ${MAIN} without the gate below. Stop with ok=false at the first failure and change nothing further.
 ${LAUNCHED}
+0. Note the commit ${MAIN} points at now (git -C ${P} rev-parse ${MAIN}): that is \`before\`.
 1. In ${wt(f)}: rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
 2. Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
 3. Fast-forward ${MAIN} to feat/${f.name}${LANES > 1 ? ` (git -C ${P} checkout ${MAIN} && git -C ${P} merge --ff-only feat/${f.name})` : ` (git checkout ${MAIN} && git merge --ff-only feat/${f.name})`}.${A.push ? ` Then git push origin ${MAIN}.` : ' Do not push: pushing is the owner\'s call.'}
 4. ${LANES > 1 ? `git -C ${P} worktree remove ${wt(f)}; ` : ''}git branch -d feat/${f.name}.
-Reply with ok, the new ${MAIN} commit and notes.`
+Reply with ok, before, the new ${MAIN} commit and notes.`
+
+// ---- triage (level unblock only): classify by script, repair without loosening, check, merge ----
+const TRIAGE = (merged, failures, base, specs, cycle) => `You are the TRIAGE of a build pipeline for the project at ${P}, manager mode at level unblock, cycle ${cycle}. The batch barrier (${A.barrierGate}) failed after these features merged into ${MAIN}: ${merged.join(', ')}. You change nothing.
+${LAUNCHED}
+THE FAILURES the barrier reported: ${JSON.stringify(failures || [])}
+For each failing test, write ONE command that runs just that test from the project root and exits non-zero when it fails, then run:
+python3 ${SKILL}/scripts/triage-probe.py --root ${P} --base ${base} --test "<that command>" --runs 3${A.setup ? ` --setup "${A.setup}"` : ''} ${specs.map(x => '--merged ' + x).join(' ')}
+It checks out ${MAIN} as it was before these merges and as it is now into temporary worktrees, runs the test in both, and prints its kind: regression (with the commit and the merged feature that introduced it), preexisting (it fails before the merges too), or not-reproduced. Its classification is the answer: copy it, never override it. If a failure is not a test (the barrier could not start, a service did not come up), report it as not-reproduced with what you saw.
+Reply with items: one per failing test, with test, command, kind, feature (for a regression) and evidence (the probe's JSON).`
+
+const REPAIR = (items, cycle) => `You are the REPAIRER of a triaged barrier failure in the project at ${P}, manager mode at level unblock. Nobody is available: decide, never ask.
+${LAUNCHED}
+Work on a new branch triage/${cycle} created from ${MAIN} in ${P}. The items, classified by a script you do not second-guess:
+${JSON.stringify(items, null, 1)}
+- A REGRESSION: the named merged feature broke that test. Fix the feature's code so the test passes and that feature's own acceptance criteria still hold (python3 ${SKILL}/scripts/feature-brief.py <feature> --root ${P}). Do not edit the test — the one exception is an owner decision recorded in the roadmap that revokes exactly its assertion, and then only as TESTS below allows.
+- PREEXISTING: the test failed before these merges too — broken, or flaky. Find the cause and fix it at the root: in the test when the test is wrong about timing, ordering or shared state (an unordered result compared as ordered, a wait on the wrong event, state leaking between tests), in the code when the code is wrong. Never raise a timeout, never loosen, narrow or delete an assertion, never skip it or mark it expected to fail, never add a retry.
+Prove each fix: run its test 10 times in a row with no retries; all 10 must pass. Commit each fix on its own, message "TRIAGE <kind> <test>: <cause>".
+${REVOKED_RULE}
+Reply ready (true only when every item is fixed and proved), fixed (one line each: test, cause, change, proof) and blockers.`
+
+const CHECK = (items, cycle) => `You are the CHECKER of a triage repair in the project at ${P}. You did not write it; try to show it is wrong. You change nothing.
+${LAUNCHED}
+Review git diff ${MAIN}...triage/${cycle} against these items: ${JSON.stringify(items)}.
+Refuse (ok=false) any change that raises a timeout, loosens, narrows or deletes an assertion, adds a skip, an expected-failure mark or a retry, edits the test of a REGRESSION (unless an owner decision recorded in the roadmap revokes exactly that assertion — read it), or does not address the cause the commit names. Then run each item's test 10 times in a row with no retries on triage/${cycle}; every run must pass.
+Reply ok and issues (each: severity, where, problem, fix).`
+
+const TRIAGE_MERGE = cycle => `You are the MERGER of a triage repair in the project at ${P}. Its checker passed. Nothing reaches ${MAIN} without the gate below. Stop with ok=false at the first failure and change nothing further.
+${LAUNCHED}
+0. Note the commit ${MAIN} points at now: that is \`before\`.
+1. In ${P}: rebase triage/${cycle} onto ${MAIN}.
+2. Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, P)}
+3. Fast-forward ${MAIN} to triage/${cycle} (git checkout ${MAIN} && git merge --ff-only triage/${cycle}).${A.push ? ` Then git push origin ${MAIN}.` : ' Do not push.'}
+4. git branch -d triage/${cycle}.
+Reply with ok, before, the new ${MAIN} commit and notes.`
 
 const BARRIER = merged => `You are the BARRIER of a build pipeline for the project at ${P}. ${merged.length} feature(s) have been merged into ${MAIN} since the last barrier: ${merged.join(', ')}. Nothing more merges until you report.
 ${LAUNCHED}
@@ -163,7 +201,10 @@ const BUILD_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' },
 const PROVE_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' }, notes: { type: 'string' }, blockers: { type: 'array', items: { type: 'string' } } }, required: ['ready', 'notes', 'blockers'] }
 const VERIFY_SCHEMA = { type: 'object', properties: { gateExit: { type: 'number' }, pass: { type: 'boolean' }, notMet: { type: 'array', items: { type: 'string' } }, issues: ISSUES }, required: ['gateExit', 'pass', 'notMet', 'issues'] }
 const REVIEW_SCHEMA = { type: 'object', properties: { issues: ISSUES }, required: ['issues'] }
-const MERGE_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, commit: { type: 'string' }, notes: { type: 'string' } }, required: ['ok', 'commit', 'notes'] }
+const MERGE_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, before: { type: 'string' }, commit: { type: 'string' }, notes: { type: 'string' } }, required: ['ok', 'before', 'commit', 'notes'] }
+const TRIAGE_SCHEMA = { type: 'object', properties: { items: { type: 'array', items: { type: 'object', properties: { test: { type: 'string' }, command: { type: 'string' }, kind: { type: 'string', enum: ['regression', 'preexisting', 'not-reproduced'] }, feature: { type: 'string' }, evidence: { type: 'string' } }, required: ['test', 'command', 'kind', 'evidence'] } } }, required: ['items'] }
+const REPAIR_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' }, fixed: { type: 'array', items: { type: 'string' } }, blockers: { type: 'array', items: { type: 'string' } } }, required: ['ready', 'fixed', 'blockers'] }
+const CHECK_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, issues: ISSUES }, required: ['ok', 'issues'] }
 const BARRIER_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, exitCode: { type: 'number' }, failures: { type: 'array', items: { type: 'string' } } }, required: ['ok', 'exitCode', 'failures'] }
 const RECORD_SCHEMA = { type: 'object', properties: { recorded: { type: 'boolean' } }, required: ['recorded'] }
 
@@ -200,14 +241,48 @@ const serious = list => (list || []).filter(i => i && i.severity !== 'minor')
 // base nobody has proved.
 let sinceBarrier = []
 let barrierRed = null
+const mergedAt = {}
+const TRIAGE_EFFORT = EFFORT.triage || 'high'
+
+// Level unblock: at most two triage cycles per red barrier. The classification is triage-probe.py's
+// (the same test run on the main branch before these merges and after them), never an agent's view;
+// anything it cannot reproduce stops the run exactly as level decide would.
+const repair = async (merged, failures) => {
+  const base = mergedAt[merged[0]] && mergedAt[merged[0]].before
+  const specs = merged.filter(n => mergedAt[n]).map(n => `${n}:${mergedAt[n].before}:${mergedAt[n].after}`)
+  const stop = (because, cycle) => { outcomes.push({ name: 'triage', result: 'stopped', cycle, because }); log(`triage: stopped — ${because}`); return false }
+  if (!base) return stop('no base commit was recorded for these merges', 1)
+  for (let cycle = 1; cycle <= 2; cycle++) {
+    const t = await agent(TRIAGE(merged, failures, base, specs, cycle), { phase: 'Barrier', label: `triage:${cycle}`, schema: TRIAGE_SCHEMA, effort: TRIAGE_EFFORT, ...MODEL })
+    const items = (t && t.items) || []
+    if (!items.length) return stop('nothing could be classified', cycle)
+    if (items.some(i => i.kind === 'not-reproduced')) return stop('a failure did not reproduce on either tree: ' + items.filter(i => i.kind === 'not-reproduced').map(i => i.test).join(', '), cycle)
+    const fx = await agent(REPAIR(items, cycle), { phase: 'Barrier', label: `repair:${cycle}`, schema: REPAIR_SCHEMA, effort: effortFor('implement', { tier: 'A' }), ...MODEL })
+    if (!fx || !fx.ready) return stop('the repair did not finish: ' + (fx ? fx.blockers.join('; ') : 'no result'), cycle)
+    const ck = await agent(CHECK(items, cycle), { phase: 'Barrier', label: `check:${cycle}`, schema: CHECK_SCHEMA, effort: TRIAGE_EFFORT, ...MODEL })
+    if (!ck || !ck.ok || serious(ck.issues).length) return stop('the checker refused the repair: ' + (ck ? serious(ck.issues).map(i => i.problem).join('; ') : 'no result'), cycle)
+    const m = await agent(TRIAGE_MERGE(cycle), { phase: 'Barrier', label: `merge:triage-${cycle}`, schema: MERGE_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...MODEL })
+    if (!m || !m.ok) return stop('the repair did not merge: ' + (m ? m.notes : 'no result'), cycle)
+    const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:after-triage-${cycle}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...MODEL })
+    const green = !!(b && b.ok && b.exitCode === 0)
+    outcomes.push({ name: 'triage', result: green ? 'repaired' : 'not enough', cycle, items: items.map(i => `${i.kind}${i.feature ? ' in ' + i.feature : ''}: ${i.test}`) })
+    outcomes.push({ name: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
+    log(`triage cycle ${cycle}: barrier ${green ? 'green' : 'still red'}`)
+    if (green) return true
+    failures = b ? b.failures : []
+  }
+  return false
+}
+
 const runBarrier = async () => {
   if (!A.barrierGate || !sinceBarrier.length) return
   const merged = sinceBarrier
   sinceBarrier = []
   const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:${merged[merged.length - 1]}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...MODEL })
-  const green = !!(b && b.ok && b.exitCode === 0)
+  let green = !!(b && b.ok && b.exitCode === 0)
   outcomes.push({ name: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
   log(`barrier after ${merged.join(', ')}: ${green ? 'green' : 'red'}`)
+  if (!green && UNBLOCK) green = await repair(merged, b ? b.failures : [])
   if (!green) barrierRed = merged
 }
 const hold = f => { blocked.add(f.name); outcomes.push({ name: f.name, result: 'held', because: 'the barrier is red' }); log(`${f.name}: held (barrier red)`) }
@@ -255,6 +330,7 @@ const runFeature = async f => {
     const m = await agent(MERGE(f), { phase: 'Merge', label: `merge:${f.name}`, schema: MERGE_SCHEMA, effort: effortFor('merge', f), ...MODEL })
     if (m && m.ok) {
       outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit })
+      mergedAt[f.name] = { before: m.before, after: m.commit }
       log(`${f.name}: merged`)
       sinceBarrier.push(f.name)
       if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()
@@ -279,4 +355,6 @@ phase('Record')
 await agent(RECORD(outcomes), { phase: 'Record', label: 'record', schema: RECORD_SCHEMA, effort: effortFor('record', { tier: 'B' }), ...MODEL })
 return outcomes.map(o => o.name === 'barrier'
   ? `barrier: ${o.result} after ${o.after.join(', ')}${o.result === 'red' ? ' — ' + (o.failures || []).slice(0, 5).join('; ') : ''}`
+  : o.name === 'triage'
+  ? `triage: ${o.result} (cycle ${o.cycle})${o.items ? ' — ' + o.items.join('; ') : ''}${o.because ? ' — ' + o.because : ''}`
   : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)

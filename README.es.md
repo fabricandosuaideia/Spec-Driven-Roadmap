@@ -217,7 +217,10 @@ preguntas abiertas y marcando cada decisión como `Decided by the manager`** par
 la construye con el pipeline de la opción C. Solo se ejecuta con tu delegación por escrito
 (`manager.delegation` en `docs/process/pipeline.json`), se detiene antes de las secciones que
 reserves (`stopAt`), ante una barrera en rojo, y nunca construye sobre una sección que no terminó.
-Fuera del modo gestor, la skill nunca decide por ti.
+Fuera del modo gestor, la skill nunca decide por ti. Dos niveles, como permisos más estrechos o más
+amplios: `decide` se detiene cuando algo se rompe y te espera; `unblock` también hace el triaje de una
+barrera en rojo por script y la repara, con un verificador independiente antes de cualquier merge.
+Experimental.
 
 ## Actualizar un proyecto que ya usa la skill
 

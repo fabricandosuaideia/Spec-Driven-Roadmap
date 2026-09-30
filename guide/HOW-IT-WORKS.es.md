@@ -312,7 +312,10 @@ orden de construcción, la descompone justo antes de construirla, responde él m
 abiertas (la opción conservadora, marcada `Decided by the manager`) y la construye con el pipeline de
 la opción C. Se detiene antes de una sección reservada o ante una barrera en rojo, y omite lo que
 depende de una sección que no terminó. Después, las decisiones son tuyas para revisar: cada una queda
-marcada en los roadmaps y listada en el registro de la ejecución.
+marcada en los roadmaps y listada en el registro de la ejecución. También eliges hasta dónde llega
+sin ti: en `decide` se detiene cuando algo se rompe; en `unblock` hace el triaje de una barrera en rojo
+— un script decide si los merges rompieron la prueba o si ya estaba rota antes —, la repara sin aflojar
+nada y hace que un agente que no la escribió revise la reparación.
 
 ⚠️ **En cualquier caso, ejecuta ese prompt en una sesión de chat nueva, con contexto limpio** — no en la
 sesión que generó el roadmap. La propia skill te lo va a advertir. En una sesión nueva **el prompt

@@ -82,7 +82,7 @@ marker, because the console encoding has no `✗`. From WSL2 you can drive the h
 |---|---|
 | `SKILL.md` | the map, and the 13 non-negotiable rules |
 | `references/` | the procedures — this is the skill; `SKILL.md` is a map to it |
-| `scripts/` | the ones in `install.sh`'s `REQUIRED_SCRIPTS` ship to users (`convert-to-multi.py`, `check-roadmap.py`, `measure-agents.py`, `feature-brief.py`, `status-block.py`, `write-agents.py`, `plan-pipeline.py`, `roadmap-pipeline.js`, `manager-pipeline.js`, `bench-gate.py`); the rest are maintainer-only ([`CLAUDE.md`](CLAUDE.md) lists them all) |
+| `scripts/` | the ones in `install.sh`'s `REQUIRED_SCRIPTS` ship to users (`convert-to-multi.py`, `check-roadmap.py`, `measure-agents.py`, `feature-brief.py`, `status-block.py`, `write-agents.py`, `plan-pipeline.py`, `roadmap-pipeline.js`, `manager-pipeline.js`, `triage-probe.py`, `bench-gate.py`); the rest are maintainer-only ([`CLAUDE.md`](CLAUDE.md) lists them all) |
 | `benchmark/` | frozen fixture, answer key, scoreboard — see [`benchmark/README.md`](benchmark/README.md) |
 | `guide/` | the human guide, in three languages, kept at structural parity |
 | `install.sh` / `install.ps1` | must stay behaviourally identical; a check enforces the payload |

@@ -311,7 +311,10 @@ comprido — pega cada seção que falta na ordem de construção, decompõe log
 responde ele mesmo as perguntas abertas (a opção conservadora, marcada `Decided by the manager`) e
 constrói com a esteira da opção C. Ele para antes de uma seção reservada ou numa barreira vermelha, e
 pula o que depende de uma seção que não terminou. Depois, as decisões são suas para revisar: cada uma
-fica marcada nos roadmaps e listada no registro da execução.
+fica marcada nos roadmaps e listada no registro da execução. Você também escolhe até onde ele vai sem
+você: em `decide` ele para quando algo quebra; em `unblock` ele faz a triagem de uma barreira vermelha —
+um script decide se os merges quebraram o teste ou se ele já estava quebrado antes —, conserta sem
+afrouxar nada e manda o conserto ser conferido por um agente que não o escreveu.
 
 ⚠️ **Em qualquer caso, rode esse prompt em uma nova sessão de chat, com contexto limpo** — não na
 sessão que gerou o roadmap. A própria skill vai te avisar disso. Numa sessão nova, **o canal é o

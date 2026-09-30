@@ -74,7 +74,7 @@ DEFAULT_CONFIG = {
                "verify": {"A": "high", "B": "high", "C": "medium"}, "review": "high",
                "merge": "medium", "record": "low"},
     "maxAttempts": {"A": 5, "B": 4, "C": 3},
-    "manager": {"delegation": "", "delegatedOn": "", "stopAt": [], "sectionsPerRun": 4,
+    "manager": {"delegation": "", "delegatedOn": "", "autonomy": "decide", "stopAt": [], "sectionsPerRun": 4,
                 "decomposeModel": None, "effort": {"decompose": "xhigh", "plan": "low", "final": "medium"}},
 }
 
@@ -244,12 +244,18 @@ def plan(root, roadmap_rel, cfg):
 SLUG_RE = re.compile(r"`?docs/ROADMAP-([A-Za-z0-9][\w-]*)\.md`?")
 
 
+AUTONOMY = ("decide", "unblock")
+
+
 def index_sections(root):
     """Sections in build order from docs/ROADMAP-INDEX.md: its `## Roadmaps` table, ordered by the
-    numbered list in `## Ordering` (table order when that list names none of them)."""
+    numbered list in `## Ordering` (table order when that list names none of them). A single-section
+    project is one section: docs/ROADMAP.md, already decomposed by Phase 2."""
     path = os.path.join(root, "docs", "ROADMAP-INDEX.md")
     if not os.path.isfile(path):
-        raise RuntimeError("no docs/ROADMAP-INDEX.md: manager mode needs a multi-section project")
+        if os.path.isfile(os.path.join(root, "docs", "ROADMAP.md")):
+            return [{"slug": "roadmap", "roadmap": "docs/ROADMAP.md", "txt": "docs/roadmap.txt", "dependsOn": []}]
+        raise RuntimeError("no docs/ROADMAP-INDEX.md and no docs/ROADMAP.md: nothing for manager mode to build")
     text = open(path, encoding="utf-8").read()
     table = CR.block(text, "## Roadmaps")
     if table is None:
@@ -300,14 +306,19 @@ def manager_args(root, cfg):
     if not (mgr.get("delegation") or "").strip():
         raise RuntimeError("%s has no manager.delegation: manager mode decides what would otherwise be asked, "
                            "and only the owner can hand that over, in their own words" % CONFIG)
+    if mgr.get("autonomy", "decide") not in AUTONOMY:
+        raise RuntimeError("%s manager.autonomy takes \"decide\" or \"unblock\"" % CONFIG)
     secs, ds, ds_dir = section_states(root, cfg)
     status = os.path.join("docs", "ROADMAP-INDEX.md")
+    if not os.path.isfile(os.path.join(root, status)):
+        status = os.path.join("docs", "ROADMAP.md")
     return {
         "project": root, "skillDir": SKILL_DIR, "downstream": ds, "downstreamDir": ds_dir,
         "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main",
         "pipelineScript": os.path.join(SKILL_DIR, "scripts", "roadmap-pipeline.js"),
         "model": cfg.get("model") or None, "decomposeModel": mgr.get("decomposeModel") or None,
         "delegation": mgr["delegation"].strip(), "delegatedOn": mgr.get("delegatedOn") or "",
+        "autonomy": mgr.get("autonomy") or "decide",
         "stopAt": list(mgr.get("stopAt") or []), "sectionsPerRun": int(mgr.get("sectionsPerRun") or 4),
         "effort": dict(DEFAULT_CONFIG["manager"]["effort"], **(mgr.get("effort") or {})),
         "sections": secs,
@@ -495,6 +506,30 @@ x
                and margs["pipelineScript"].endswith("roadmap-pipeline.js") and len(margs["sections"]) == 2)
         expect("its summary line names the manager's absolute scriptPath",
                os.path.join(SKILL_DIR, "scripts", "manager-pipeline.js") in err.getvalue())
+        expect("autonomy is decide unless the owner raises it", margs.get("autonomy") == "decide")
+        written["manager"]["autonomy"] = "unblock"
+        json.dump(written, open(os.path.join(root, CONFIG), "w"))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            main(["--root", root, "--manager"])
+        expect("the owner's unblock reaches the manager", json.loads(out.getvalue()).get("autonomy") == "unblock")
+        written["manager"]["autonomy"] = "everything"
+        json.dump(written, open(os.path.join(root, CONFIG), "w"))
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            rc = main(["--root", root, "--manager"])
+        expect("an autonomy level that does not exist is refused", rc == 1)
+        written["manager"]["autonomy"] = "decide"
+        json.dump(written, open(os.path.join(root, CONFIG), "w"))
+        os.remove(os.path.join(root, "docs", "ROADMAP-INDEX.md"))
+        os.rename(os.path.join(root, "docs", "ROADMAP-core.md"), os.path.join(root, "docs", "ROADMAP.md"))
+        os.rename(os.path.join(root, "docs", "roadmap-core.txt"), os.path.join(root, "docs", "roadmap.txt"))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc = main(["--root", root, "--manager"])
+        one = json.loads(out.getvalue()) if rc == 0 else {}
+        expect("a single-section project is one section, its roadmap the Status file",
+               rc == 0 and [x["roadmap"] for x in one.get("sections", [])] == ["docs/ROADMAP.md"]
+               and one.get("statusPath") == os.path.join("docs", "ROADMAP.md"))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("\n%d failed" % len(failures))
@@ -553,8 +588,8 @@ def main(argv=None):
             return 1
         todo = [x for x in margs["sections"] if not x["decomposed"] or x["pending"]]
         doubt = {k: v for x in margs["sections"] for k, v in x["doubtful"].items()}
-        print("manager: %d section(s), %d with work left (%s); stops at %s; scriptPath %s" % (
-              len(margs["sections"]), len(todo),
+        print("manager (autonomy %s): %d section(s), %d with work left (%s); stops at %s; scriptPath %s" % (
+              margs["autonomy"], len(margs["sections"]), len(todo),
               ", ".join("%s:%s" % (x["slug"], ("%d, %d needing the owner" % (len(x["pending"]), len(x["doubtful"]))
                                               if x["doubtful"] else len(x["pending"])) if x["decomposed"] else "to decompose")
                         for x in todo) or "none",

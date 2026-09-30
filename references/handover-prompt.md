@@ -72,15 +72,18 @@ default to the loop because it looks faster.** Ask, in the confirmed output lang
   conversation, the verifier reuses the prover's receipt instead of re-running the suite, and this
   session only receives one line per feature at the end.
 
-- **Option D — manager mode, experimental; Claude Code and a multi-section project only.** Not one
-  roadmap but every section still to do, in build order, unattended: a Workflow decomposes each section
-  just before building it and builds it with option C's pipeline, section after section
-  ([manager-mode.md](manager-mode.md)). Say plainly what the user trades: **nobody asks them
-  anything** — the manager answers every open question itself, taking the conservative option and
-  marking each answer as its own for them to review afterwards, and it runs only on a delegation they
-  write in their own words. Say that it is experimental: first run on a real project on 2026-09-29.
-  Offer it only when both conditions hold; in a single-section project option C already builds
-  everything.
+- **Option D — manager mode, experimental; Claude Code only.** Not one roadmap but every section still
+  to do, in build order, unattended: a Workflow decomposes each section just before building it and
+  builds it with option C's pipeline, section after section ([manager-mode.md](manager-mode.md)); in a
+  single-section project, the one roadmap with the same autonomy. Say plainly what the user trades:
+  **nobody asks them anything** — the manager answers every open question itself, taking the
+  conservative option and marking each answer as its own for them to review afterwards, and it runs
+  only on a delegation they write in their own words. Name its **two levels**, like narrower or wider
+  permissions for an agent: **decide** stops when something breaks (a red barrier, a feature the gate
+  cannot decide) and waits for them; **unblock** also triages and repairs those — by script where it
+  classifies, with an independent checker before anything merges — at the price of more calls made
+  for them, test and code repairs included. Say that it is experimental: first run on a real project
+  on 2026-09-29.
 
 Everywhere below, **"the roadmap"** means that one file and its build order — `<ROADMAP-PATH>` and
 `<BUILD-ORDER-TXT>` exactly as Step 6's table resolves them for the target section.
@@ -141,7 +144,7 @@ warns on every feature. Say that in the same breath, so a "no" is chosen knowing
 be a self-read.
 
 Option A → skip to Step 10. Option B or C → Step 9. Option D → [manager-mode.md](manager-mode.md),
-"Before the first run" — Step 9 does not apply, because the manager answers the open questions
+"Before the first run", which asks the level — Step 9 does not apply, because the manager answers the open questions
 itself, and manager-mode.md carries its own prompt.
 
 ## Step 9 — Loop option only: close every open question first

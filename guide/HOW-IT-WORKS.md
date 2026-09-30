@@ -295,7 +295,10 @@ long context — takes each remaining section in build order, decomposes it just
 answers the open questions itself (the conservative option, marked `Decided by the manager`), and
 builds it with option C's pipeline. It stops before a reserved section or on a red barrier, and skips
 anything that depends on a section that did not finish. Afterwards, the decisions are yours to review:
-each one is marked in the roadmaps and listed in the run's record.
+each one is marked in the roadmaps and listed in the run's record. You also pick how far it may go
+without you: at `decide` it stops when something breaks; at `unblock` it triages a red barrier — a
+script decides whether the merges broke the test or it was broken before — repairs it without
+loosening anything, and has the repair checked by an agent that did not write it.
 
 ⚠️ **Either way, run that prompt in a new chat session, with clean context** — not in the session
 that generated the roadmap. The skill will tell you this too. In a fresh session **the prompt itself

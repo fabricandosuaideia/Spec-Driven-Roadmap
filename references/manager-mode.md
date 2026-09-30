@@ -8,8 +8,40 @@ pipeline — section after section, until the backlog ends, a section the owner 
 something breaks that it must not build on.
 
 **Claude Code only**: it is a Workflow script (`scripts/manager-pipeline.js`), and the Workflow tool
-exists nowhere else. **Multi-section projects only**: it walks `docs/ROADMAP-INDEX.md`. A
-single-section project has one roadmap, and option C already builds all of it.
+exists nowhere else. **Experimental**: first run on a real project on 2026-09-29. It walks
+`docs/ROADMAP-INDEX.md`'s sections; a single-section project is one section, `docs/ROADMAP.md`, which
+gets the same autonomy without the decomposing.
+
+## Two levels — how much permission the owner gives
+
+Like running an agent with narrower or wider permissions, the owner picks how far the manager may go
+without them (`manager.autonomy` in `pipeline.json`):
+
+- **`decide` — level 1, the default.** It answers the open questions itself (marked as its own), and
+  in its builds it may correct a test asserting what the owner revoked. When something breaks — a red
+  batch barrier, a feature the downstream gate cannot decide, a chain blocked behind a failed feature
+  — it **stops** and waits for the owner.
+- **`unblock` — level 2, more permission.** Everything level 1 does, and it also **repairs what
+  would stop it**:
+  - **A red barrier is triaged, not just reported.** For each failing test `scripts/triage-probe.py`
+    runs it on the main branch as it was before the merges being judged and as it is now: *regression*
+    (it names the merged feature that broke it, by bisection), *preexisting* (it failed before them
+    too — broken or flaky), or *not reproduced*. That classification is the script's, never an
+    agent's view. A fresh repairer fixes each at the root — a regression in the feature's code, never
+    in its test; a preexisting failure at its cause, never by raising a timeout, loosening an assertion,
+    skipping or retrying — and proves it ten runs in a row; an independent checker refuses any
+    repair that loosens anything; the repair merges through the gate and the barrier runs again. At
+    most two cycles; anything not reproduced stops the run, as level 1 would.
+  - **A feature the gate cannot decide is classified, not held.** A fresh agent reads its report and
+    decides done or build — when in doubt, build: rebuilding finished work costs a visible attempt,
+    calling unfinished work done leaves a hole nothing revisits — and records it in `featureStatus`
+    as the manager's decision.
+
+  Its price: more of the owner's calls are made for them, including changes to tests and to code
+  outside the feature being built. Every one is recorded — decisions in the roadmaps and the run's
+  record, repairs as commits named `TRIAGE <kind> <test>: <cause>` — for the owner to review after.
+  What it will not do at any level: push, touch anything outside the project, or build on a red main
+  branch it could not repair.
 
 ## What changes, and what does not
 
@@ -67,9 +99,11 @@ section against the code as the previous ones left it.
    builder's effort at tier A. A third happens by itself: Phase 2 groups small same-area units into
    one feature (decompose-phase.md Step 3), so a section of small fixes pays the per-feature cycle
    fewer times.
-6. **Optionally, a stronger model for the decisions.** `manager.decomposeModel` sets the decomposer's
+6. **The level.** `manager.autonomy`: `decide` (the default) or `unblock` — ask, with the price of each
+   as "Two levels — how much permission the owner gives" above states it, and write the owner's answer; never raise it yourself.
+7. **Optionally, a stronger model for the decisions.** `manager.decomposeModel` sets the decomposer's
    model on its own. Decomposition is where the manager decides; the builders follow what it wrote.
-7. **A clean tree on the main branch**, and nothing else running in that folder: with one lane, the
+8. **A clean tree on the main branch**, and nothing else running in that folder: with one lane, the
    pipeline's builders switch branches in it.
 
 Then run:

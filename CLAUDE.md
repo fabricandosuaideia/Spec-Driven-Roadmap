@@ -41,6 +41,7 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 | `scripts/plan-pipeline.py` | Shipped to users. Prints the pipeline's args; refuses until `docs/process/pipeline.json`'s gate is confirmed by the user. |
 | `scripts/roadmap-pipeline.js` | Shipped to users. The option C Workflow script. |
 | `scripts/manager-pipeline.js` | Shipped to users. Manager mode's Workflow script: every section in build order, decomposed under the owner's delegation, then built by `roadmap-pipeline.js` as a child workflow. |
+| `scripts/triage-probe.py` | Shipped to users. Manager mode level `unblock`: runs one failing test on the main branch before a batch of merges and after it, and says regression (bisected to the merged feature), preexisting or not reproduced. Writes nothing. |
 | `scripts/bench-gate.py` | Shipped to users. Times the project's full gate; writes nothing. |
 | `scripts/check-pipeline.mjs` | Maintainer. The pipeline's control flow on stubbed agents, plus planted defects. Release gate, when `node` exists. |
 
@@ -92,8 +93,9 @@ none of it is yours to decide unprompted.
 **Never edit by hand:** `benchmark/RESULTS.md` (the runner appends it), and the three version
 declarations (`bump-version.sh` writes them together, and refuses when they already disagree). In a
 user's project the skill's own equivalents: `## Status` and `docs/roadmap-history.md` are
-`status-block.py`'s, and `docs/process/pipeline.json`'s `"confirmed"`, `"featureStatus"` and
-`"manager.delegation"` are the user's alone.
+`status-block.py`'s, and `docs/process/pipeline.json`'s `"confirmed"`, `"featureStatus"`,
+`"manager.delegation"` and `"manager.autonomy"` are the user's alone — the one exception being manager
+mode at level `unblock` writing `featureStatus` under that delegation, recorded as its own decision.
 
 **What is never touched without saying so:** the 13 non-negotiable rules in `SKILL.md`, the prompt
 templates Step 10 emits — options A and C in `references/handover-prompt.md`, the two `/loop` templates

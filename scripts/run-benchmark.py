@@ -84,6 +84,8 @@ SCENARIOS = {
     "manager-build": ("manager mode: two sections, one to decompose with an open question", ["manager-fixture"]),
     # Manager mode's one test exception: an existing test asserts what the owner revoked.
     "manager-revoke": ("manager mode: a feature whose existing test asserts a revoked behaviour", ["revoke-fixture"]),
+    # Manager mode level unblock: a red barrier from a defect older than the merge, single-section.
+    "manager-unblock": ("manager mode, level unblock: a barrier red for a reason older than the merge", ["unblock-fixture"]),
 }
 
 # Scenarios that must NOT get the downstream skill: their whole point is the
@@ -93,7 +95,7 @@ NO_DOWNSTREAM = {"0b-interview"}
 # Scenarios whose downstream is tlc-spec-lean rather than tlc-spec-driven. Every
 # other scenario keeps the driven skill only, so that Phase 0 finds exactly one
 # candidate and never has to ask which — that question is its own test.
-LEAN_DOWNSTREAM = {"state-lean", "pipeline-build", "manager-build", "manager-revoke"}
+LEAN_DOWNSTREAM = {"state-lean", "pipeline-build", "manager-build", "manager-revoke", "manager-unblock"}
 
 # The seven, keyed to how they surface in a roadmap. Each pattern list is
 # alternatives in the languages the skill may write in — it follows the source
@@ -189,7 +191,7 @@ def cmd_setup(args):
             copy_tree(os.path.join(FIXTURE, "state"), proj)
             copy_tree(os.path.join(FIXTURE, want.split(":", 1)[1]), proj)
             continue
-        if want in ("loop-fixture", "pipeline-fixture", "manager-fixture", "revoke-fixture"):
+        if want in ("loop-fixture", "pipeline-fixture", "manager-fixture", "revoke-fixture", "unblock-fixture"):
             copy_tree(os.path.join(REPO, "benchmark", want), proj)
             os.remove(os.path.join(proj, "README.md"))
             continue
@@ -215,9 +217,9 @@ def cmd_setup(args):
     installed = install_skills(proj, args.scenario)
 
     if any(w.startswith("state:") or w == "state-lean" for w in wants) or "loop-fixture" in wants \
-            or any(w in wants for w in ("pipeline-fixture", "manager-fixture", "revoke-fixture")):
+            or any(w in wants for w in ("pipeline-fixture", "manager-fixture", "revoke-fixture", "unblock-fixture")):
         git_init(proj)
-        if any(w in wants for w in ("pipeline-fixture", "manager-fixture", "revoke-fixture")):
+        if any(w in wants for w in ("pipeline-fixture", "manager-fixture", "revoke-fixture", "unblock-fixture")):
             # The fixture's config names the branch features merge into; git's default decides it.
             cfg_path = os.path.join(proj, "docs", "process", "pipeline.json")
             cfg = json.load(open(cfg_path, encoding="utf-8"))

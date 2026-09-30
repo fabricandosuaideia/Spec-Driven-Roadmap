@@ -33,6 +33,7 @@ it would be worth having; as the benchmark, no.
 | `fixture/state-lean/` | the seed against `tlc-spec-lean`'s tree — scenario `state-lean` |
 | [`loop-fixture/`](loop-fixture/) | the loop prompt's project, with a test that cannot pass honestly — scenario `loop-build` |
 | [`pipeline-fixture/`](pipeline-fixture/) | option C with real agents: two small features, a gate longer than one wait, a batch barrier — scenario `pipeline-build` |
+| [`unblock-fixture/`](unblock-fixture/) | manager mode, level `unblock`, single-section: a barrier red for a defect older than the merge — scenario `manager-unblock` |
 | [`revoke-fixture/`](revoke-fixture/) | manager mode's one test exception: an existing test asserts what the owner revoked — scenario `manager-revoke` |
 | [`manager-fixture/`](manager-fixture/) | manager mode with real agents: one section decomposed, one to decompose around an open question nobody can answer — scenario `manager-build` |
 | [`expected.md`](expected.md) | the answer key — where each planted ambiguity must land, and why |

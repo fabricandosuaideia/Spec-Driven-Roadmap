@@ -18,7 +18,7 @@ export const meta = {
 // receives one line per section.
 //
 // args (from plan-pipeline.py --manager): { project, skillDir, downstream, downstreamDir, statusPath,
-//   mainBranch, pipelineScript, model?, decomposeModel?, delegation, delegatedOn, stopAt[],
+//   mainBranch, pipelineScript, model?, decomposeModel?, autonomy?, delegation, delegatedOn, stopAt[],
 //   sectionsPerRun, effort: { decompose, plan, final },
 //   sections: [{ slug, roadmap, txt, dependsOn[], decomposed, pending[], doubtful{} }] }   (build order)
 // `doubtful` lists features the downstream gate cannot decide (a report it refuses, or a pending
@@ -36,6 +36,10 @@ if (!P || !SKILL || !A.downstream || !A.pipelineScript || !(A.delegation || '').
   throw new Error('args incomplete, or no delegation: run plan-pipeline.py --manager and pass its output as args')
 }
 const MODEL = A.model ? { model: A.model } : {}
+// manager.autonomy: "decide" (level 1) answers the open questions and stops when something breaks;
+// "unblock" (level 2, more permission) also repairs what would stop it — a red barrier (triaged by
+// script in roadmap-pipeline.js) and features the downstream gate cannot decide (classified below).
+const AUTONOMY = A.autonomy === 'unblock' ? 'unblock' : 'decide'
 const DECOMPOSE_MODEL = A.decomposeModel ? { model: A.decomposeModel } : MODEL
 
 // The Workflow harness relays the request that launched the run to every agent as the user's voice.
@@ -50,6 +54,15 @@ ROLE: run Phase 2 of the spec-driven-roadmap skill (${SKILL}) for this one secti
 DECIDING: every question the procedure would put to the user, you answer. Take the option the procedure itself calls conservative or proposes as the default; when it proposes none, the one that is cheapest to reverse. Write each as \`status: answered\`, its answer beginning **Decided by the manager (owner's delegation of ${A.delegatedOn || 'the recorded date'})**: followed by the answer and one sentence of why — the owner reviews every one of these later, and an answer not marked this way is indistinguishable from one the owner gave. Never leave a question open: a section built unattended has nobody to ask. The Cross-Cutting Decisions ledger in docs/ROADMAP-INDEX.md follows the same rule.
 Then run python3 ${SKILL}/scripts/check-roadmap.py --root ${P} and fix what it fails in this section's files until it reports 0 failed. On ${A.mainBranch}, commit only this section's files and docs/ROADMAP-INDEX.md, message "docs(roadmap-${s.slug}): decompose (manager mode)".
 Reply ok (true only when the files are committed and the linter reports 0 failed), features (the names in build order), decided (one line per decision: the question, then the answer).`
+
+const CLASSIFY = s => `You are the CLASSIFIER of section \`${s.slug}\` in the project at ${P}, manager mode at level unblock.
+${LAUNCHED}
+${DELEGATION}
+The downstream gate cannot decide these features: ${JSON.stringify(s.doubtful)}. For each, read its report under .specs/features/<name>/ in full and its entry in ${s.roadmap}, and decide:
+- done — the report shows the feature finished and verified by someone other than its builder, and only the report's shape is what the gate cannot read;
+- build — anything else: a FAIL verdict, a criterion not met, no independent verification, or you are not sure. Rebuilding finished work costs an attempt that anyone can see; calling unfinished work done leaves a hole nothing ever revisits. When in doubt, build.
+Never edit a report. Write your decisions into docs/process/pipeline.json under "featureStatus" (add only these features, change nothing else) and commit on ${A.mainBranch}, message "chore(process): classify doubtful features of ${s.slug} (manager mode)".
+Reply ok (true only when that commit exists) and decided (one line each: feature → done or build, Decided by the manager (owner's delegation of ${A.delegatedOn || 'the recorded date'}): why).`
 
 const PLAN = s => `You are the PLANNER of section \`${s.slug}\` in the project at ${P}.
 ${LAUNCHED}
@@ -66,6 +79,7 @@ THE ACCOUNT — the run's lines, then every decision the manager made, for the o
 ${JSON.stringify({ lines, decisions }, null, 1)}`
 
 const DECOMPOSE_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, features: { type: 'array', items: { type: 'string' } }, decided: { type: 'array', items: { type: 'string' } } }, required: ['ok', 'features', 'decided'] }
+const CLASSIFY_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, decided: { type: 'array', items: { type: 'string' } } }, required: ['ok', 'decided'] }
 const PLAN_SCHEMA = { type: 'object', properties: { exitCode: { type: 'number' }, line: { type: 'string' }, argsJson: { type: 'string' } }, required: ['exitCode', 'line', 'argsJson'] }
 const FINAL_SCHEMA = { type: 'object', properties: { recorded: { type: 'boolean' }, summary: { type: 'string' } }, required: ['recorded', 'summary'] }
 
@@ -81,7 +95,10 @@ for (const s of SECTIONS) {
   const bad = (s.dependsOn || []).find(d => blockedSections.has(d))
   if (bad) { blockedSections.add(s.slug); lines.push(`${s.slug}: skipped — depends on ${bad}, which did not finish`); log(`${s.slug}: skipped`); continue }
   const doubt = Object.keys(s.doubtful || {})
-  if (doubt.length) { blockedSections.add(s.slug); lines.push(`${s.slug}: needs the owner — the gate cannot decide ${doubt.join(', ')}; classify each in featureStatus`); log(`${s.slug}: needs the owner`); continue }
+  if (doubt.length && AUTONOMY === 'unblock') {
+    const c = await agent(CLASSIFY(s), { phase: 'Plan', label: `classify:${s.slug}`, schema: CLASSIFY_SCHEMA, effort: EFFORT.decompose, ...DECOMPOSE_MODEL })
+    if (c && c.ok) { for (const x of c.decided || []) decisions.push(`${s.slug}: ${x}`) } else { blockedSections.add(s.slug); lines.push(`${s.slug}: needs the owner — classifying ${doubt.join(', ')} did not finish`); continue }
+  } else if (doubt.length) { blockedSections.add(s.slug); lines.push(`${s.slug}: needs the owner — the gate cannot decide ${doubt.join(', ')}; classify each in featureStatus`); log(`${s.slug}: needs the owner`); continue }
   if (built >= PER_RUN) { stopped = `sectionsPerRun (${PER_RUN}) reached — launch again to continue`; break }
 
   if (!s.decomposed) {
@@ -105,14 +122,19 @@ for (const s of SECTIONS) {
   let out
   // managerMode lets a builder correct a test asserting behaviour the owner revoked, and makes the
   // verifier check every test change; option C, run by a person, never gets it.
-  try { out = await workflow({ scriptPath: A.pipelineScript }, { ...pargs, managerMode: true }) } catch (e) { out = null; lines.push(`${s.slug}: blocked — the pipeline did not run: ${e.message}`) }
+  try { out = await workflow({ scriptPath: A.pipelineScript }, { ...pargs, managerMode: true, autonomy: AUTONOMY }) } catch (e) { out = null; lines.push(`${s.slug}: blocked — the pipeline did not run: ${e.message}`) }
   out = Array.isArray(out) ? out : []
   const merged = out.filter(l => /: merged/.test(l)).length
   const unfinished = out.filter(l => /: (blocked|skipped|held|merge-failed)/.test(l))
-  const red = out.find(l => l.startsWith('barrier: red'))
-  if (out.length) lines.push(`${s.slug}: ${merged} merged${unfinished.length ? ', ' + unfinished.length + ' not finished (' + unfinished.map(l => l.split(':')[0]).join(', ') + ')' : ''}${red ? ' — ' + red : ''}`)
+  // The last barrier line decides: at level unblock a red barrier can be repaired and run again
+  // green, and a real run stopped on the first, red line after its triage had fixed the cause.
+  const red = [...out].reverse().find(l => l.startsWith('barrier: '))
+  const stillRed = red && red.startsWith('barrier: red') ? red : null
+  const triaged = out.filter(l => l.startsWith('triage: '))
+  if (out.length) lines.push(`${s.slug}: ${merged} merged${unfinished.length ? ', ' + unfinished.length + ' not finished (' + unfinished.map(l => l.split(':')[0]).join(', ') + ')' : ''}${stillRed ? ' — ' + stillRed : ''}`)
+  for (const t of triaged) lines.push(`  ${s.slug} ${t}`)
   if (!out.length || unfinished.length) blockedSections.add(s.slug)
-  if (red) { stopped = `the barrier is red after ${s.slug}`; break }
+  if (stillRed) { stopped = `the barrier is red after ${s.slug}`; break }
 }
 
 phase('Final')

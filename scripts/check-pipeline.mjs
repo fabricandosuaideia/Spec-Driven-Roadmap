@@ -45,7 +45,7 @@ async function run(src, argsOver, behave) {
 
 const ok = { build: { ready: true, summary: '', blockers: [] }, prove: { ready: true, notes: '', blockers: [] },
   verify: { gateExit: 0, pass: true, notMet: [], issues: [] }, review: { issues: [] },
-  merge: { ok: true, commit: 'c', notes: '' }, barrier: { ok: true, exitCode: 0, failures: [] }, record: { recorded: true } }
+  merge: { ok: true, before: 'b0', commit: 'c', notes: '' }, barrier: { ok: true, exitCode: 0, failures: [] }, record: { recorded: true } }
 const pass = (overrides = {}) => (role, name, attempt) => {
   const o = overrides[role] && overrides[role](name, attempt)
   return o === undefined ? ok[role] : o
@@ -162,6 +162,66 @@ const scenarios = {
     return /REVOKED-TEST <file>:<line>/.test(b.prompt) && /same strength/.test(b.prompt) && !/never edit, weaken/.test(b.prompt) &&
       /REVOKED TESTS \(manager mode\)/.test(v.prompt) && /is a blocker issue/.test(v.prompt)
   },
+  // 3.35.0 — level unblock: a red barrier is triaged by script, repaired, checked, merged, re-run.
+  'at level decide a red barrier is never triaged': async src => {
+    const r = await run(src, { managerMode: true, barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }) }))
+    return !r.calls.some(c => ['triage', 'repair', 'check'].includes(c.role)) && line(r.out, 'b').includes('held')
+  },
+  'outside manager mode a red barrier is never triaged, whatever the config says': async src => {
+    const r = await run(src, { autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }) }))
+    return !r.calls.some(c => c.role === 'triage') && line(r.out, 'b').includes('held')
+  },
+  'at level unblock a red barrier is triaged, repaired, checked, merged and run again — and the run goes on': async src => {
+    let n = 0
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => (n++ === 0 ? { ok: false, exitCode: 1, failures: ['tests/test_x.py::test_y'] } : undefined),
+             triage: () => ({ items: [{ test: 'tests/test_x.py::test_y', command: 'pytest x', kind: 'preexisting', evidence: '{}' }] }),
+             repair: () => ({ ready: true, fixed: ['t: cause, change, 10/10'], blockers: [] }), check: () => ({ ok: true, issues: [] }) }))
+    const seq = r.calls.map(c => c.role).join()
+    return seq.includes('barrier,triage,repair,check,merge,barrier') && line(r.out, 'b').includes('merged') &&
+      (r.out || []).some(l => l.startsWith('triage: repaired (cycle 1) — preexisting: tests/test_x.py::test_y'))
+  },
+  'triage runs the probe from the main branch before the first merge, over every merged range': async src => {
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', features: [feat('a'), feat('b')] },
+      pass({ merge: n => ({ ok: true, before: 'before-' + n, commit: 'after-' + n, notes: '' }), barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }),
+             triage: () => ({ items: [] }) }))
+    const t = r.calls.find(c => c.role === 'triage')
+    return !!t && /triage-probe\.py/.test(t.prompt) && /--base before-a /.test(t.prompt) &&
+      /--merged a:before-a:after-a/.test(t.prompt) && /--merged b:before-b:after-b/.test(t.prompt)
+  },
+  'a failure the probe cannot reproduce stops the run as level decide would': async src => {
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }),
+             triage: () => ({ items: [{ test: 't', command: 'c', kind: 'not-reproduced', evidence: '{}' }] }) }))
+    return !r.calls.some(c => c.role === 'repair') && line(r.out, 'b').includes('held') &&
+      (r.out || []).some(l => /triage: stopped \(cycle 1\) — a failure did not reproduce/.test(l))
+  },
+  'a repair the checker refuses never merges': async src => {
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }),
+             triage: () => ({ items: [{ test: 't', command: 'c', kind: 'regression', feature: 'a', evidence: '{}' }] }),
+             repair: () => ({ ready: true, fixed: ['x'], blockers: [] }),
+             check: () => ({ ok: false, issues: [{ severity: 'blocker', where: 't:1', problem: 'assertion loosened', fix: 'restore it' }] }) }))
+    return !r.calls.some(c => c.role === 'merge' && c.name === 'triage-1') && line(r.out, 'b').includes('held')
+  },
+  'at most two triage cycles, then the run stops': async src => {
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }),
+             triage: () => ({ items: [{ test: 't', command: 'c', kind: 'preexisting', evidence: '{}' }] }),
+             repair: () => ({ ready: true, fixed: ['x'], blockers: [] }), check: () => ({ ok: true, issues: [] }) }))
+    return r.calls.filter(c => c.role === 'triage').length === 2 && line(r.out, 'b').includes('held')
+  },
+  'the repairer may never loosen a test, and the checker refuses one that does': async src => {
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }),
+             triage: () => ({ items: [{ test: 't', command: 'c', kind: 'preexisting', evidence: '{}' }] }),
+             repair: () => ({ ready: true, fixed: ['x'], blockers: [] }), check: () => ({ ok: true, issues: [] }) }))
+    const rp = r.calls.find(c => c.role === 'repair'), ck = r.calls.find(c => c.role === 'check')
+    return /Never raise a timeout, never loosen, narrow or delete an assertion/.test(rp.prompt) && /Do not edit the test/.test(rp.prompt) &&
+      /Refuse \(ok=false\) any change that raises a timeout, loosens, narrows or deletes an assertion/.test(ck.prompt) && /10 times in a row/.test(ck.prompt)
+  },
   'a model set in the config reaches every agent': async src => {
     const r = await run(src, { model: 'sonnet', barrierGate: 'x', features: [feat('a', 'A')] }, pass())
     const none = await run(src, { features: [feat('a')] }, pass())
@@ -180,6 +240,10 @@ const mutants = {
   'gate not waited for': ['tail --pid=<that PID>', 'cat <that PID>'],
   'verifier not told to check test changes in manager mode': ["${MANAGED ? REVOKED_CHECK(f) + '\\n' : ''}", ''],
   'barrier only at the end': ['if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()', ''],
+  'unblock outside manager mode': ["const UNBLOCK = MANAGED && A.autonomy === 'unblock'", "const UNBLOCK = A.autonomy === 'unblock'"],
+  'repair merged without the checker': ["if (!ck || !ck.ok || serious(ck.issues).length) return stop(", "if (false) return stop("],
+  'triage cycles unbounded': ['for (let cycle = 1; cycle <= 2; cycle++) {', 'for (let cycle = 1; cycle <= 5; cycle++) {'],
+  'a not-reproduced failure repaired anyway': ["if (items.some(i => i.kind === 'not-reproduced')) return stop(", "if (false) return stop("],
 }
 
 // ---- manager mode: manager-pipeline.js, with stubbed agents and a stubbed child pipeline ----
@@ -199,7 +263,7 @@ async function runManager(src, argsOver, child = () => ['x: merged (attempt 1)',
     if (role === 'plan') return { exitCode: 0, line: 'ok', argsJson: JSON.stringify({ features: [{ name: slug + '-a' }], roadmap: `docs/ROADMAP-${slug}.md` }) }
     if (role === 'final') return { recorded: true, summary: 's' }
   }
-  const workflow = async (ref, a) => { const slug = a.roadmap.match(/ROADMAP-(.+)\.md/)[1]; children.push({ ref, slug, managerMode: a.managerMode }); return child(slug) }
+  const workflow = async (ref, a) => { const slug = a.roadmap.match(/ROADMAP-(.+)\.md/)[1]; children.push({ ref, slug, managerMode: a.managerMode, autonomy: a.autonomy }); return child(slug) }
   const fn = new AsyncFunction('args', 'agent', 'parallel', 'phase', 'log', 'workflow', src.replace(/^export const meta/m, 'const meta'))
   let out, error = null
   try { out = await fn({ ...MBASE, ...argsOver }, agent, fns => Promise.all(fns.map(f => f())), () => {}, () => {}, workflow) } catch (e) { error = e.message }
@@ -216,6 +280,19 @@ const managerScenarios = {
   'manager: every child pipeline runs in manager mode': async src => {
     const r = await runManager(src, { sections: [sec('a'), sec('b', { decomposed: true, pending: ['b-a'] })] })
     return r.children.length === 2 && r.children.every(c => c.managerMode === true)
+  },
+  'manager: the autonomy level reaches every child, decide by default': async src => {
+    const d = await runManager(src, { sections: [sec('a')] })
+    const u = await runManager(src, { autonomy: 'unblock', sections: [sec('a')] })
+    return d.children[0].autonomy === 'decide' && u.children[0].autonomy === 'unblock'
+  },
+  'manager: at level unblock a doubtful section is classified, then built; at level decide it waits': async src => {
+    const sections = [sec('a', { decomposed: true, pending: ['a-x'], doubtful: { 'a-x': 'has a validation.md the gate refuses' } })]
+    const u = await runManager(src, { autonomy: 'unblock', sections }, undefined, { classify: () => ({ ok: true, decided: ['a-x → done, Decided by the manager: report PASS'] }) })
+    const d = await runManager(src, { sections })
+    const cl = u.calls.find(c => c.role === 'classify')
+    return !!cl && /When in doubt, build/.test(cl.prompt) && /Never edit a report/.test(cl.prompt) && u.children.length === 1 &&
+      u.out.some(l => /decisions made by the manager: 1/.test(l)) && !d.calls.some(c => c.role === 'classify') && d.children.length === 0
   },
   'manager: a finished section costs nothing': async src => {
     const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: [] }), sec('b')] })
@@ -235,6 +312,15 @@ const managerScenarios = {
       sec('b', { dependsOn: ['a'] }), sec('c')] })
     return !r.calls.some(c => c.slug === 'a' || c.slug === 'b') && r.children.map(c => c.slug).join() === 'c' &&
       r.out.some(l => /^a: needs the owner — the gate cannot decide a-x/.test(l)) && r.out.some(l => /^b: skipped/.test(l))
+  },
+  // The exact child output of a real level-unblock run (3.35.0): red, repaired, green.
+  'manager: a barrier the child repaired and ran again green does not stop the run': async src => {
+    const r = await runManager(src, { autonomy: 'unblock', sections: [sec('a'), sec('b')] }, slug => slug === 'a'
+      ? ['a-x: merged (attempt 1)', 'barrier: red after a-x — tests.test_tags...: returned [b, a]',
+         'triage: repaired (cycle 1) — preexisting: tests.test_tags...', 'barrier: green after a-x']
+      : ['b-x: merged (attempt 1)', 'barrier: green after b-x'])
+    return r.children.map(c => c.slug).join() === 'a,b' && !r.out.some(l => /stopped/.test(l)) &&
+      r.out.some(l => /a triage: repaired \(cycle 1\)/.test(l))
   },
   'manager: a red barrier stops the run': async src => {
     const r = await runManager(src, { sections: [sec('a'), sec('b')] }, slug => ['a-a: merged (attempt 1)', 'barrier: red after a-a — t'])
@@ -277,10 +363,12 @@ const managerScenarios = {
 const managerMutants = {
   'dependants of an unfinished section not skipped': ['if (bad) { blockedSections.add', 'if (false) { blockedSections.add'],
   'stopAt ignored': ['if (STOP_AT.has(s.slug))', 'if (false)'],
-  'red barrier ignored': ["if (red) { stopped = `the barrier is red after ${s.slug}`; break }", ''],
+  'red barrier ignored': ["if (stillRed) { stopped = `the barrier is red after ${s.slug}`; break }", ''],
   'decisions not marked': ['**Decided by the manager', '**Decided'],
+  'the first barrier line decides': ["const red = [...out].reverse().find(l => l.startsWith('barrier: '))", "const red = out.find(l => l.startsWith('barrier: '))"],
   'doubtful features built anyway': ['if (doubt.length) {', 'if (false) {'],
-  'child pipelines not told they run in manager mode': ['{ ...pargs, managerMode: true }', 'pargs'],
+  'child pipelines not told they run in manager mode': ['{ ...pargs, managerMode: true, autonomy: AUTONOMY }', 'pargs'],
+  'doubtful features classified at level decide': ["if (doubt.length && AUTONOMY === 'unblock') {", "if (doubt.length) {"],
 }
 
 let failed = 0

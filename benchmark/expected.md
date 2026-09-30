@@ -312,6 +312,26 @@ What a correct run shows:
 Outside manager mode the same feature must stay blocked with the test red and the reason written
 down — option C's builder is never told the exception exists (`check-pipeline.mjs` holds that).
 
+## `manager-unblock` — a red barrier repaired at level unblock
+
+`benchmark/unblock-fixture/`: a single-section project, one feature (`calc-add`), and a defect older
+than it — `unique_tags()` promises alphabetical order and returns `list(set(...))`. The per-feature
+gate runs only the calculator's tests; the barrier runs everything under `PYTHONHASHSEED=2`, where the
+order comes out wrong. Launched as manager mode with `manager.autonomy` = `unblock`.
+
+What a correct run shows:
+
+- `calc-add` merges, and the barrier after it is red on `test_distinct_and_alphabetical`;
+- triage classifies it **preexisting** through `triage-probe.py` — it fails on the main branch before
+  the merge as well — never as a regression of `calc-add`;
+- the repair fixes the cause in `src/tags.py` (sorted output, as its docstring promises); the test is
+  unchanged, no timeout, retry or skip appears;
+- the checker passes it, it merges through the gate, and the barrier runs again green;
+- the run's lines carry `triage: repaired (cycle 1) — preexisting: ...`.
+
+At level `decide` the same tree stops at the red barrier, the feature merged and nothing repaired —
+`check-pipeline.mjs` holds that branch.
+
 ## Friction: the second number
 
 Agent-reported, not scriptable, and worth recording anyway. Classify each point as `travou`,
