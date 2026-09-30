@@ -187,6 +187,25 @@ What it asserts is in [`loop-fixture/README.md`](loop-fixture/README.md), and th
 that `git diff -- tests/` must be empty: the prompt forbids reaching a PASS by bending a test, and
 that is the one clause whose failure destroys the only evidence the loop produces.
 
+## `0a-bugfix` — grouping small same-area units (Phase 2, Step 3)
+
+`benchmark/fixture/bugfix/`: a list of seven small fixes (`docs/PRD.md`) against three files in
+`app/`. Three touch `billing.py` (B1, B2, B3), three touch `notify.py` (B4, B5, B6) and one
+`reports.py` (B7). B6 carries a genuine open question — which channel notifies an overdue invoice —
+that the source never answers.
+
+What a correct decomposition shows, under Step 3's "Group small units that live in the same place":
+
+- **B1, B2 and B3 in one feature** — small, same file, no dependency between them;
+- **B4 and B5 in one feature** — small, same file;
+- **B6 alone**, its question left `status: open` — a unit with an open question is never grouped;
+- **B7 alone** — nothing else touches `reports.py`;
+- four features in all, where one feature per unit would be seven.
+
+A run that writes seven features has not applied the move; one that folds B6 into B4 and B5 has
+grouped across an open question, which the move forbids. The planted question must still land where
+rule 1 sends it.
+
 ## `state-lean` — the seed against `tlc-spec-lean`
 
 `benchmark/fixture/state-lean/`: a four-feature roadmap (`notes-create`, `notes-list`, `notes-tag`,

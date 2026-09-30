@@ -9,6 +9,66 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.34.0 — 2026-09-29
+
+**Speed, as choices the user makes with the price named: small units grouped, lanes measured before
+they are used, the builder's effort offered, and manager mode offered as option D.** Asked for by the
+owner after measuring the pace of his project. That project took 60 to 106 minutes per feature,
+counting the retries of refused features, and a backlog of ~95 to 150 features remains. Of the four
+levers, two already existed as configuration nobody was offered (`lanes`, `effort`). One was missing
+where it belongs, in decomposition. One was deliberately hidden (manager mode at Step 8).
+
+- **Phase 2 groups small units that live in the same place** (`decompose-phase.md` Step 3, a new
+  slicing move). Every feature pays a fixed cycle however small it is. On the measured project a
+  backlog of small fixes decomposed one feature per unit (fix 10 → 11, gaps 10 → 8, reply 10 → 10).
+  The move folds units that are each small (a task or two), touch the same module or files and do not
+  depend on a feature between them into one feature, within eight tasks and below size Large. It
+  never groups across a dependency, never with a unit whose question is still open, and never so the
+  group's risk tier rises. It is aimed at lists of fixes, cleanups and test batches, and does not
+  merge capabilities.
+- **`bench-gate.py --lanes N`** answers whether a project can prove N features at once. It checks
+  out HEAD into N temporary worktrees, runs the project's `setup` in each, and runs the gate alone
+  and then N at a time. One failure means the gate shares something it does not isolate per run, and
+  lanes stay at 1. That is the generic form of the user's project refusing a second gate on its Redis
+  pool.
+- **Step 10, option C** now asks about the two levers, each with its price:
+  - `lanes`, measured first, where a chain gains nothing and more load surfaces flaky tests;
+  - the builder's effort at tier A, where `high` is faster and its effect on quality is not measured.
+
+  `manager-mode.md` points at both, and notes that grouping happens by itself in Phase 2.
+- **Step 8 offers manager mode as option D, experimental**, only in Claude Code and only in a
+  multi-section project. It says plainly that nobody will be asked anything, and that the manager
+  answers every open question, marked as its own. Until now the text said never to offer it.
+
+**Executed:**
+- **`bench-gate.py --selftest`:** 3 new assertions. A gate that isolates its runs passes at once, a
+  gate holding a shared lock is refused at 2 lanes, and the worktrees are removed.
+- **Phase 2's move: two blind agents (Sonnet 5.5, one copy each)** on the new `0a-bugfix` fixture.
+  The fixture is seven small fixes in three modules, one of them with a genuine open question.
+  - **Both wrote the four features the answer key expects:** B1 + B2 + B3 (`billing.py`), B4 + B5
+    (`notify.py`), B7 alone (the only unit in its module), and B6 alone with its channel question left
+    `status: open`. Each quoted the move's own words for every grouping and every unit left alone.
+    The linter reported 0 failed on both.
+  - **Friction they reported:** B6's second question (how often to notify) was raised by both, from
+    Step 1's "what the unit leaves unsaid". One raised B1's tier from C to B on its own judgment that
+    invoice amounts are money.
+  - **A misleading message they found, fixed here.** `status-block.py --body` said "previous content
+    kept in docs/roadmap-history.md" when there was no previous body and no history was written. It
+    now says there was nothing to keep.
+- **Regression on the PRD scenario (`0a-single`), one blind agent:**
+  - The single-section pass came to 18 features (the answer key says "roughly 20").
+  - Step 8's size question was re-raised, and the run switched to multi-section. It decomposed only
+    the first section, the documented lazy default.
+  - Score: `PARTIAL`, 6/7. The one missing (the vote tie-break) belongs to a section nobody reached.
+    The answer key counts that shape as correct and not a regression, and the runner refuses to
+    record it.
+  - The linter reported 0 failed.
+  - Only one feature in that run covers two units: A2 + A3, which are coupled because inviting needs
+    a team. The move did not merge the PRD's capabilities.
+  - It also reported the misleading `status-block.py` message fixed above.
+
+---
+
 ## 3.33.0 — 2026-09-29
 
 **In manager mode, a builder may correct a test that asserts what the owner revoked. The verifier

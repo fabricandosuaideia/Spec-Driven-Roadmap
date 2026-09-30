@@ -29,6 +29,7 @@ it would be worth having; as the benchmark, no.
 | `fixture/PRD.md` | 26 numbered scope units across six sections, and **seven planted ambiguities** |
 | `fixture/brownfield/` | a working FastAPI + React project with no scope document, for the 0c path |
 | `fixture/state/` + `state-rerun/`, `state-inflight/`, `state-conversion/` | a project with a past, and the overlay each state scenario adds to it |
+| `fixture/bugfix/` | seven small fixes across three modules, one with an open question — scenario `0a-bugfix` (Phase 2's grouping move) |
 | `fixture/state-lean/` | the seed against `tlc-spec-lean`'s tree — scenario `state-lean` |
 | [`loop-fixture/`](loop-fixture/) | the loop prompt's project, with a test that cannot pass honestly — scenario `loop-build` |
 | [`pipeline-fixture/`](pipeline-fixture/) | option C with real agents: two small features, a gate longer than one wait, a batch barrier — scenario `pipeline-build` |

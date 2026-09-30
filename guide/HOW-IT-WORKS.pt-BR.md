@@ -302,7 +302,7 @@ na branch principal mesclada e para todo merge seguinte quando fica vermelha —
 esteira registra se apoia nele, e pode cronometrar esse comando para você. Um gate mais longo que os 10
 minutos de um comando roda desanexado e é esperado. Mesma precondição da B: zero perguntas em aberto.
 
-**Modo gestor — não é uma quarta opção, é um jeito de trabalhar.** A, B e C constroem um roadmap cada
+**Opção D, o modo gestor — experimental, e um outro jeito de trabalhar.** A, B e C constroem um roadmap cada
 e param, porque a costura entre duas seções é onde uma pessoa replaneja. Quando ninguém vai estar lá —
 um build deixado rodando dia e noite —, peça o *"manager mode"* num projeto multi-seção, no Claude
 Code. Você escreve, uma vez, o que delega (`manager.delegation`) e quais seções ainda precisam de você

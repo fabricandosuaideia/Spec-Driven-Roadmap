@@ -302,7 +302,7 @@ detiene todo merge siguiente cuando queda en rojo —, porque cada PASS que regi
 apoya en él, y puede medir el tiempo de ese comando por ti. Un gate más largo que los 10 minutos de un
 comando se ejecuta desacoplado y se espera. Misma precondición que B: cero preguntas abiertas.
 
-**Modo gestor — no es una cuarta opción, es una forma de trabajar.** A, B y C construyen un roadmap
+**Opción D, el modo gestor — experimental, y otra forma de trabajar.** A, B y C construyen un roadmap
 cada una y se detienen, porque la costura entre dos secciones es donde una persona vuelve a planificar.
 Cuando nadie va a estar ahí — un build que se deja corriendo día y noche —, pide el *"manager mode"*
 en un proyecto multi-sección, en Claude Code. Escribes, una vez, lo que delegas (`manager.delegation`)

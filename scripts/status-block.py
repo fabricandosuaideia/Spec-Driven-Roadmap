@@ -538,6 +538,7 @@ def main(argv=None):
               "ran this ends its report with the line above and never answers it")
         return 0
     history = args.history or os.path.join(os.path.dirname(os.path.abspath(args.status_file)), HISTORY_NAME)
+    hist_before = os.path.getsize(history) if os.path.isfile(history) else 0
     if args.body:
         err = replace_body(args.status_file, read_arg(args.body), history)
     else:
@@ -545,8 +546,10 @@ def main(argv=None):
     if err:
         print(err, file=sys.stderr)
         return 1
-    print("%s: %d -> %d bytes; previous content kept in %s"
-          % (args.status_file, before, os.path.getsize(args.status_file), history))
+    kept = os.path.isfile(history) and os.path.getsize(history) > hist_before
+    print("%s: %d -> %d bytes; %s"
+          % (args.status_file, before, os.path.getsize(args.status_file),
+             "previous content kept in %s" % history if kept else "there was no previous content to keep"))
     return 0
 
 

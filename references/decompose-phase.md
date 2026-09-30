@@ -125,6 +125,19 @@ Common slicing moves:
   feature be skipped as discharged.
 - **Split at eight tasks.** When honest counting exceeds eight, split along the clearest internal
   seam (read-path vs. write-path; core vs. add-on) and state the reason in both halves.
+- **Group small units that live in the same place.** Every feature pays a fixed cost however small it
+  is: its own cycle in the downstream skill (plan or spec, checks or tasks), a fresh run of the gate
+  to prove it, an independent verification, a review at risk tier A, and a merge. On a measured build
+  every feature took 60 to 106 minutes to carry through that cycle, and a backlog of small fixes
+  decomposed one feature per unit (ten units, ten features) pays it ten times. So when several units
+  are each **small** (a task or two), **touch the same module or files**, and **none needs a feature
+  that comes between them** in the build order, fold them into one feature — within the eight-task
+  budget, below size Large — whose objective names each unit and whose `scope-units covered` lists
+  them all. Never group across a dependency, never with a unit whose question is still `status:
+  open` (it would hold the others behind it), and never to the point that the group's risk tier
+  exceeds what each unit would get alone. This is for many small, same-area units — a list of bug
+  fixes, a cleanup, a batch of missing tests; it does not merge capabilities that are each a feature
+  in their own right.
 
 ## Step 4 — Shared ownership across sections
 

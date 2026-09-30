@@ -286,7 +286,7 @@ red — because every PASS the pipeline records rests on it, and can time that c
 longer than one command's 10 minutes is run detached and waited for. Same precondition as B: zero
 open questions.
 
-**Manager mode — not a fourth option, a way of working.** A, B and C each build one roadmap and stop,
+**Option D, manager mode — experimental, and a different way of working.** A, B and C each build one roadmap and stop,
 because the seam between two sections is where a person re-plans. When nobody will be there — a
 build left running day and night — ask for *"manager mode"* in a multi-section project, in Claude
 Code. You write, once, what you delegate (`manager.delegation`) and which sections still need you

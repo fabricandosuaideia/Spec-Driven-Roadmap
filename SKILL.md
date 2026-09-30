@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.33.0"
+  version: "3.34.0"
 ---
 
 # Spec-Driven Roadmap
@@ -32,7 +32,7 @@ a map; the procedures live in `references/`. Read the relevant reference complet
 | 2 | [references/decompose-phase.md](references/decompose-phase.md) | Slice into vertical features with full coverage, open questions, and a build order. Then pre-empt the cross-cutting gray areas, and record the ones left to the downstream skill. |
 | Seed | [references/handoff-seed.md](references/handoff-seed.md) | Write the durable `## Status` block, then — only when Phase 0 confirmed a skill whose schema is readable — a Handoff write to `.specs/STATE.md`, both through `scripts/status-block.py`. Its report (Step 7) ends the procedure only when nothing was seeded; otherwise the same reply asks Step 8's question. **Also its own entry, on a project with a roadmap:** *"update the roadmap status"*, *"refresh the status"*, *"re-seed"*, *"what's next"* after work was done — run it from its third trigger through to Step 8's question whenever Step 7 allows — asking how to build is part of the seed, and the user may decline it. Steps 1-7 may be handed to a sub-agent; Step 8 never — it is a question, so the session the user talks to asks it when the report comes back. Never answer such a request by editing `## Status` yourself. |
 | Upgrade | [references/upgrade-project.md](references/upgrade-project.md) | Its own entry, for a project a previous version already planned: baseline the cost, lint, re-run the seed (which empties `## Status` into `docs/roadmap-history.md`), offer the current bridge lines, then Steps 8-10 as usual. Never regenerates the roadmap; never installs the skill itself. |
-| Manager | [references/manager-mode.md](references/manager-mode.md) | Its own entry, Claude Code and multi-section only: *"manager mode"*, *"modo gestor"*, *"build everything unattended"*. On the owner's written delegation, a Workflow walks every remaining section in build order — decomposes it just before building it, deciding what would otherwise be asked and marking each decision as the manager's, then builds it with option C's pipeline. Stops where the owner reserved a section, on a red barrier, and never builds on a section that did not finish. |
+| Manager | [references/manager-mode.md](references/manager-mode.md) | Its own entry, and option D (experimental) at the seed's Step 8 — Claude Code and multi-section only: *"manager mode"*, *"modo gestor"*, *"build everything unattended"*. On the owner's written delegation, a Workflow walks every remaining section in build order — decomposes it just before building it, deciding what would otherwise be asked and marking each decision as the manager's, then builds it with option C's pipeline. Stops where the owner reserved a section, on a red barrier, and never builds on a section that did not finish. |
 | Handover | [references/handover-prompt.md](references/handover-prompt.md) | Reached only from the seed's Step 7. Asks which implementation prompt the user wants — a single feature, or a `/loop` over one roadmap (which first requires every open question in it closed) — and emits it. The `/loop` template for the confirmed profile is in [loop-tlc-spec-lean.md](references/loop-tlc-spec-lean.md) or [loop-tlc-spec-driven.md](references/loop-tlc-spec-driven.md); read only that one, and only for a loop. |
 
 ## Version and model

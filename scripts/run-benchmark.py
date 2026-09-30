@@ -56,6 +56,8 @@ SCENARIOS = {
     "0a-multi": ("PRD in docs/, multi-section", ["PRD.md"]),
     "0b-interview": ("empty project, no downstream skill", []),
     "0c-brownfield": ("working code, no scope document", ["brownfield"]),
+    # Phase 2's grouping move (3.34.0): seven small fixes in three files, one with an open question.
+    "0a-bugfix": ("a list of small fixes in docs/, single-section", ["bugfix"]),
     "loop": ("PRD in docs/, single-section, option B", ["PRD.md"]),
     # The three that need a project with a PAST. Each is the frozen `state/`
     # tree plus a small overlay: a wave-2 source and a clean Handoff for the

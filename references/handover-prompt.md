@@ -35,7 +35,7 @@ template it goes into — a run that emits no loop never needs it.
 ## Step 8 — Ask which implementation prompt to hand over
 
 The roadmap is done and the user now has to actually build from it. There are two legitimate ways to
-drive that — three in Claude Code — and **which one is the user's call — never pick for them, and never
+drive that — three in Claude Code, and a fourth, experimental, in a multi-section project there — and **which one is the user's call — never pick for them, and never
 default to the loop because it looks faster.** Ask, in the confirmed output language:
 
 - **Option A — one feature at a time.** They get the prompt for `<target>` only, run it, and come
@@ -72,10 +72,15 @@ default to the loop because it looks faster.** Ask, in the confirmed output lang
   conversation, the verifier reuses the prover's receipt instead of re-running the suite, and this
   session only receives one line per feature at the end.
 
-  **Manager mode is not a fourth option here.** It is its own entry
-  ([manager-mode.md](manager-mode.md)), for an owner who will not be there at all, and it runs only on
-  their written delegation. In a multi-section project in Claude Code, when the user asks how to build
-  everything unattended, name it in one sentence and do not offer it as a choice.
+- **Option D — manager mode, experimental; Claude Code and a multi-section project only.** Not one
+  roadmap but every section still to do, in build order, unattended: a Workflow decomposes each section
+  just before building it and builds it with option C's pipeline, section after section
+  ([manager-mode.md](manager-mode.md)). Say plainly what the user trades: **nobody asks them
+  anything** — the manager answers every open question itself, taking the conservative option and
+  marking each answer as its own for them to review afterwards, and it runs only on a delegation they
+  write in their own words. Say that it is experimental: first run on a real project on 2026-09-29.
+  Offer it only when both conditions hold; in a single-section project option C already builds
+  everything.
 
 Everywhere below, **"the roadmap"** means that one file and its build order — `<ROADMAP-PATH>` and
 `<BUILD-ORDER-TXT>` exactly as Step 6's table resolves them for the target section.
@@ -135,7 +140,9 @@ the builder; without one the run writes the report through that skill's degraded
 warns on every feature. Say that in the same breath, so a "no" is chosen knowing that every PASS will
 be a self-read.
 
-Option A → skip to Step 10. Option B or C → Step 9.
+Option A → skip to Step 10. Option B or C → Step 9. Option D → [manager-mode.md](manager-mode.md),
+"Before the first run" — Step 9 does not apply, because the manager answers the open questions
+itself, and manager-mode.md carries its own prompt.
 
 ## Step 9 — Loop option only: close every open question first
 
@@ -587,6 +594,17 @@ them for an unattended run:
      suite.
    - **The model** (`"model"`), for every agent the pipeline starts. Left `null`, they all inherit the
      session's model — say so, and say which one that is: a real run went out on a model nobody chose.
+   - **Speed — two levers, each with its price, both the user's to choose:**
+     - **Lanes** (`"lanes"`): how many features are proved at once, each in its own git worktree. It
+       only helps features that do not depend on each other; a chain gains nothing. Before setting it
+       above 1, run `python3 <this-skill-dir>/scripts/bench-gate.py --root <project-root> --lanes 2`:
+       it runs the gate twice at once, and a failure means the gate shares something it does not
+       isolate per run (a database, a port, a queue, a pool) — then lanes stay at 1 until the project
+       fixes that. More load also surfaces flaky tests; say so.
+     - **The builder's effort at risk tier A** (`"effort"` → `"implement"` → `"A"`, `"xhigh"` by
+       default). Builders took two thirds of a measured run's time; `"high"` thinks less per turn. What
+       it does to quality and to refused attempts is not measured — say that, and offer to compare
+       with `measure-agents.py` after a few features.
 
    Write their answers and `"confirmed": true` into the file. If `plan-pipeline.py` then refuses
    with features the gate "cannot decide" — a report the gate refuses, or a pending feature a
