@@ -27,7 +27,11 @@ Install once, then `/plugin update` keeps it current:
 /plugin install spec-driven-roadmap@fabricandosuaideia
 ```
 
-### As a plain skill
+### As a plain skill — macOS, Linux, WSL, Git Bash
+
+> **On Windows, in a PowerShell terminal, do not use this block — jump to [Windows](#windows-powershell).**
+> With WSL installed, `bash` in PowerShell is the *WSL launcher*: the pipe runs inside Linux and the
+> terminal ends up in WSL. (And in Windows PowerShell 5.1, `curl` is an alias that rejects `-fsSL`.)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/install.sh | bash
@@ -42,10 +46,10 @@ curl -fsSL .../install.sh | bash -s -- --global   # install to ~/.claude/skills/
 curl -fsSL .../install.sh | bash -s -- --force    # overwrite an existing install
 ```
 
-### Windows
+### Windows (PowerShell)
 
-`install.sh` needs bash, so it works in Git Bash and WSL. For native PowerShell (5.1+, ships with
-Windows 10 and later) use `install.ps1` instead — it needs no curl, tar, bash or WSL:
+`install.sh` needs bash. For native PowerShell (5.1+, ships with Windows 10 and later) use
+`install.ps1` instead — it needs no curl, tar, bash or WSL, and it stays in the terminal you are in:
 
 ```powershell
 irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/install.ps1 | iex

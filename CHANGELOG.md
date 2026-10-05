@@ -9,6 +9,47 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.35.1 — 2026-10-05
+
+**A Windows user running the install from a PowerShell terminal in VS Code ended up in WSL.** The
+reply to the report was not to blame the installer: `install.ps1` was executed from WSL against the
+host's Windows PowerShell 5.1 and PowerShell 7, in fresh project folders, and installed 3.35.0
+correctly in both and stayed in the terminal it was started from. The defect was in how the README
+led a person to the installer.
+
+- **Cause.** Under "As a plain skill" the README gave `curl -fsSL … | bash` first, and the PowerShell
+  installer only further down, under a separate "Windows" heading. A person in a PowerShell terminal
+  copies the first block. On a machine with WSL, `bash` there resolves to
+  `C:\Users\<user>\AppData\Local\Microsoft\WindowsApps\bash.exe`, the WSL launcher, not Git Bash,
+  so the pipe runs inside Linux and the terminal becomes WSL. In Windows PowerShell 5.1 it does not
+  get that far: `curl` is an alias for `Invoke-WebRequest` and rejects `-fsSL`.
+- **Not a regression of recent commits.** `install.sh` and `install.ps1` mention no WSL and the
+  README order predates the recent releases. It was reproduced on this machine by running both
+  commands from PowerShell 7 and 5.1.
+
+**What changed:**
+- **README, in all three languages.** The `curl | bash` block is now titled for macOS, Linux, WSL and
+  Git Bash, and opens with a warning that it is not for a PowerShell terminal and why. The Windows
+  section is titled "Windows (PowerShell)" and says the installer stays in the terminal you are in.
+- **`install.sh` warns** when it runs under WSL (`WSL_DISTRO_NAME`) and the project folder is under
+  `/mnt/<drive>/`, naming the `irm … | iex` line to use instead. It only warns: working in WSL on a
+  Windows folder is legitimate, and refusing would break it. It is for whoever already has the old
+  command copied from a video or a post.
+
+**Executed:**
+- `install.ps1` under PowerShell 5.1 and 7, piped as the README shows (`irm … | iex`), into fresh
+  Windows folders: installed 3.35.0, scripts and references present.
+- `curl -fsSL … | bash` from PowerShell 5.1: fails on `-fsSL`. From PowerShell 7 with `bash` as the
+  WSL launcher: runs as Linux (`uname` reports the WSL2 kernel).
+- The new warning from PowerShell 7 into a Windows folder: printed, and the install carried on. From a
+  plain Linux directory: not printed.
+- `scripts/check-consistency.py`: 42 checks, 0 failed.
+
+**Not executed:** the VS Code terminal itself (the profile icon switching to WSL), only its
+cause. No machine without WSL was available, so `install.ps1` there is the same code path but unrun.
+
+---
+
 ## 3.35.0 — 2026-09-30
 
 **Manager mode gets two levels, `decide` and `unblock`, and the second repairs what used to stop

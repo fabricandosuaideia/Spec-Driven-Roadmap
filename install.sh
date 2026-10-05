@@ -105,6 +105,19 @@ else
     DEST="$(pwd)/.claude/skills/$SKILL_NAME"
 fi
 
+# ---------------------------------------------------------------------------
+# WSL + a Windows folder. From a PowerShell terminal `| bash` is not Git Bash,
+# it is the WSL launcher (WindowsApps\bash.exe): the install lands in the right
+# folder but the person's terminal is now Linux. Say so, once, and carry on —
+# working in WSL on /mnt/c is legitimate, so this warns and never refuses.
+# ---------------------------------------------------------------------------
+if [[ "$SCOPE" == "project" && -n "${WSL_DISTRO_NAME:-}" && "$PWD" == /mnt/[a-z]/* ]]; then
+    echo "Note: this is WSL (Linux), installing into a Windows folder ($PWD)." >&2
+    echo "If you meant to stay in PowerShell, press Ctrl+C now and run the native installer instead:" >&2
+    echo "  irm https://raw.githubusercontent.com/${REPO}/${BRANCH}/install.ps1 | iex" >&2
+    echo "" >&2
+fi
+
 for bin in curl tar; do
     command -v "$bin" >/dev/null 2>&1 || { print_error "'$bin' is required but not on PATH."; exit 1; }
 done

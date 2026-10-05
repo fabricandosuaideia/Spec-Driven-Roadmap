@@ -28,7 +28,11 @@ mantiene al día:
 /plugin install spec-driven-roadmap@fabricandosuaideia
 ```
 
-### Como skill simple
+### Como skill simple — macOS, Linux, WSL, Git Bash
+
+> **En Windows, en una terminal PowerShell, no uses este bloque — ve a [Windows](#windows-powershell).**
+> Con WSL instalado, `bash` en PowerShell es el *lanzador de WSL*: el pipe corre dentro de Linux y la
+> terminal termina en WSL. (Y en Windows PowerShell 5.1, `curl` es un alias que rechaza `-fsSL`.)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/install.sh | bash
@@ -43,10 +47,10 @@ curl -fsSL .../install.sh | bash -s -- --global   # instala en ~/.claude/skills/
 curl -fsSL .../install.sh | bash -s -- --force    # sobrescribe una instalación existente
 ```
 
-### Windows
+### Windows (PowerShell)
 
-`install.sh` necesita bash, así que funciona en Git Bash y WSL. Para PowerShell nativo (5.1+, viene
-con Windows 10 y posteriores) usa `install.ps1` — no necesita curl, tar, bash ni WSL:
+`install.sh` necesita bash. Para PowerShell nativo (5.1+, viene con Windows 10 y posteriores) usa
+`install.ps1` — no necesita curl, tar, bash ni WSL, y se queda en la terminal en la que estás:
 
 ```powershell
 irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/install.ps1 | iex
