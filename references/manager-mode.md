@@ -31,7 +31,9 @@ without them (`manager.autonomy` in `pipeline.json`):
     in its test; a preexisting failure at its cause, never by raising a timeout, loosening an assertion,
     skipping or retrying — and proves it ten runs in a row; an independent checker refuses any
     repair that loosens anything; the repair merges through the gate and the barrier runs again. At
-    most two cycles; anything not reproduced stops the run, as level 1 would.
+    most two cycles; anything not reproduced stops the run, as level 1 would. A failing test is
+    always named, never located by `file:line` — a repair that adds a line above it moves it, and the
+    command would then find no test (the probe refuses such a command).
   - **A feature the gate cannot decide is classified, not held.** A fresh agent reads its report and
     decides done or build — when in doubt, build: rebuilding finished work costs a visible attempt,
     calling unfinished work done leaves a hole nothing revisits — and records it in `featureStatus`
@@ -155,6 +157,10 @@ For each section in `## Ordering`'s order:
 - **In `stopAt`**: the run stops there.
 - **Depends on a section that did not finish** in this run (a feature blocked, held or not merged):
   skipped — never built on a base nobody proved. A section that does not depend on it still runs.
+- **A barrier an earlier run never finished** (code on the main branch after the last green barrier,
+  which `plan-pipeline.py` reads from the commit each green barrier records): a finished section is
+  not called done until that barrier has run, and it runs before anything new is built; red stops the
+  run, as above, and level `unblock` triages it from the last proved commit.
 - **Not decomposed**: a fresh decomposer runs Phase 2 for it (decompose-phase.md, the whole
   procedure), decides every question, marks each decision, runs `check-roadmap.py` to 0 failed and
   commits.

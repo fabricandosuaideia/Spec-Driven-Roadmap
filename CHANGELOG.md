@@ -9,6 +9,73 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.36.0 — 2026-10-06
+
+**Manager mode at level `unblock`, with two lanes, stopped twice on defects of the pipeline itself,
+not of the product** (Sales-ai, skill 3.35.0). Four causes, each reproduced in a selftest that failed
+before the fix and passes after it. The evidence is the two workflow journals of that project, read
+only.
+
+- **A lane re-assigned between runs blocked a feature that had passed everything.**
+  `plan-pipeline.py` recomputes each feature's lane on every run and `roadmap-pipeline.js` builds the
+  worktree path from it. A feature left unfinished kept its worktree in `lane2`; the next run gave it
+  `lane1`; git refuses a branch checked out twice, so the builder used the old tree and the merger
+  looked in the new lane (`merge:conf-default-task-admin-only` → "worktree … does not exist"), with
+  verifier and reviewer already PASS. Now the worktree git reports (`git worktree list --porcelain`,
+  branch `feat/<name>`) is the truth: the feature keeps its lane, is counted before the rest are
+  balanced, and its args carry `worktree`, which every prompt uses. Chosen over "a path without the lane"
+  (the old tree is already on disk) and "prompts that look the worktree up by branch" (leaves the
+  decision to an agent). Refused with a message: lanes shrunk to 1 while a feature still holds a lane
+  worktree, and the project root left on a feature branch while lanes is above 1 — both are the same
+  git refusal one step later. A worktree whose directory is gone is not trusted.
+- **A test identified by `file:line` refused a correct repair.** The triage wrote
+  `playwright test e2e/setup-checklist.spec.ts:157`; the repair added four comment lines, the test
+  moved to `:161`, the checker's command found "No tests found" ten times in ten and refused. Now the
+  TRIAGE selects by name (pytest node id, `--grep`/`-g`, `-t`, escaped and anchored); the REPAIR keeps
+  the name; the CHECKER treats "No tests found" as a defective command, derives one from the name,
+  confirms with the runner's list/collect-only mode that it selects exactly that test, requires the
+  test to still exist under the same name (a rename is a deletion) and refuses with `ok=false` if no
+  selector can be made. `triage-probe.py` refuses a `path.ext:LINE` argument before running anything
+  (judged per token, so URLs, env assignments and quoted names are not caught), and a command whose
+  runner says it ran no test is an error, not a `preexisting` failure.
+- **An interrupted barrier was never redone.** A run paused inside its barrier left merges no green
+  barrier proved; the next run called the section "already done" and built the following one on top.
+  Each green barrier now records the commit it proved with the new `scripts/record-barrier.py`, inside
+  the git directory (no commit, no HEAD moved, shared by every worktree). `plan-pipeline.py` prints
+  `barrierPending` when code (anything outside `docs/` and `.specs/`) reached the main branch after
+  that commit; the pipeline then runs the barrier first, before anything is built, with the level-
+  `unblock` triage starting from that commit, and manager mode no longer calls a finished section done
+  while a barrier is owed. The barrier refuses to run on a dirty tree. A separate script, not a flag
+  of `plan-pipeline.py`, because the harness relays the launch request ("run plan-pipeline.py") to
+  every agent and a role told to run it too cannot be told from one obeying the relay. **Limits:** with
+  no barrier ever recorded the state is unknown and nothing is forced, so a project already carrying an
+  unproved main branch records one by hand; a rewritten main branch or an unreadable record is
+  refused, naming the file to delete; with `barrierEvery: 0` an owed barrier means two barriers in that
+  run (not measured further).
+- **Per-lane resources had no life cycle.** `setup` runs when a worktree is created and nothing runs
+  when a feature merges, is held or the run stops; in that project seven idle lane stacks among 32
+  Docker networks exhausted the pool and failed the barrier's own `make smoke`. Documented as the
+  contract in `references/handover-prompt.md` (Option C, lanes): idempotent `setup`, the gate owns the
+  resources and tears them down before it exits, names derived from the worktree's own directory. A
+  `teardown` hook was not added: the gate already runs wherever a lane's resources are needed.
+  `triage-probe.py` gave every temporary worktree the basename `t0`, `t1`; each now has its own
+  `mkdtemp`.
+
+**Not touched:** the 13 rules, the Option A/C prompt templates, the `/loop` templates, the Handoff
+schemas. The `handover-prompt.md` additions sit in Step 10's configuration questions, not in a template.
+`bump-version.sh` now also runs the self-tests of `triage-probe.py` and `record-barrier.py`, which the
+gate was not running although the rule says it does.
+
+**Executed:** `plan-pipeline.py`, `triage-probe.py` and `record-barrier.py` selftests, with real `git`
+worktrees and commits; `check-pipeline.mjs` with new scenarios and mutants for each cause (lane
+worktree, owed barrier first / red / with nothing to build / triage base / manager, selector wording,
+barrier recording and dirty tree); three independent adversarial reviews, whose confirmed findings
+(a regex too broad and too narrow, a root on a feature branch, a lanes shrink, a dirty tree before an
+owed barrier, an agent told to run `plan-pipeline.py`, a corrupt record failing open, a number the
+journal did not support) were fixed before this entry.
+
+---
+
 ## 3.35.1 — 2026-10-05
 
 **A Windows user running the install from a PowerShell terminal in VS Code ended up in WSL.** The

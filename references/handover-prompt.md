@@ -594,7 +594,12 @@ them for an unattended run:
    - **The barrier, if the project has one** (`"barrierGate"`, and `"barrierEvery"`: how many merges
      between barriers, `0` for once at the end). The pipeline runs it on the merged main branch, and a
      red barrier stops every later merge. Leave it `null` when every feature already passes the whole
-     suite.
+     suite. Each green barrier records the commit it proved (inside the git directory, never in a
+     commit); if a run stops inside its barrier, the next one runs that barrier first, before it
+     builds anything, instead of building on a main branch nobody proved. With no barrier ever
+     recorded the state is unknown and nothing is forced: run the barrier once by hand on a main
+     branch you trust and record it with `python3 <this-skill-dir>/scripts/record-barrier.py --root
+     <project-root> --sha <commit>`.
    - **The model** (`"model"`), for every agent the pipeline starts. Left `null`, they all inherit the
      session's model — say so, and say which one that is: a real run went out on a model nobody chose.
    - **Speed — two levers, each with its price, both the user's to choose:**
@@ -604,6 +609,18 @@ them for an unattended run:
        it runs the gate twice at once, and a failure means the gate shares something it does not
        isolate per run (a database, a port, a queue, a pool) — then lanes stay at 1 until the project
        fixes that. More load also surfaces flaky tests; say so.
+       **What a lane's resources must satisfy, and say it to the user before they set it.** `setup`
+       runs once, when a worktree is created, and nothing runs when a feature merges, is held, is
+       skipped or the run stops; a feature that does not finish keeps its worktree (and its lane) into
+       the next run. So a project that starts something per lane — a Docker stack, a database, a
+       dev server — leaks it: on a real project seven idle lane stacks were up among 32 Docker networks, which
+       exhausted its network pool and made the barrier's own `make smoke` fail. The contract:
+       **`setup` is idempotent** (running it twice in one worktree changes nothing); **the gate owns
+       the resources** — it starts what it needs and tears it down before it exits, pass or fail, so
+       nothing stays up between gates; and anything a name or port is derived from comes from the
+       worktree's own directory, which is unique per feature. The pipeline has no teardown hook, by
+       choice: a hook would be one more thing for every project to get right, and the gate already
+       runs at every point a lane's resources are needed.
      - **The builder's effort at risk tier A** (`"effort"` → `"implement"` → `"A"`, `"xhigh"` by
        default). Builders took two thirds of a measured run's time; `"high"` thinks less per turn. What
        it does to quality and to refused attempts is not measured — say that, and offer to compare

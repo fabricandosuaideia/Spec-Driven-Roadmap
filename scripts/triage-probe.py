@@ -20,12 +20,20 @@ worktrees and runs the one test command RUNS times in each:
         [--runs 3] [--setup "<command>"] [--merged <feature>:<before>:<after> ...]
     python3 triage-probe.py --selftest
 
+The test command must select by NAME (a pytest node id, `--grep` for Playwright, `-t` for jest and
+vitest), never by `file:line`: a line moves when anyone adds one above it, and the command then runs no
+test. A command with a `file.ext:LINE` selector is refused (exit 2) before anything runs.
+
 Prints one JSON object on stdout. Exit codes: 0 classified, 2 usage or git failed, 1 --selftest failed.
 """
 
 import argparse
+import contextlib
+import io
 import json
 import os
+import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -45,17 +53,41 @@ def git(root, *argv):
     return r.stdout.strip()
 
 
+# A test named by file and line moves when anyone adds a line above it, and then selects nothing.
+TEST_EXT = "py|pyi|pyx|js|jsx|ts|tsx|mjs|cjs|vue|coffee|rb|go|rs|java|kt|php|cs|c|cpp|exs?|swift|jl|feature|sh|bats"
+LINE_SELECTOR = re.compile(r"\S+\.(?:%s):[0-9]+(?::[0-9]+)*" % TEST_EXT, re.I)
+
+
+def line_selector(test):
+    """The `path/file.ext:LINE` argument of a test command, or None. Judged token by token, so a quoted
+    test name that happens to contain `a.ts:5`, a URL, an option's value or an env assignment is not one."""
+    try:
+        tokens = shlex.split(test)
+    except ValueError:
+        tokens = test.split()
+    for tok in tokens:
+        if tok.startswith("-") or "=" in tok or "://" in tok or re.search(r"\s", tok):
+            continue
+        m = LINE_SELECTOR.fullmatch(tok)
+        if m:
+            return m
+    return None
+
+
 class Trees:
     """Temporary detached worktrees, removed on exit whatever happens."""
 
     def __init__(self, root, setup=""):
-        self.root, self.setup, self.base = root, setup, tempfile.mkdtemp(prefix="triage-probe-")
+        self.root, self.setup = root, setup
         self.made = []
 
     def at(self, commit):
-        wt = os.path.join(self.base, "t%d" % len(self.made))
-        git(self.root, "worktree", "add", "--detach", wt, commit)
+        # Each tree is its own mkdtemp directory: a project that derives the names of its resources from
+        # the basename of the directory it runs in must not see the same basename twice, here or in a
+        # probe running beside this one.
+        wt = tempfile.mkdtemp(prefix="triage-probe-")
         self.made.append(wt)
+        git(self.root, "worktree", "add", "--detach", wt, commit)
         if self.setup and subprocess.run(self.setup, shell=True, cwd=wt, stdout=subprocess.DEVNULL,
                                          stderr=subprocess.DEVNULL).returncode != 0:
             raise RuntimeError("the project's setup failed at %s" % commit)
@@ -64,15 +96,24 @@ class Trees:
     def close(self):
         for wt in self.made:
             subprocess.run(["git", "-C", self.root, "worktree", "remove", "--force", wt], capture_output=True)
-        shutil.rmtree(self.base, ignore_errors=True)
+            shutil.rmtree(wt, ignore_errors=True)
+        subprocess.run(["git", "-C", self.root, "worktree", "prune"], capture_output=True)
+
+
+NOTHING_RAN = re.compile(r"No tests found|no tests ran|collected 0 items|Ran 0 tests|no test files? found", re.I)
 
 
 def fails(tree, test, runs):
-    """How many of `runs` runs of the test failed in this tree."""
+    """How many of `runs` runs of the test failed in this tree. A command that selected no test is not
+    a failing test: it exits non-zero on every tree, and counting that as a failure would call a test
+    that never ran 'preexisting'."""
     n = 0
     for _ in range(runs):
-        n += subprocess.run(test, shell=True, cwd=tree, stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL).returncode != 0
+        r = subprocess.run(test, shell=True, cwd=tree, capture_output=True, text=True, errors="replace")
+        if r.returncode != 0 and NOTHING_RAN.search(r.stdout + r.stderr):
+            raise RuntimeError("the test command selected no test (the runner said so): fix its selector — by name, "
+                               "not by file and line — before the result means anything")
+        n += r.returncode != 0
     return n
 
 
@@ -151,6 +192,37 @@ def selftest():
         expect("a test passing on both is not reproduced", r["kind"] == "not-reproduced")
         expect("every temporary worktree is removed",
                git(repo, "worktree", "list").count("\n") == 0)
+        # 3.36.0: a project that derives the names of its resources (a compose project, a port, a
+        # database) from the basename of the directory it runs in collides with a probe running beside
+        # it when every probe's trees are called t0, t1
+        one, two = Trees(repo), Trees(repo)
+        try:
+            names = [os.path.basename(x) for x in (one.at(c0), one.at(a1), two.at(c0))]
+        finally:
+            one.close()
+            two.close()
+        expect("no two temporary worktrees share a basename, and none is a bare t<n>",
+               len(set(names)) == 3 and not any(re.fullmatch(r"t\d+", n) for n in names))
+        for sel in ("npx playwright test e2e/setup-checklist.spec.ts:157", "bundle exec rspec spec/a_spec.rb:12:3",
+                    "go test ./... -run x pkg/a_test.go:40", "pytest tests/A_TEST.PY:9", "rspec spec/a_spec.rb:12", "run src/a.vue:5"):
+            expect("a line-number selector is refused: %s" % sel, line_selector(sel) is not None)
+        for ok in ("npx playwright test e2e/a.spec.ts -g \"renders a.ts:5\"", "jest -t 'a.js:3 works'", 
+                   "FOO=a.go:5 pytest a.py::t", "curl http://x.io/a.py:8080 && pytest a.py::t", "pytest 'f.py::test[a.py:1]'",
+                   "npx playwright test e2e/a.spec.ts -g \"setup checklist\"", "python3 -m pytest tests/test_x.py::test_y",
+                   "npx vitest run a.test.ts -t name", "BASE=http://example.com:8080 pytest tests/test_x.py::t",
+                   "curl 127.0.0.1:3000 && pytest a.py::b"):
+            expect("a name selector is accepted: %s" % ok, line_selector(ok) is None)
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = main(["--root", repo, "--base", c0, "--test", "npx playwright test e2e/a.spec.ts:157"])
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = main(["--root", repo, "--base", c0, "--test", "python3 -c \"print('No tests found'); raise SystemExit(1)\""])
+        expect("a command whose runner says it selected no test is not a failing test", rc == 2 and "selected no test" in err.getvalue())
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = main(["--root", repo, "--base", c0, "--test", "npx playwright test e2e/a.spec.ts:157"])
+        expect("the probe refuses a line-number command before running anything", rc == 2 and "line" in err.getvalue())
     finally:
         shutil.rmtree(repo, ignore_errors=True)
     print("\n%d failed" % len(failures))
@@ -172,6 +244,12 @@ def main(argv=None):
         return selftest()
     if not (a.root and a.base and a.test):
         print("give --root, --base and --test", file=sys.stderr)
+        return 2
+    sel = line_selector(a.test)
+    if sel:
+        print("the test command selects by file and line (%s): a line moves when anyone adds one above it and "
+              "the command then runs no test. Select by name: a pytest node id (file.py::test_name), "
+              "--grep/-g for Playwright, -t for jest and vitest" % sel.group(0), file=sys.stderr)
         return 2
     try:
         print(json.dumps(classify(os.path.abspath(a.root), a.base, a.head, a.test, max(1, a.runs), a.setup, a.merged)))

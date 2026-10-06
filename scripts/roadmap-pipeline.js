@@ -29,10 +29,12 @@ export const meta = {
 //
 // args (from plan-pipeline.py): { project, skillDir, downstream, downstreamDir, statusPath, mainBranch,
 //   gate, barrierGate?, barrierEvery?, model?, waitChunk?, testHint, setup, push, lanes, worktreeRoot,
-//   checklist, effort, maxAttempts, features: [{ name, roadmap, tier, dependsOn[], lane, startAttempt?, feedback? }] }
+//   checklist, effort, maxAttempts, barrierPending?: { base, head },
+//   features: [{ name, roadmap, tier, dependsOn[], lane, worktree?, startAttempt?, feedback? }] }
 // `gate` is what every feature must pass before it merges; `barrierGate`, when a project keeps its
 // whole suite for a batch barrier, runs on the merged main branch every `barrierEvery` merges (0 =
-// once, at the end).
+// once, at the end). `barrierPending` is set when code reached the main branch after the last green
+// barrier (a run paused inside its barrier): that barrier runs first, before anything is built.
 
 const A = args || {}
 const P = A.project
@@ -62,7 +64,10 @@ const UNBLOCK = MANAGED && A.autonomy === 'unblock'
 
 const tierOf = f => (f.tier === 'A' || f.tier === 'C') ? f.tier : 'B'
 const laneOf = f => Math.min(LANES, Math.max(1, f.lane || 1))
-const wt = f => LANES > 1 ? `${A.worktreeRoot}/lane${laneOf(f)}/${f.name}` : P
+// A feature that did not finish an earlier run keeps its worktree, wherever that lane's number now points:
+// plan-pipeline.py names it (`worktree`), because git refuses to check a branch out twice and the builder
+// and the merger must be looking at the same directory.
+const wt = f => LANES > 1 ? (f.worktree || `${A.worktreeRoot}/lane${laneOf(f)}/${f.name}`) : P
 const effortFor = (role, f) => {
   const e = EFFORT[role]
   return (e && typeof e === 'object') ? e[tierOf(f)] : e
@@ -151,7 +156,7 @@ Reply with ok, before, the new ${MAIN} commit and notes.`
 const TRIAGE = (merged, failures, base, specs, cycle) => `You are the TRIAGE of a build pipeline for the project at ${P}, manager mode at level unblock, cycle ${cycle}. The batch barrier (${A.barrierGate}) failed after these features merged into ${MAIN}: ${merged.join(', ')}. You change nothing.
 ${LAUNCHED}
 THE FAILURES the barrier reported: ${JSON.stringify(failures || [])}
-For each failing test, write ONE command that runs just that test from the project root and exits non-zero when it fails, then run:
+For each failing test, write ONE command that runs just that test from the project root and exits non-zero when it fails. Select the test by its NAME or id, never a file:line — a line moves the moment anyone adds one above it, and the command then runs no test: a pytest node id (path.py::test_name), npx playwright test <file> --grep "<exact title>" (-g), -t "<exact name>" for jest and vitest, or the runner's own name filter; the filters are regular expressions, so escape the title's special characters and anchor it. Then run:
 python3 ${SKILL}/scripts/triage-probe.py --root ${P} --base ${base} --test "<that command>" --runs 3${A.setup ? ` --setup "${A.setup}"` : ''} ${specs.map(x => '--merged ' + x).join(' ')}
 It checks out ${MAIN} as it was before these merges and as it is now into temporary worktrees, runs the test in both, and prints its kind: regression (with the commit and the merged feature that introduced it), preexisting (it fails before the merges too), or not-reproduced. Its classification is the answer: copy it, never override it. If a failure is not a test (the barrier could not start, a service did not come up), report it as not-reproduced with what you saw.
 Reply with items: one per failing test, with test, command, kind, feature (for a regression) and evidence (the probe's JSON).`
@@ -160,8 +165,9 @@ const REPAIR = (items, cycle) => `You are the REPAIRER of a triaged barrier fail
 ${LAUNCHED}
 Work on a new branch triage/${cycle} created from ${MAIN} in ${P}. The items, classified by a script you do not second-guess:
 ${JSON.stringify(items, null, 1)}
-- A REGRESSION: the named merged feature broke that test. Fix the feature's code so the test passes and that feature's own acceptance criteria still hold (python3 ${SKILL}/scripts/feature-brief.py <feature> --root ${P}). Do not edit the test — the one exception is an owner decision recorded in the roadmap that revokes exactly its assertion, and then only as TESTS below allows.
+- A REGRESSION: the named merged feature broke that test. (If the feature is \`earlier-run\`, the break is in merges of an earlier run, not a feature name: find the owner with git log -1 <the commit in the evidence> and its feature-brief.py.) Fix the feature's code so the test passes and that feature's own acceptance criteria still hold (python3 ${SKILL}/scripts/feature-brief.py <feature> --root ${P}). Do not edit the test — the one exception is an owner decision recorded in the roadmap that revokes exactly its assertion, and then only as TESTS below allows.
 - PREEXISTING: the test failed before these merges too — broken, or flaky. Find the cause and fix it at the root: in the test when the test is wrong about timing, ordering or shared state (an unordered result compared as ordered, a wait on the wrong event, state leaking between tests), in the code when the code is wrong. Never raise a timeout, never loosen, narrow or delete an assertion, never skip it or mark it expected to fail, never add a retry.
+Identify a test by its name, never a file:line, when you write a command or a note about it: a line moves when you add one above it. Your fix keeps the test's name, so a command that selects by name still finds the test.
 Prove each fix: run its test 10 times in a row with no retries; all 10 must pass. Commit each fix on its own, message "TRIAGE <kind> <test>: <cause>".
 ${REVOKED_RULE}
 Reply ready (true only when every item is fixed and proved), fixed (one line each: test, cause, change, proof) and blockers.`
@@ -169,7 +175,8 @@ Reply ready (true only when every item is fixed and proved), fixed (one line eac
 const CHECK = (items, cycle) => `You are the CHECKER of a triage repair in the project at ${P}. You did not write it; try to show it is wrong. You change nothing.
 ${LAUNCHED}
 Review git diff ${MAIN}...triage/${cycle} against these items: ${JSON.stringify(items)}.
-Refuse (ok=false) any change that raises a timeout, loosens, narrows or deletes an assertion, adds a skip, an expected-failure mark or a retry, edits the test of a REGRESSION (unless an owner decision recorded in the roadmap revokes exactly that assertion — read it), or does not address the cause the commit names. Then run each item's test 10 times in a row with no retries on triage/${cycle}; every run must pass.
+Refuse (ok=false) any change that raises a timeout, loosens, narrows or deletes an assertion, adds a skip, an expected-failure mark or a retry, edits the test of a REGRESSION (unless an owner decision recorded in the roadmap revokes exactly that assertion — read it), or does not address the cause the commit names. Then run each item's test 10 times in a row with no retries on triage/${cycle}; every run must pass, and a run counts only if it actually ran that test.
+A command that selects by file:line can select nothing once the repair added or removed a line above the test; "No tests found", "no tests ran" or 0 collected is then a defective command, never evidence of a wrong repair. Derive the command from its NAME (a pytest node id, --grep or -g for Playwright, -t for jest and vitest), confirm with the runner's list or collect-only mode (--list, --collect-only, --listTests) that it selects exactly that test, and use that command for the 10 runs; each run's output must show that one test passing. The test must still exist under the same name in the diff: a rename or a move counts as a deletion, and is refused. If no command can be made to select exactly that test, reply ok=false with a major issue naming the missing selector — never ok=true on runs that ran nothing. Only a test that ran and failed counts against the repair.
 Reply ok and issues (each: severity, where, problem, fix).`
 
 const TRIAGE_MERGE = cycle => `You are the MERGER of a triage repair in the project at ${P}. Its checker passed. Nothing reaches ${MAIN} without the gate below. Stop with ok=false at the first failure and change nothing further.
@@ -181,9 +188,13 @@ ${LAUNCHED}
 4. git branch -d triage/${cycle}.
 Reply with ok, before, the new ${MAIN} commit and notes.`
 
-const BARRIER = merged => `You are the BARRIER of a build pipeline for the project at ${P}. ${merged.length} feature(s) have been merged into ${MAIN} since the last barrier: ${merged.join(', ')}. Nothing more merges until you report.
+const EARLIER = 'earlier-run'
+const sinceText = merged => merged.map(n => n === EARLIER ? `an earlier run's merges (${A.barrierPending.base.slice(0, 9)}..${A.barrierPending.head.slice(0, 9)}), which no green barrier ever proved` : n).join(', ')
+const BARRIER = merged => `You are the BARRIER of a build pipeline for the project at ${P}. These have been merged into ${MAIN} since the last green barrier: ${sinceText(merged)}. Nothing more merges until you report.
 ${LAUNCHED}
-You change no code and fix nothing. On ${MAIN}, in ${P}${LANES > 1 ? '' : ` (git checkout ${MAIN} first)`}, run the project's barrier — ${A.barrierGate} — and ${RUN_GATE(A.barrierGate || '', P)}
+You change no code and fix nothing. On ${MAIN}, in ${P}${LANES > 1 ? '' : ` (git checkout ${MAIN} first)`}, note the commit ${MAIN} points at (git -C ${P} rev-parse ${MAIN}), then run the project's barrier — ${A.barrierGate} — and ${RUN_GATE(A.barrierGate || '', P)}
+The tree must be clean on ${MAIN} before the barrier runs: if \`git -C ${P} status --porcelain\` prints anything, change nothing, run no barrier and reply ok=false with exitCode -1 and that output as the failure — a barrier that ran on uncommitted work proves nothing.
+Recording the proof is part of your task: only if the barrier exited 0, run python3 ${SKILL}/scripts/record-barrier.py --root ${P} --sha <that commit>. Never for a red or unfinished barrier: the next run reads that record to know what is proved.
 Reply with ok (true only if the barrier finished and exited 0), exitCode, and failures: the failing tests or files, as the log names them.`
 
 // The record lands on the main branch and is committed: on the first real run a blocked feature
@@ -242,6 +253,12 @@ const serious = list => (list || []).filter(i => i && i.severity !== 'minor')
 let sinceBarrier = []
 let barrierRed = null
 const mergedAt = {}
+// A run paused inside its barrier leaves merges no green barrier proved; the next run owes it, and the
+// triage reads its base from the commit recorded as last proved.
+if (A.barrierGate && A.barrierPending && A.barrierPending.base) {
+  sinceBarrier = [EARLIER]
+  mergedAt[EARLIER] = { before: A.barrierPending.base, after: A.barrierPending.head }
+}
 const TRIAGE_EFFORT = EFFORT.triage || 'high'
 
 // Level unblock: at most two triage cycles per red barrier. The classification is triage-probe.py's
@@ -344,6 +361,8 @@ const runFeature = async f => {
   outcomes.push({ name: f.name, result: 'merge-failed', notes: m ? m.notes : 'no result' })
   log(`${f.name}: merge failed`)
 }
+
+await withMergeLock(runBarrier)
 
 await parallel(Object.values(queues).map(q => async () => {
   for (const f of q) { try { await runFeature(f) } finally { resolve[f.name]() } }

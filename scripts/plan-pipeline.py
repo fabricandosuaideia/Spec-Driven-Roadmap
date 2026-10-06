@@ -26,6 +26,12 @@ list, never guessed — with whether it is decomposed and which of its features 
 refuses unless pipeline.json carries the owner's written delegation (`manager.delegation`): in that
 mode the manager decides what would otherwise be asked, and only the owner can hand that over.
 
+A feature that did not finish a run keeps its git worktree, and its lane: lanes are balanced once, and
+after that the worktree git reports is the truth (`worktree` in the feature's args). The last green
+barrier is recorded inside the git directory (record-barrier.py, which the barrier agent runs on a
+green exit); code on the main branch after it makes the barrier owed, so a run paused inside its
+barrier is not followed by one that builds on a main branch nobody proved (`barrierPending`).
+
 One roadmap per run, as for the loop: across roadmaps, producer names are provisional until a
 section is decomposed, and the seam between sections is where a person re-seeds.
 
@@ -121,6 +127,83 @@ def detect_main(root):
     return git(root, "branch", "--show-current") or "main"
 
 
+def feature_worktrees(root):
+    """{branch: path} for every worktree git lists whose directory still exists.
+
+    The lanes are not the truth about where a feature lives, the worktree is: a feature that did not
+    finish a run keeps its worktree, and git refuses to check its branch out a second time."""
+    here = os.path.realpath(root)
+    found, path, branch, prunable = {}, None, None, False
+    for line in (git(root, "worktree", "list", "--porcelain") or "").splitlines() + [""]:
+        if line.startswith("worktree "):
+            path, branch, prunable = line[len("worktree "):], None, False
+        elif line.startswith("branch refs/heads/"):
+            branch = line[len("branch refs/heads/"):]
+        elif line.startswith("prunable"):
+            prunable = True
+        elif not line and path:
+            if branch and not prunable and os.path.isdir(path) and os.path.realpath(path) != here:
+                found[branch] = path
+            path = None
+    return found
+
+
+BARRIER_FILE = "spec-driven-roadmap-barrier.json"
+
+
+def barrier_state_path(root):
+    """Where the last green barrier is kept: inside the git directory, so it is no commit, moves no
+    HEAD, is shared by every worktree and is never merged into anything."""
+    return os.path.join(root, git(root, "rev-parse", "--git-common-dir") or ".git", BARRIER_FILE)  # absolute stays
+
+
+def record_barrier(root, main_branch, sha):
+    """Record that the barrier passed on `sha`. Refuses a commit the main branch does not contain."""
+    full = git(root, "rev-parse", "--verify", "--quiet", sha + "^{commit}")
+    if full is None:
+        raise RuntimeError("%s is not a commit of this repository" % sha)
+    if subprocess.run(["git", "-C", root, "merge-base", "--is-ancestor", full, "refs/heads/" + main_branch],
+                      capture_output=True).returncode != 0:
+        raise RuntimeError("%s is not on %s: a barrier proves a commit of the main branch" % (sha, main_branch))
+    path = barrier_state_path(root)
+    with open(path + ".tmp", "w", encoding="utf-8") as fh:
+        json.dump({"main": main_branch, "sha": full}, fh)
+    os.replace(path + ".tmp", path)
+    return full
+
+
+def barrier_pending(root, cfg):
+    """{"base", "head"} when code reached the main branch after the last green barrier, else None.
+
+    Only a project with a barrierGate has one, and only once a barrier has been recorded: with no record
+    the state is unknown, and guessing a base for the triage would be worse than not running."""
+    if not cfg.get("barrierGate"):
+        return None
+    main_branch = cfg.get("mainBranch") or "main"
+    path = barrier_state_path(root)
+    if not os.path.isfile(path):
+        return None
+    try:
+        state = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        raise RuntimeError("%s exists but cannot be read: delete it once you know the current %s passes the barrier "
+                           "gate (an unreadable record is not the same as no record)" % (path, main_branch))
+    if not isinstance(state, dict):
+        raise RuntimeError("%s is not a record: delete it, as above" % path)
+    if state.get("main") != main_branch or not state.get("sha"):
+        return None
+    head = git(root, "rev-parse", "refs/heads/" + main_branch)
+    if head is None or head == state["sha"]:
+        return None
+    if subprocess.run(["git", "-C", root, "merge-base", "--is-ancestor", state["sha"], head],
+                      capture_output=True).returncode != 0:
+        raise RuntimeError("the last green barrier, %s, is not an ancestor of %s: the main branch was rewritten. "
+                           "Delete %s once you know the current %s passes the barrier gate"
+                           % (state["sha"][:9], main_branch, barrier_state_path(root), main_branch))
+    code = git(root, "diff", "--name-only", state["sha"], head, "--", ".", ":!docs", ":!.specs")
+    return {"base": state["sha"], "head": head} if code else None
+
+
 def downstream(root):
     for name in ("tlc-spec-lean", "tlc-spec-driven"):
         d = os.path.join(root, ".claude", "skills", name)
@@ -214,6 +297,28 @@ def plan(root, roadmap_rel, cfg):
         raise RuntimeError(doubtful_message(doubtful))
     lanes = max(1, int(cfg.get("lanes") or 1))
     lane_of, load = {}, {n: 0 for n in range(1, lanes + 1)}
+    # a feature with a worktree keeps it, and its lane: counted first, so the rest balance around it
+    trees = feature_worktrees(root)
+    if lanes == 1:
+        stray = sorted(n for n in pending if "feat/" + n in trees)
+        if stray:
+            raise RuntimeError("lanes is 1, but %s still has a worktree from a run with more lanes (%s): git refuses to "
+                               "check a branch out in two places. Finish it with lanes above 1, or remove it "
+                               "(git worktree remove <path>, after saving what is in it)" % (stray[0], trees["feat/" + stray[0]]))
+        trees = {}
+    elif any(git(root, "branch", "--show-current") == "feat/" + n for n in pending):
+        raise RuntimeError("the project root is on %s, a feature to build, and lanes is above 1: every lane builds in its "
+                           "own worktree and git refuses the branch twice. Check out %s in the root first"
+                           % (git(root, "branch", "--show-current"), cfg.get("mainBranch") or "main"))
+    kept = {}
+    for name in pending:
+        path = trees.get("feat/" + name)
+        if path:
+            m = re.search(r"/lane(\d+)/[^/]+$", path.replace(os.sep, "/"))
+            lane = int(m.group(1)) if m and 1 <= int(m.group(1)) <= lanes else None
+            kept[name] = (path, lane)
+            if lane:
+                load[lane] += 1
     feats = []
     for name in pending:
         fields = entries[name]
@@ -222,10 +327,14 @@ def plan(root, roadmap_rel, cfg):
         tier = stated if stated and CR.TIER_RANK[stated] >= CR.TIER_RANK[floor] else floor
         deps = [d for d in deps_of(fields) if d in pending and d != name]
         first = next((lane_of[d] for d in deps if d in lane_of), None)
-        lane = first or min(load, key=lambda k: (load[k], k))
+        keeps = kept.get(name, (None, None))[1]
+        lane = keeps or first or min(load, key=lambda k: (load[k], k))
         lane_of[name] = lane
-        load[lane] += 1
+        if not keeps:
+            load[lane] += 1
         feats.append({"name": name, "roadmap": roadmap_rel, "tier": tier, "dependsOn": deps, "lane": lane})
+        if name in kept:
+            feats[-1]["worktree"] = kept[name][0]
     args = {
         "project": root, "skillDir": SKILL_DIR, "downstream": ds, "downstreamDir": ds_dir,
         "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main", "gate": cfg["gate"],
@@ -238,6 +347,9 @@ def plan(root, roadmap_rel, cfg):
     }
     if cfg.get("waitChunk"):  # seconds per wait on a detached gate; only tests set it lower
         args["waitChunk"] = int(cfg["waitChunk"])
+    owed = barrier_pending(root, cfg)
+    if owed:
+        args["barrierPending"] = owed
     return args, {"done": done, "discharged": discharged, "pending": pending, "downstream": ds}
 
 
@@ -309,6 +421,7 @@ def manager_args(root, cfg):
     if mgr.get("autonomy", "decide") not in AUTONOMY:
         raise RuntimeError("%s manager.autonomy takes \"decide\" or \"unblock\"" % CONFIG)
     secs, ds, ds_dir = section_states(root, cfg)
+    owed = barrier_pending(root, cfg)
     status = os.path.join("docs", "ROADMAP-INDEX.md")
     if not os.path.isfile(os.path.join(root, status)):
         status = os.path.join("docs", "ROADMAP.md")
@@ -322,6 +435,7 @@ def manager_args(root, cfg):
         "stopAt": list(mgr.get("stopAt") or []), "sectionsPerRun": int(mgr.get("sectionsPerRun") or 4),
         "effort": dict(DEFAULT_CONFIG["manager"]["effort"], **(mgr.get("effort") or {})),
         "sections": secs,
+        **({"barrierPending": owed} if owed else {}),
     }
 
 
@@ -415,6 +529,43 @@ x
         expect("a pending dependency is kept, and shares its lane", by["n-big"]["dependsOn"] == ["n-fail"]
                and by["n-big"]["lane"] == by["n-fail"]["lane"])
         expect("an independent feature goes to the least-loaded lane", by["n-next"]["lane"] != by["n-fail"]["lane"])
+        # 3.36.0, from a real run: a feature left unfinished kept its worktree in lane2, was handed lane1
+        # on the next run, and its merger looked for the worktree where it was not
+        rel_road = os.path.join("docs", "ROADMAP.md")
+        held = os.path.join(root.rstrip("/") + ".lanes", "lane2", "n-big")
+        subprocess.run(["git", "-C", root, "worktree", "add", "-q", "-b", "feat/n-big", held], check=True)
+        byw = {f["name"]: f for f in plan(root, rel_road, cfg)[0]["features"]}
+        expect("a feature that already has a worktree keeps that lane, whatever the balancing says",
+               byw["n-big"]["lane"] == 2 and byw["n-fail"]["lane"] == 1)
+        expect("and names that worktree, as git reports it",
+               os.path.realpath(byw["n-big"].get("worktree", "")) == os.path.realpath(held) and "worktree" not in byw["n-fail"])
+        shutil.rmtree(held)
+        expect("a worktree whose directory is gone is not trusted",
+               "worktree" not in {f["name"]: f for f in plan(root, rel_road, cfg)[0]["features"]}["n-big"])
+        subprocess.run(["git", "-C", root, "worktree", "prune"], check=True)
+        # lanes shrunk to 1 with a feature still in its lane worktree: git would refuse the branch twice
+        subprocess.run(["git", "-C", root, "worktree", "add", "-q", held, "feat/n-big"], check=True)
+        try:
+            plan(root, rel_road, dict(cfg, lanes=1))
+            shrunk = ""
+        except RuntimeError as e:
+            shrunk = str(e)
+        expect("lanes shrunk to 1 refuses while a feature still holds a lane worktree, and says what to do",
+               "n-big" in shrunk and "worktree remove" in shrunk)
+        subprocess.run(["git", "-C", root, "worktree", "remove", "--force", held], check=True)
+        # the root itself on a feature branch is no worktree to keep; with lanes above 1 it must be refused
+        subprocess.run(["git", "-C", root, "checkout", "-q", "feat/n-big"], check=True)
+        expect("the project root is never reported as a feature's worktree", "feat/n-big" not in feature_worktrees(root))
+        try:
+            plan(root, rel_road, cfg)
+            onbranch = ""
+        except RuntimeError as e:
+            onbranch = str(e)
+        expect("with lanes above 1 a root left on a feature branch is refused", "n-big" in onbranch and "Check out" in onbranch)
+        expect("with one lane that root is the normal state, and is planned", "n-big" in
+               {f["name"] for f in plan(root, rel_road, dict(cfg, lanes=1))[0]["features"]})
+        subprocess.run(["git", "-C", root, "checkout", "-q", "master"], check=True)
+        subprocess.run(["git", "-C", root, "branch", "-q", "-D", "feat/n-big"], check=True)
         expect("the gate comes from the confirmed config", args["gate"] == "make check" and args["downstream"] == "tlc-spec-lean")
         _a, info2 = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, featureStatus={"n-fail": "done"}))
         expect("classified done, it is skipped without touching its report", "n-fail" in info2["done"]
@@ -530,6 +681,67 @@ x
         expect("a single-section project is one section, its roadmap the Status file",
                rc == 0 and [x["roadmap"] for x in one.get("sections", [])] == ["docs/ROADMAP.md"]
                and one.get("statusPath") == os.path.join("docs", "ROADMAP.md"))
+
+        # 3.36.0: a barrier a run never finished is owed by the next one. The proof is the commit of the
+        # last green barrier, kept outside the tree; code that landed after it has never been proved.
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+
+        def land(path, body="x\n"):
+            os.makedirs(os.path.dirname(os.path.join(root, path)), exist_ok=True)
+            open(os.path.join(root, path), "w").write(body)
+            subprocess.run(["git", "-C", root, "add", path], check=True, env=env)
+            subprocess.run(["git", "-C", root, "commit", "-qm", "add " + path], check=True, env=env)
+            return git(root, "rev-parse", "master")
+        gated = dict(cfg, barrierGate="make all", mainBranch="master")
+        expect("with no barrier ever recorded nothing is owed (unknown, not unproven)", barrier_pending(root, gated) is None)
+        h0 = git(root, "rev-parse", "master")
+        record_barrier(root, "master", h0)
+        expect("with the head proved nothing is owed", barrier_pending(root, gated) is None)
+        h1 = land("src/a.py")
+        expect("code merged after the last green barrier is owed a barrier, from that commit",
+               barrier_pending(root, gated) == {"base": h0, "head": h1})
+        expect("a project with no barrierGate is never owed one", barrier_pending(root, dict(gated, barrierGate=None)) is None)
+        record_barrier(root, "master", h1)
+        land("docs/notes.md")
+        land(".specs/features/x/plan.md")
+        expect("commits that only touch docs and .specs owe nothing", barrier_pending(root, gated) is None)
+        h3 = land("src/b.py")
+        orphan = subprocess.run(["git", "-C", root, "commit-tree", "-m", "orphan", git(root, "rev-parse", "master^{tree}")],
+                                capture_output=True, text=True, env=env, check=True).stdout.strip()
+        try:
+            record_barrier(root, "master", orphan)
+            refused = ""
+        except RuntimeError as e:
+            refused = str(e)
+        expect("a commit that is not on the main branch cannot be recorded as proved", "not on master" in refused)
+        expect("and the refused record left the old one standing", barrier_pending(root, gated) == {"base": h1, "head": h3})
+        state = barrier_state_path(root)
+        json.dump({"main": "master", "sha": orphan}, open(state, "w"))
+        try:
+            barrier_pending(root, gated)
+            unreachable = ""
+        except RuntimeError as e:
+            unreachable = str(e)
+        expect("a recorded commit the main branch no longer contains is refused, naming the file to delete",
+               "not an ancestor" in unreachable and os.path.basename(state) in unreachable)
+        json.dump({"main": "master", "sha": h1}, open(state, "w"))
+        written = json.load(open(os.path.join(root, CONFIG)))
+        written.update(barrierGate="make all", mainBranch="master",
+                       featureStatus={"n-fail": "done", "n-big": "done", "n-next": "done"})
+        json.dump(written, open(os.path.join(root, CONFIG), "w"))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc = main(["--root", root])
+        owed = json.loads(out.getvalue()) if rc == 0 else {}
+        expect("with nothing to build but a barrier owed, the args still print so the pipeline can run it",
+               rc == 0 and owed.get("features") == [] and owed.get("barrierPending") == {"base": h1, "head": h3})
+        mw = dict(written, manager={"delegation": "decide", "delegatedOn": "2026-10-06"})
+        expect("manager mode is told too, so it does not call the section already done",
+               manager_args(root, mw).get("barrierPending") == {"base": h1, "head": h3})
+        record_barrier(root, "master", h3)
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            rc = main(["--root", root])
+        expect("once the barrier is green and recorded, nothing to build is a refusal again", rc == 1)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("\n%d failed" % len(failures))
@@ -587,6 +799,9 @@ def main(argv=None):
             print(str(e), file=sys.stderr)
             return 1
         todo = [x for x in margs["sections"] if not x["decomposed"] or x["pending"]]
+        if margs.get("barrierPending") and not todo:
+            print("manager: nothing left to build, but the barrier owes a run: %s..%s carries code no green barrier proved"
+                  % (margs["barrierPending"]["base"][:9], margs["barrierPending"]["head"][:9]), file=sys.stderr)
         doubt = {k: v for x in margs["sections"] for k, v in x["doubtful"].items()}
         print("manager (autonomy %s): %d section(s), %d with work left (%s); stops at %s; scriptPath %s" % (
               margs["autonomy"], len(margs["sections"]), len(todo),
@@ -598,7 +813,7 @@ def main(argv=None):
         if doubt:
             print("a section with a feature that needs the owner is not built, nor is any section depending on "
                   "it. " + doubtful_message(doubt), file=sys.stderr)
-        if not todo:
+        if not todo and not margs.get("barrierPending"):
             return 1
         print(json.dumps(margs, indent=1))
         return 0
@@ -615,7 +830,10 @@ def main(argv=None):
           rel, len(info["done"]), len(info["discharged"]), len(info["pending"]),
           ", ".join("%s:%s" % (f["name"], f["tier"]) for f in args["features"]) or "none",
           os.path.join(SKILL_DIR, "scripts", "roadmap-pipeline.js")), file=sys.stderr)
-    if not args["features"]:
+    if args.get("barrierPending"):
+        print("the barrier is owed: %s..%s carries code that no green barrier proved; it runs before anything is built"
+              % (args["barrierPending"]["base"][:9], args["barrierPending"]["head"][:9]), file=sys.stderr)
+    if not args["features"] and not args.get("barrierPending"):
         return 1
     print(json.dumps(args, indent=1))
     return 0

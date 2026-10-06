@@ -244,7 +244,7 @@ release_gate() {
     # feature whose name prefixes another's). A self-test nobody runs is a
     # decoration, so every release runs them; a missing script fails the gate.
     local scr
-    for scr in measure-agents.py feature-brief.py status-block.py write-agents.py plan-pipeline.py bench-gate.py; do
+    for scr in measure-agents.py feature-brief.py status-block.py write-agents.py plan-pipeline.py triage-probe.py record-barrier.py bench-gate.py; do
         if [[ -f "$REPO_ROOT/scripts/$scr" ]]; then
             printf '\n%s\n' "Running the $scr self-test..."
             python3 "$REPO_ROOT/scripts/$scr" --selftest || ok=1

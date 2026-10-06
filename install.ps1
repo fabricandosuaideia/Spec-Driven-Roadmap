@@ -38,7 +38,7 @@ $SkillName = 'spec-driven-roadmap'
 
 # The skill is these files and nothing else. Used to validate the download
 # before anything on disk is touched.
-$RequiredScripts = @('convert-to-multi.py', 'check-roadmap.py', 'measure-agents.py', 'feature-brief.py', 'status-block.py', 'write-agents.py', 'plan-pipeline.py', 'roadmap-pipeline.js', 'manager-pipeline.js', 'triage-probe.py', 'bench-gate.py')
+$RequiredScripts = @('convert-to-multi.py', 'check-roadmap.py', 'measure-agents.py', 'feature-brief.py', 'status-block.py', 'write-agents.py', 'plan-pipeline.py', 'roadmap-pipeline.js', 'manager-pipeline.js', 'triage-probe.py', 'record-barrier.py', 'bench-gate.py')
 $RequiredRefs = @(
     'scope-phase.md',
     'index-phase.md',

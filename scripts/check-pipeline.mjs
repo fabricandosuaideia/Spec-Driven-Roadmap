@@ -222,6 +222,64 @@ const scenarios = {
     return /Never raise a timeout, never loosen, narrow or delete an assertion/.test(rp.prompt) && /Do not edit the test/.test(rp.prompt) &&
       /Refuse \(ok=false\) any change that raises a timeout, loosens, narrows or deletes an assertion/.test(ck.prompt) && /10 times in a row/.test(ck.prompt)
   },
+  // 3.36.0, from a real run (Sales-ai): a feature unfinished in one run keeps its worktree, and the next
+  // run's lane for it is another one; its builder used the old tree, its merger looked in the new lane.
+  'a feature that already has a worktree is built, proved, verified and merged there, whatever its lane': async src => {
+    const r = await run(src, { lanes: 2, worktreeRoot: '/p.wt', features: [{ ...feat('a', 'B', [], 1), worktree: '/p.wt/lane2/a' }, feat('b', 'B', [], 1)] }, pass())
+    const of = (role, n) => r.calls.filter(c => c.role === role && c.name === n)
+    return ['build', 'prove', 'verify', 'merge'].every(role => of(role, 'a').length && of(role, 'a').every(c => c.prompt.includes('/p.wt/lane2/a') && !c.prompt.includes('/p.wt/lane1/a'))) &&
+      of('merge', 'b').every(c => c.prompt.includes('/p.wt/lane1/b'))
+  },
+  // 3.36.0: a barrier a run never finished is owed by the next one, before any feature.
+  'a barrier owed by an earlier run runs first, from the commit proved last, and again records itself when green': async src => {
+    const r = await run(src, { barrierGate: 'make all', barrierPending: { base: 'base0', head: 'head0' }, features: [feat('a')] }, pass())
+    const roles = r.calls.map(c => c.role).join()
+    const b = r.calls.find(c => c.role === 'barrier')
+    return roles.startsWith('barrier,build') && /earlier run/.test(b.prompt) && /record-barrier\.py --root \/p --sha <that commit>/.test(b.prompt) && !/--barrier-green/.test(b.prompt) && /status --porcelain/.test(b.prompt) &&
+      (r.out || []).some(l => l.startsWith('barrier: green after earlier-run'))
+  },
+  'every barrier is told to record the commit it ran on, only when it exits 0': async src => {
+    const r = await run(src, { barrierGate: 'make all', features: [feat('a')] }, pass())
+    const b = r.calls.find(c => c.role === 'barrier')
+    return /git -C \/p rev-parse main/.test(b.prompt) && /record-barrier\.py --root \/p --sha <that commit>/.test(b.prompt) && /only if the barrier exited 0/.test(b.prompt)
+  },
+  'a red barrier owed by an earlier run holds every feature': async src => {
+    const r = await run(src, { barrierGate: 'make all', barrierPending: { base: 'base0', head: 'head0' }, features: [feat('a'), feat('b', 'B', ['a'])] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }) }))
+    return !r.calls.some(c => c.role === 'build') && line(r.out, 'a').includes('held') && line(r.out, 'b').includes('skipped')
+  },
+  'with nothing to build, an owed barrier still runs': async src => {
+    const r = await run(src, { barrierGate: 'make all', barrierPending: { base: 'base0', head: 'head0' }, features: [] }, pass())
+    return r.calls.map(c => c.role).join() === 'barrier,record'
+  },
+  'a barrier owed by an earlier run is triaged from the commit proved last': async src => {
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierPending: { base: 'base0', head: 'head0' }, features: [] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }), triage: () => ({ items: [] }) }))
+    const t = r.calls.find(c => c.role === 'triage')
+    return !!t && /--base base0 /.test(t.prompt) && /--merged earlier-run:base0:head0/.test(t.prompt)
+  },
+  'no barrier is owed unless the args say so': async src => {
+    const r = await run(src, { barrierGate: 'make all', features: [feat('a')] }, pass())
+    return r.calls.filter(c => c.role === 'barrier').length === 1 && r.calls.map(c => c.role).join().startsWith('build')
+  },
+  // 3.36.0, from a real run: the repair added comment lines, the test moved from :157 to :161, and the
+  // checker's command, a file:line selector, found no test; ten of ten "failures" refused a correct repair.
+  'triage commands select a test by name, never by file:line': async src => {
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }), triage: () => ({ items: [] }) }))
+    const t = r.calls.find(c => c.role === 'triage')
+    return /NAME or id/.test(t.prompt) && /never a file:line/.test(t.prompt) && /--grep/.test(t.prompt) && /-t /.test(t.prompt) && /::/.test(t.prompt)
+  },
+  'a checker whose command finds no test derives one from the name, and never reads "no tests" as a bad repair': async src => {
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => ({ ok: false, exitCode: 1, failures: ['t'] }),
+             triage: () => ({ items: [{ test: 't', command: 'c', kind: 'preexisting', evidence: '{}' }] }),
+             repair: () => ({ ready: true, fixed: ['x'], blockers: [] }), check: () => ({ ok: true, issues: [] }) }))
+    const ck = r.calls.find(c => c.role === 'check'), rp = r.calls.find(c => c.role === 'repair')
+    return /No tests found/.test(ck.prompt) && /never evidence/.test(ck.prompt) && /from its NAME/.test(ck.prompt) && /selects exactly that test/.test(ck.prompt) &&
+      /never a file:line/.test(rp.prompt) && /keeps the test's name/.test(rp.prompt) &&
+      /list or collect-only mode/.test(ck.prompt) && /rename or a move counts as a deletion/.test(ck.prompt) && /reply ok=false with a major issue/.test(ck.prompt)
+  },
   'a model set in the config reaches every agent': async src => {
     const r = await run(src, { model: 'sonnet', barrierGate: 'x', features: [feat('a', 'A')] }, pass())
     const none = await run(src, { features: [feat('a')] }, pass())
@@ -243,6 +301,15 @@ const mutants = {
   'unblock outside manager mode': ["const UNBLOCK = MANAGED && A.autonomy === 'unblock'", "const UNBLOCK = A.autonomy === 'unblock'"],
   'repair merged without the checker': ["if (!ck || !ck.ok || serious(ck.issues).length) return stop(", "if (false) return stop("],
   'triage cycles unbounded': ['for (let cycle = 1; cycle <= 2; cycle++) {', 'for (let cycle = 1; cycle <= 5; cycle++) {'],
+  'an existing worktree ignored': ['const wt = f => LANES > 1 ? (f.worktree ||', 'const wt = f => LANES > 1 ? (false ||'],
+  'an owed barrier seeds nothing': ['sinceBarrier = [EARLIER]', 'sinceBarrier = []'],
+  'an owed barrier has no base for the triage': ['mergedAt[EARLIER] = {', "mergedAt['x'] = {"],
+  'an owed barrier ignored without the guard': ['if (A.barrierGate && A.barrierPending && A.barrierPending.base) {', 'if (false) {'],
+  'an owed barrier never run': ['await withMergeLock(runBarrier)\n\nawait parallel', 'await parallel'],
+  'the barrier does not record itself': ['record-barrier.py --root ${P} --sha <that commit>', 'true'],
+  'the barrier runs on a dirty tree': ['status --porcelain', 'status --short'],
+  'checker told nothing about a command that finds no test': ['No tests found', 'Something else'],
+  'triage allowed a line selector': ['never a file:line', 'any selector'],
   'a not-reproduced failure repaired anyway': ["if (items.some(i => i.kind === 'not-reproduced')) return stop(", "if (false) return stop("],
 }
 
@@ -297,6 +364,13 @@ const managerScenarios = {
   'manager: a finished section costs nothing': async src => {
     const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: [] }), sec('b')] })
     return !r.calls.some(c => c.slug === 'a') && r.out.some(l => l === 'a: already done')
+  },
+  // 3.36.0: a run paused inside its barrier left the main branch unproved, and the next run called the
+  // section "already done" and built the following one on top of it.
+  'manager: a finished section is not called done while a barrier is owed; the pipeline runs it': async src => {
+    const owed = await runManager(src, { barrierPending: { base: 'b0', head: 'h0' }, sections: [sec('a', { decomposed: true, pending: [] }), sec('b', { decomposed: true, pending: [] })] })
+    const none = await runManager(src, { sections: [sec('a', { decomposed: true, pending: [] })] })
+    return owed.children.length === 1 && owed.children[0].slug === 'a' && owed.out.some(l => l === 'b: already done') && none.children.length === 0
   },
   'manager: it stops before a section the owner reserved (stopAt)': async src => {
     const r = await runManager(src, { stopAt: ['b'], sections: [sec('a'), sec('b'), sec('c')] })
@@ -362,6 +436,7 @@ const managerScenarios = {
 }
 const managerMutants = {
   'dependants of an unfinished section not skipped': ['if (bad) { blockedSections.add', 'if (false) { blockedSections.add'],
+  'a finished section called done with a barrier owed': ['if (s.decomposed && !(s.pending || []).length && !barrierOwed) {', 'if (s.decomposed && !(s.pending || []).length) {'],
   'stopAt ignored': ['if (STOP_AT.has(s.slug))', 'if (false)'],
   'red barrier ignored': ["if (stillRed) { stopped = `the barrier is red after ${s.slug}`; break }", ''],
   'decisions not marked': ['**Decided by the manager', '**Decided'],

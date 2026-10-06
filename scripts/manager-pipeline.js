@@ -20,7 +20,11 @@ export const meta = {
 // args (from plan-pipeline.py --manager): { project, skillDir, downstream, downstreamDir, statusPath,
 //   mainBranch, pipelineScript, model?, decomposeModel?, autonomy?, delegation, delegatedOn, stopAt[],
 //   sectionsPerRun, effort: { decompose, plan, final },
-//   sections: [{ slug, roadmap, txt, dependsOn[], decomposed, pending[], doubtful{} }] }   (build order)
+//   sections: [{ slug, roadmap, txt, dependsOn[], decomposed, pending[], doubtful{} }],   (build order)
+//   barrierPending?: { base, head } }
+// `barrierPending` is set when code reached the main branch after the last green barrier: a finished
+// section is then not "already done" until the barrier it owes has run, because the next section would be
+// built on a main branch nobody proved.
 // `doubtful` lists features the downstream gate cannot decide (a report it refuses, or a pending
 // feature a finished one depends on). They are the owner's to classify in pipeline.json's
 // `featureStatus`; until then the section is not built, and neither is anything depending on it.
@@ -88,10 +92,11 @@ const decisions = []
 const blockedSections = new Set()
 let built = 0
 let stopped = null
+let barrierOwed = !!A.barrierPending
 
 for (const s of SECTIONS) {
   if (STOP_AT.has(s.slug)) { stopped = `${s.slug} needs the owner (stopAt)`; break }
-  if (s.decomposed && !(s.pending || []).length) { lines.push(`${s.slug}: already done`); continue }
+  if (s.decomposed && !(s.pending || []).length && !barrierOwed) { lines.push(`${s.slug}: already done`); continue }
   const bad = (s.dependsOn || []).find(d => blockedSections.has(d))
   if (bad) { blockedSections.add(s.slug); lines.push(`${s.slug}: skipped — depends on ${bad}, which did not finish`); log(`${s.slug}: skipped`); continue }
   const doubt = Object.keys(s.doubtful || {})
@@ -124,6 +129,7 @@ for (const s of SECTIONS) {
   // verifier check every test change; option C, run by a person, never gets it.
   try { out = await workflow({ scriptPath: A.pipelineScript }, { ...pargs, managerMode: true, autonomy: AUTONOMY }) } catch (e) { out = null; lines.push(`${s.slug}: blocked — the pipeline did not run: ${e.message}`) }
   out = Array.isArray(out) ? out : []
+  if (out.some(l => l.startsWith('barrier: '))) barrierOwed = false
   const merged = out.filter(l => /: merged/.test(l)).length
   const unfinished = out.filter(l => /: (blocked|skipped|held|merge-failed)/.test(l))
   // The last barrier line decides: at level unblock a red barrier can be repaired and run again

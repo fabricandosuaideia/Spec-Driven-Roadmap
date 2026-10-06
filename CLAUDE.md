@@ -42,6 +42,7 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 | `scripts/roadmap-pipeline.js` | Shipped to users. The option C Workflow script. |
 | `scripts/manager-pipeline.js` | Shipped to users. Manager mode's Workflow script: every section in build order, decomposed under the owner's delegation, then built by `roadmap-pipeline.js` as a child workflow. |
 | `scripts/triage-probe.py` | Shipped to users. Manager mode level `unblock`: runs one failing test on the main branch before a batch of merges and after it, and says regression (bisected to the merged feature), preexisting or not reproduced. Writes nothing. |
+| `scripts/record-barrier.py` | Shipped to users. Records the main-branch commit a green barrier proved (inside the git directory); `plan-pipeline.py` reads it to know whether a barrier is owed. Its own script because no barrier agent may be told to run `plan-pipeline.py`. |
 | `scripts/bench-gate.py` | Shipped to users. Times the project's full gate; writes nothing. |
 | `scripts/check-pipeline.mjs` | Maintainer. The pipeline's control flow on stubbed agents, plus planted defects. Release gate, when `node` exists. |
 
