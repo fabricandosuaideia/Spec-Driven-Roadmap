@@ -9,6 +9,35 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.42.0 — 2026-10-21
+
+**`measure-agents.py` measures time, not only tokens** (Infinity-Agent-Creator, skill 3.41.0, sixth step of
+the time review). The script was built for a quota problem and reported tokens only, so a run could look
+cheap and take 39 hours, and the build kit's lever for builders ("two thirds of the time") was never
+checked against time on any project but the one it was measured on.
+
+- **Per workflow role:** the wall-clock its agents spent (first to last turn), the share of all
+  workflow-agent time, and the median minutes per agent, next to the existing cost share. Roles of a main
+  session or an Agent-tool subagent show `-`: their span is idle time, not work.
+- **Parallelism:** the workflow runs' own journals (`<session>/workflows/wf_*.json`, `durationMs`) give the
+  clock of each run; agent-hours over run-hours is how many agents ran at once (1.00 is one at a time,
+  which says whether `lanes` was in use). A run still going has no journal yet, and the report says so.
+- **Verifications:** passed and refused, read from the verifier's structured result (counts only, never
+  its content).
+- A baseline written before this version still compares: the new fields are optional, and `was` appears
+  only where both sides have them.
+
+**Executed:** `--selftest` (6 new assertions, values worked out by hand: 120 s and 0 s builds, a 10-minute
+and a 1-minute verifier, a 4-minute run → 3.25 agents at once, one passed and one refused, a journal
+outside the window left out, a subagent folder named `workflows` not mistaken for a journal), and a run
+over the Infinity-Agent-Creator transcripts, read only, which reproduced the shares measured by hand
+before this existed (prove 49.4% of agent time and merge 9.5%, against 51% and 10% by hand; parallelism 1.08) and
+added what was not measured then (59% of the verifications refused). That window included the agents of a
+run still going, which inflates the agent-hours a little; the report says so. **Not executed:** a
+before/after on a real change, which needs a second run.
+
+---
+
 ## 3.41.0 — 2026-10-21
 
 **A model per role, and configuration keys that mean nothing are refused instead of ignored**

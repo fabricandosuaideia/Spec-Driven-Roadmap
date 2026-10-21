@@ -34,7 +34,7 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 | `scripts/check-conversion-guards.py` | Every path on which the conversion must refuse. Builds and deletes its own trees. Called by the release gate, and by the hook when the conversion or its fixture changes. |
 | `scripts/run-benchmark.py` | Sets up an isolated run and scores it. See [`benchmark/`](benchmark/). |
 | `scripts/convert-to-multi.py` | Shipped to users. The single→multi conversion. |
-| `scripts/measure-agents.py` | Shipped to users. Reads a project's Claude Code transcripts and decomposes token cost by class, role, retry, model/effort and orchestrator. Read-only. |
+| `scripts/measure-agents.py` | Shipped to users. Reads a project's Claude Code transcripts and decomposes token cost by class, role, retry, model/effort and orchestrator, and wall-clock time by workflow role, with the run's parallelism and the verifications passed or refused. Read-only. |
 | `scripts/feature-brief.py` | Shipped to users. Prints one feature's slice of the roadmap for its builder (entry, questions, contracts, ledger, risk tier). Read-only. |
 | `scripts/status-block.py` | Shipped to users. The only writer of `## Status` and of the seed's `## Handoff` (`--handoff`); archives every body it replaces, and every old copy of the Handoff, to `docs/roadmap-history.md`. |
 | `scripts/write-agents.py` | Shipped to users. Writes `.claude/agents/roadmap-*.md` (option B); never overwrites a changed file. |

@@ -20,7 +20,13 @@ and prints, never message content, only counts:
   - per role: turns, context at the first turn, average context, and the share
     of context tokens that is GROWTH beyond the first turn — the measured form of
     "long conversations cost quadratically";
-  - the orchestrator: how many task notifications its session processed.
+  - the orchestrator: how many task notifications its session processed;
+  - TIME, because tokens are not the only price: per workflow role, the wall-clock its
+    agents spent (first to last turn) and its share of all workflow-agent time; the
+    wall-clock of the workflow runs themselves (from each run's journal) against the
+    agents' own, which is how many agents ran at once; and how many verifications passed
+    and how many were refused. On one project the gate was 61% of the time and about 2%
+    of the tokens, so a run can be cheap and still slow.
 
     python3 measure-agents.py                       # project = current directory
     python3 measure-agents.py --project /path/to/repo --since 2026-09-01
@@ -40,6 +46,7 @@ transcripts, or none in the window) — an empty measurement is not a result.
 import argparse
 import collections
 import json
+import datetime
 import os
 import re
 import shutil
@@ -59,7 +66,7 @@ DEFAULT_WEIGHTS = (1.0, 1.25, 0.1, 5.0)  # input, cache write, cache read, outpu
 TOKEN_CLASSES = ("inp", "cw", "cr", "out")
 CLASS_NAMES = {"inp": "fresh input", "cw": "cache write", "cr": "cache read", "out": "output"}
 NOTIFICATION_MARK = "<task-notification>"
-BASELINE_VERSION = 1
+BASELINE_VERSION = 1  # the time fields are optional additions; an older baseline simply lacks them
 
 
 # --------------------------------------------------------------------------- locate
@@ -134,6 +141,8 @@ def scan(path, since, until):
     ctx = []
     notifications = 0
     mix = collections.Counter()
+    stamps = []
+    verdict = None
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             if NOTIFICATION_MARK in line and '"type":"user"' in line.replace(" ", ""):
@@ -154,6 +163,14 @@ def scan(path, since, until):
                 continue
             msg = d.get("message") or {}
             usage = msg.get("usage") or {}
+            t = epoch(d.get("timestamp"))
+            if t is not None:
+                stamps.append(t)
+            for block in (msg.get("content") or []) if isinstance(msg.get("content"), list) else []:
+                if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "StructuredOutput":
+                    passed = (block.get("input") or {}).get("pass")
+                    if isinstance(passed, bool):
+                        verdict = passed
             key = msg.get("id") or d.get("requestId") or d.get("uuid")
             if key in seen:
                 continue
@@ -165,7 +182,18 @@ def scan(path, since, until):
             totals.update(inp=inp, cw=cw, cr=cr, out=out)
             ctx.append(inp + cw + cr)
             mix["%s/%s" % (short_model(msg.get("model")), d.get("effort") or "?")] += 1
-    return ctx, totals, notifications, mix
+    span = (max(stamps) - min(stamps)) if stamps else 0.0
+    return ctx, totals, notifications, mix, span, verdict
+
+
+def epoch(ts):
+    """Seconds since the epoch for an ISO timestamp, or None. Only differences are used."""
+    if not ts:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
 
 
 def short_model(m):
@@ -191,7 +219,8 @@ def cost_of(totals, weights):
 def measure(dirs, since, until, weights):
     roles = collections.defaultdict(lambda: {
         "kind": None, "agents": 0, "turns": [], "first_ctx": [], "ctx_sum": 0,
-        "growth_sum": 0, "totals": collections.Counter(), "mix": collections.Counter()})
+        "growth_sum": 0, "totals": collections.Counter(), "mix": collections.Counter(), "secs": []})
+    verdicts = collections.Counter()
     attempts = collections.Counter()
     features = collections.defaultdict(lambda: {"cost": 0.0, "max_attempt": 0})
     classes = collections.Counter()
@@ -204,7 +233,7 @@ def measure(dirs, since, until, weights):
                     continue
                 path = os.path.join(dp, f)
                 kind, role, feature, attempt = classify(path, root)
-                ctx, totals, notes, mix = scan(path, since, until)
+                ctx, totals, notes, mix, span, verdict = scan(path, since, until)
                 if kind == "main-session":
                     notifications += notes
                 if not ctx:
@@ -219,6 +248,9 @@ def measure(dirs, since, until, weights):
                 r["growth_sum"] += sum(c - ctx[0] for c in ctx if c > ctx[0])
                 r["totals"].update(totals)
                 r["mix"].update(mix)
+                r["secs"].append(span)
+                if kind == "workflow-agent" and role == "verify" and verdict is not None:
+                    verdicts["passed" if verdict else "refused"] += 1
                 classes.update(totals)
                 c = cost_of(totals, weights)
                 if attempt is not None:
@@ -227,7 +259,33 @@ def measure(dirs, since, until, weights):
                     features[feature]["cost"] += c
                     features[feature]["max_attempt"] = max(features[feature]["max_attempt"], attempt or 0)
     return {"roles": roles, "attempts": attempts, "features": features,
-            "classes": classes, "notifications": notifications, "files": files}
+            "classes": classes, "notifications": notifications, "files": files,
+            "verdicts": verdicts, "workflows": workflow_runs(dirs, since, until)}
+
+
+def workflow_runs(dirs, since, until):
+    """The workflow runs' own journals (<session>/workflows/wf_*.json): how long each run took on the
+    clock and how many agents it started. A subagent folder of the same name holds transcripts, not these."""
+    runs = []
+    for root in dirs:
+        for dp, _dirs, fs in os.walk(root):
+            if os.path.basename(dp) != "workflows" or os.path.basename(os.path.dirname(dp)) == "subagents":
+                continue
+            for f in fs:
+                if not (f.startswith("wf_") and f.endswith(".json")):
+                    continue
+                try:
+                    with open(os.path.join(dp, f), encoding="utf-8") as fh:
+                        d = json.load(fh)
+                    start = d.get("startTime")
+                    day = datetime.datetime.fromtimestamp(start / 1000, datetime.timezone.utc).strftime("%Y-%m-%d") if start else None
+                    if (since or until) and not (day and (not since or day >= since) and (not until or day <= until)):
+                        continue
+                    runs.append({"name": d.get("workflowName") or "?", "hours": (d.get("durationMs") or 0) / 3.6e6,
+                                 "agents": d.get("agentCount") or 0, "status": d.get("status") or "?"})
+                except (OSError, ValueError, TypeError):
+                    continue
+    return runs
 
 
 def summarise(m, weights):
@@ -245,8 +303,10 @@ def summarise(m, weights):
         c = cost_of(r["totals"], weights)
         kinds[r["kind"]] += c
         turns = sum(r["turns"])
+        hours = sum(r["secs"]) / 3600 if r["kind"] == "workflow-agent" else None
         out["roles"][name] = {
             "kind": r["kind"], "agents": r["agents"], "turns": turns,
+            "hours": hours, "median_min": (statistics.median(r["secs"]) / 60) if hours is not None else None,
             "median_turns": statistics.median(r["turns"]),
             "first_ctx": statistics.median(r["first_ctx"]),
             "avg_ctx": r["ctx_sum"] / max(turns, 1),
@@ -254,6 +314,15 @@ def summarise(m, weights):
             "share": c / total,
             "model_effort": dict(r["mix"].most_common(3))}
     out["kind_share"] = {k: v / total for k, v in kinds.items()}
+    wf_hours = sum(r["hours"] for r in out["roles"].values() if r["hours"] is not None)
+    out["agent_hours"] = wf_hours
+    for r in out["roles"].values():
+        r["time_share"] = (r["hours"] / wf_hours) if (r["hours"] is not None and wf_hours) else None
+    runs = m.get("workflows") or []
+    out["workflow_runs"] = len(runs)
+    out["workflow_hours"] = sum(x["hours"] for x in runs)
+    out["parallelism"] = (wf_hours / out["workflow_hours"]) if out["workflow_hours"] else None
+    out["verified"] = dict(m.get("verdicts") or {})
     att_total = sum(m["attempts"].values())
     if att_total:
         out["attempt_share"] = {str(a): c / total for a, c in sorted(m["attempts"].items())}
@@ -283,17 +352,21 @@ def report(s, top, base=None):
     print("by kind:       " + "  ".join(
         "%s %s" % (k, pct(v).strip()) for k, v in sorted(s["kind_share"].items(), key=lambda kv: -kv[1])))
     print("")
-    print("%-24s %6s %8s %6s %7s %7s %7s %7s  %s" % (
-        "role", "agents", "turns", "med.t", "ctx@1", "avg.ctx", "growth", "cost", "model/effort (share of turns)"))
+    print("%-24s %6s %8s %6s %7s %7s %7s %7s %7s %6s  %s" % (
+        "role", "agents", "turns", "med.t", "ctx@1", "avg.ctx", "growth", "cost", "time", "med.m", "model/effort (share of turns)"))
     ranked = sorted(s["roles"].items(), key=lambda kv: -kv[1]["share"])
     for name, r in ranked[:top]:
         me = r.get("model_effort") or {}
         me_txt = ", ".join("%s %d%%" % (k, round(100 * v / max(r["turns"], 1))) for k, v in me.items())
-        line = "%-24s %6d %8d %6d %7s %7s %7s %7s  %s" % (
+        line = "%-24s %6d %8d %6d %7s %7s %7s %7s %7s %6s  %s" % (
             name[:24], r["agents"], r["turns"], r["median_turns"], kilo(r["first_ctx"]),
-            kilo(r["avg_ctx"]), pct(r["growth_share"]).strip(), pct(r["share"]).strip(), me_txt)
+            kilo(r["avg_ctx"]), pct(r["growth_share"]).strip(), pct(r["share"]).strip(),
+            pct(r.get("time_share")).strip() if r.get("time_share") is not None else "-",
+            ("%.1f" % r["median_min"]) if r.get("median_min") is not None else "-", me_txt)
         if base and name in base.get("roles", {}):
             line += "   was %s" % pct(base["roles"][name]["share"]).strip()
+            if base["roles"][name].get("time_share") is not None and r.get("time_share") is not None:
+                line += " of cost, %s of time" % pct(base["roles"][name]["time_share"]).strip()
         print(line)
     if len(ranked) > top:
         rest = sum(r["share"] for _, r in ranked[top:])
@@ -303,6 +376,21 @@ def report(s, top, base=None):
     if main:
         print("orchestrator/main sessions: %d, %d turns, avg context %s, %d task notifications processed"
               % (main["agents"], main["turns"], kilo(main["avg_ctx"]), s["notifications"]))
+    if s.get("agent_hours"):
+        line = "workflow agents: %.1f agent-hours" % s["agent_hours"]
+        if s.get("workflow_runs"):
+            line += " in %d run(s) of %.1f h on the clock - %.2f agents at once (1.00 = one at a time)" % (
+                s["workflow_runs"], s["workflow_hours"], s["parallelism"] or 0)
+        else:
+            line += " (no workflow journal found, so no wall-clock for the runs)"
+        if base and base.get("agent_hours"):
+            line += "   was %.1f agent-hours" % base["agent_hours"]
+        print(line)
+    v = s.get("verified") or {}
+    if v:
+        n = sum(v.values())
+        print("verifications: %d passed, %d refused (%s refused)" % (v.get("passed", 0), v.get("refused", 0),
+                                                                      pct(v.get("refused", 0) / n).strip()))
     if s["retry_share"] is not None:
         print("retries (attempt 2+): %s of total cost" % pct(s["retry_share"]).strip()
               + (("   was %s" % pct(base["retry_share"]).strip()) if base and base.get("retry_share") is not None else ""))
@@ -315,6 +403,8 @@ def report(s, top, base=None):
                                                100 * (s["per_feature_units"] / base["per_feature_units"] - 1))
         print(line)
     print("")
+    print("time = a role's share of all workflow-agent wall-clock (first to last turn of each agent); a")
+    print("run still going has no journal yet, so its agents count in the agent-hours but not on the clock.")
     print("growth = share of a role's context tokens beyond each agent's first turn. High growth")
     print("with many turns is what a fresh agent per phase attacks; a high main-session share is")
     print("what a leaner orchestrator attacks; a high retry share is what the attempt policy attacks.")
@@ -329,10 +419,13 @@ def _write(path, lines):
             fh.write(json.dumps(d) + "\n")
 
 
-def _turn(mid, ts, inp, cw, cr, out, model="claude-sonnet-5-5", effort="high"):
-    return {"type": "assistant", "timestamp": ts, "effort": effort, "message": {"id": mid, "model": model, "usage": {
+def _turn(mid, ts, inp, cw, cr, out, model="claude-sonnet-5-5", effort="high", verdict=None):
+    d = {"type": "assistant", "timestamp": ts, "effort": effort, "message": {"id": mid, "model": model, "usage": {
         "input_tokens": inp, "cache_creation_input_tokens": cw,
         "cache_read_input_tokens": cr, "output_tokens": out}}}
+    if verdict is not None:
+        d["message"]["content"] = [{"type": "tool_use", "name": "StructuredOutput", "input": {"pass": verdict, "issues": []}}]
+    return d
 
 
 def selftest():
@@ -366,6 +459,17 @@ def selftest():
         _write(os.path.join(wf, "agent-b.jsonl"), [_turn("c1", "2026-09-10T12:00:00Z", 0, 500, 0, 10)])
         json.dump({"agentType": "workflow-subagent", "description": "build:feat-x:2"},
                   open(os.path.join(wf, "agent-b.meta.json"), "w"))
+        # Time: two verifiers (10 minutes then passed, 1 minute then refused) and the run's own journal, 4 minutes
+        # on the clock. The agents spent 120 s + 0 s (builds) + 600 s + 60 s = 780 s, so 3.25 agents at once.
+        _write(os.path.join(wf, "agent-v1.jsonl"), [_turn("v1a", "2026-09-10T14:00:00Z", 0, 100, 0, 1),
+                                                   _turn("v1b", "2026-09-10T14:10:00Z", 0, 0, 100, 1, verdict=True)])
+        json.dump({"agentType": "workflow-subagent", "description": "verify:feat-x:1"}, open(os.path.join(wf, "agent-v1.meta.json"), "w"))
+        _write(os.path.join(wf, "agent-v2.jsonl"), [_turn("v2a", "2026-09-10T15:00:00Z", 0, 100, 0, 1),
+                                                   _turn("v2b", "2026-09-10T15:01:00Z", 0, 0, 100, 1, verdict=False)])
+        json.dump({"agentType": "workflow-subagent", "description": "verify:feat-x:1"}, open(os.path.join(wf, "agent-v2.meta.json"), "w"))
+        os.makedirs(os.path.join(root, sess, "workflows"), exist_ok=True)
+        json.dump({"workflowName": "roadmap-pipeline", "status": "completed", "agentCount": 4, "durationMs": 240000,
+                   "startTime": 1789048800000}, open(os.path.join(root, sess, "workflows", "wf_1.json"), "w"))
         sub = os.path.join(root, sess, "subagents")
         _write(os.path.join(sub, "agent-c.jsonl"), [_turn("d1", "2026-09-10T13:00:00Z", 0, 200, 0, 1)])
         json.dump({"agentType": "Explore", "description": "find things"},
@@ -391,6 +495,16 @@ def selftest():
         expect("an empty window measures nothing", empty["files"] == 0 and not empty["total_units"])
         expect("the model and effort each role ran at are recorded",
                s["roles"]["build"]["model_effort"] == {"sonnet-5-5/high": 4})
+        expect("a workflow role's wall-clock is first to last turn", abs(s["roles"]["build"]["hours"] - 120 / 3600) < 1e-9
+               and s["roles"]["build"]["median_min"] == 1.0)
+        expect("a role's share of time is over workflow agents only", abs(s["roles"]["build"]["time_share"] - 120 / 780) < 1e-9
+               and abs(s["roles"]["verify"]["time_share"] - 660 / 780) < 1e-9 and s["roles"]["main-session"]["time_share"] is None)
+        expect("the run's clock comes from its journal and gives the parallelism",
+               s["workflow_runs"] == 1 and abs(s["workflow_hours"] - 240 / 3600) < 1e-9 and abs(s["parallelism"] - 3.25) < 1e-9)
+        expect("verifications are counted as passed and refused", s["verified"] == {"passed": 1, "refused": 1})
+        expect("a subagent folder named workflows is not mistaken for a journal",
+               len(workflow_runs([root], None, None)) == 1)
+        expect("a journal outside the window is left out", workflow_runs([root], "2030-01-01", None) == [])
         expect("the project path is encoded the way Claude Code stores it",
                encode_project("/root/.claude/x_y") == "-root--claude-x-y")
     finally:
