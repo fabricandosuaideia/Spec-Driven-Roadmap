@@ -70,6 +70,7 @@ DEFAULT_CONFIG = {
     "barrierGate": None,
     "barrierEvery": 0,
     "gateOrder": "gate-first",
+    "verifier": {"sensor": None, "survivor": None, "rounds": "scoped"},
     "model": None,
     "testHint": "",
     "setup": "",
@@ -343,6 +344,7 @@ def plan(root, roadmap_rel, cfg):
         "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main", "gate": cfg["gate"],
         "barrierGate": cfg.get("barrierGate") or None, "barrierEvery": int(cfg.get("barrierEvery") or 0),
         "model": cfg.get("model") or None, "gateOrder": cfg.get("gateOrder") or "gate-first",
+        "verifier": verifier_policy(cfg, ds),
         "testHint": cfg.get("testHint") or "", "setup": cfg.get("setup") or "", "push": bool(cfg.get("push")),
         "lanes": lanes, "worktreeRoot": root.rstrip("/") + ".lanes", "checklist": cfg.get("checklist"),
         "effort": cfg.get("effort") or DEFAULT_CONFIG["effort"],
@@ -361,6 +363,40 @@ SLUG_RE = re.compile(r"`?docs/ROADMAP-([A-Za-z0-9][\w-]*)\.md`?")
 
 AUTONOMY = ("decide", "unblock")
 GATE_ORDERS = ("gate-first", "verify-first")
+SURVIVOR_SEVERITIES = ("blocker", "major", "minor")
+ROUND_MODES = ("scoped", "full")
+
+
+def verifier_policy(cfg, ds):
+    """The `verifier` block, checked: a cap on mutants per tier and the severity of a survivor. Both
+    optional. `minor` is refused under tlc-spec-lean, whose completion gate refuses a PASS written
+    above a surviving mutant, so the verifier could not write the report the policy asks for."""
+    v = cfg.get("verifier") or {}
+    if not isinstance(v, dict):
+        raise RuntimeError("%s verifier takes an object: {\"sensor\": {\"A\": n, \"B\": n, \"C\": n}, \"survivor\": ...}" % CONFIG)
+    out = {}
+    sensor = v.get("sensor")
+    if sensor:
+        bad = [k for k in sensor if k not in ("A", "B", "C")] if isinstance(sensor, dict) else ["sensor"]
+        bad += [k for k, n in (sensor.items() if isinstance(sensor, dict) else [])
+                if k in ("A", "B", "C") and not (isinstance(n, int) and not isinstance(n, bool) and n >= 1)]
+        if bad:
+            raise RuntimeError("%s verifier.sensor takes a whole number of at least 1 for A, B and C; not: %s" % (CONFIG, ", ".join(sorted(set(bad)))))
+        out["sensor"] = dict(sensor)
+    survivor = v.get("survivor")
+    if survivor:
+        if survivor not in SURVIVOR_SEVERITIES:
+            raise RuntimeError("%s verifier.survivor takes %s; not: %s" % (CONFIG, ", ".join(SURVIVOR_SEVERITIES), survivor))
+        if survivor == "minor" and ds == "tlc-spec-lean":
+            raise RuntimeError("%s verifier.survivor \"minor\" cannot be used with tlc-spec-lean: its completion gate refuses a PASS "
+                               "written above a surviving mutant. Cap the mutants instead, or use tlc-spec-driven." % CONFIG)
+        out["survivor"] = survivor
+    rounds = v.get("rounds")
+    if rounds:
+        if rounds not in ROUND_MODES:
+            raise RuntimeError("%s verifier.rounds takes %s; not: %s" % (CONFIG, " or ".join(ROUND_MODES), rounds))
+        out["rounds"] = rounds
+    return out or None
 
 
 def index_sections(root):
@@ -593,6 +629,24 @@ x
         except RuntimeError as e:
             ok_order = "gateOrder" in str(e)
         expect("gateOrder takes only gate-first or verify-first", ok_order)
+        expect("no mutant cap and no survivor severity unless the config sets them",
+               not (args["verifier"] or {}).get("sensor") and not (args["verifier"] or {}).get("survivor"))
+        v1, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, verifier={"sensor": {"A": 5, "B": 3, "C": 1}, "survivor": "major"}))
+        expect("a verifier policy reaches the args", v1["verifier"] == {"sensor": {"A": 5, "B": 3, "C": 1}, "survivor": "major"})
+        try:
+            plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, verifier={"survivor": "minor"}))
+            lean_minor = False
+        except RuntimeError as e:
+            lean_minor = "tlc-spec-lean" in str(e)
+        expect("a survivor that is only minor is refused under tlc-spec-lean, whose gate would refuse the report", lean_minor)
+        for label, bad in (("a round mode that does not exist", {"rounds": "partial"}), ("a mutant cap of zero", {"sensor": {"A": 0}}), ("an unknown tier", {"sensor": {"D": 3}}),
+                           ("an unknown severity", {"survivor": "fatal"}), ("a cap that is not a number", {"sensor": {"A": "5"}})):
+            try:
+                plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, verifier=bad))
+                refused = False
+            except RuntimeError as e:
+                refused = "verifier" in str(e)
+            expect("%s is refused" % label, refused)
         expect("the barrier and the model reach the args",
                args2["barrierGate"] == "make all" and args2["barrierEvery"] == 3 and args2["model"] == "sonnet")
         rc = main(["--root", root])

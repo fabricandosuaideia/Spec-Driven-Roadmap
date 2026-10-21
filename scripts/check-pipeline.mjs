@@ -129,6 +129,31 @@ const scenarios = {
     return ['prove', 'merge', 'barrier', 'verify'].every(role => r.calls.filter(c => c.role === role).every(waits)) &&
       r.calls.some(c => c.role === 'barrier')
   },
+  // 3.39.0: the verifier's policy and its scoped rounds.
+  'with no verifier policy the verifier is told nothing about mutants': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    return !/SENSOR POLICY/.test(r.calls.find(c => c.role === 'verify').prompt)
+  },
+  'a verifier policy caps the mutants by tier and sets what a survivor is': async src => {
+    const r = await run(src, { verifier: { sensor: { A: 5, B: 3, C: 1 }, survivor: 'minor' }, features: [feat('a', 'A'), feat('b', 'C')] }, pass())
+    const va = r.calls.find(c => c.role === 'verify' && c.name === 'a').prompt, vb = r.calls.find(c => c.role === 'verify' && c.name === 'b').prompt
+    return /at most 5 mutants/.test(va) && /at most 1 mutants/.test(vb) && /surviving mutant is a minor issue/.test(va)
+  },
+  'the first round verifies everything; a later round is scoped to the refused rows and the diff': async src => {
+    const r = await run(src, { features: [feat('a', 'C')] }, pass({ verify: (n, att) => att < 3 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }))
+    const v = n => r.calls.find(c => c.role === 'verify' && c.attempt === n).prompt
+    return /ROUND 1: verify everything/.test(v(1)) && !/ROUND 2/.test(v(1)) &&
+      /ROUND 2: a verifier already refused this feature/.test(v(2)) && /SCOPED to/.test(v(2)) && /a surface the diff touched or created/.test(v(3)) && /carries forward/.test(v(3)) && /Never new mutants on code and tests that did not change/.test(v(3))
+  },
+  'rounds full turns the scoping off': async src => {
+    const r = await run(src, { verifier: { rounds: 'full' }, features: [feat('a', 'C')] }, pass({ verify: (n, att) => att < 2 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }))
+    return r.calls.filter(c => c.role === 'verify').every(c => !/ROUND \d/.test(c.prompt))
+  },
+  'a builder on a branch an earlier run refused is told to read that report first': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    const b = r.calls.find(c => c.role === 'build').prompt
+    return /an earlier run refused this feature: read that report first/.test(b)
+  },
   // 3.38.0: verify-first spends the full gate only on a feature the verifier passed.
   'verify-first runs builder, verifier, then the prover, then the merge': async src => {
     const r = await run(src, { gateOrder: 'verify-first', features: [feat('a')] }, pass())
@@ -329,6 +354,10 @@ const mutants = {
   'red barrier ignored': ['if (!green) barrierRed = merged', 'if (false) barrierRed = merged'],
   'launch request not scoped': ['never ask.\n${LAUNCHED}', 'never ask.'],
   'gate not waited for': ['tail --pid=<that PID>', 'cat <that PID>'],
+  'rounds full ignored': ["VP.rounds === 'full' ? '' : attempt > 1", 'attempt > 1'],
+  'verifier policy dropped': ['${ROUND(f, attempt)}${SENSOR_POLICY(f)}', '${ROUND(f, attempt)}'],
+  'a later round not scoped': ['? `ROUND ${attempt}: a verifier already refused this feature; ${SCOPE(f)}\\n`', '? `ROUND ${attempt}: verify everything\\n`'],
+  'builder not sent to an earlier refusal': ['an earlier run refused this feature: read that report first', 'the feature is new'],
   'verify-first ignored': ["const VERIFY_FIRST = A.gateOrder === 'verify-first'", 'const VERIFY_FIRST = false'],
   'verify-first gate result ignored': ['if (pass && VERIFY_FIRST) { pass = await proveStep(); gateRefused = !pass }', 'if (pass && VERIFY_FIRST) { await proveStep() }'],
   'verify-first runs the gate before the verdict anyway': ['if (!VERIFY_FIRST && !(await proveStep())) continue', 'if (!(await proveStep())) continue'],

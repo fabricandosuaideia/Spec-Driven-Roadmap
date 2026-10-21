@@ -602,7 +602,7 @@ them for an unattended run:
      <project-root> --sha <commit>`.
    - **The model** (`"model"`), for every agent the pipeline starts. Left `null`, they all inherit the
      session's model — say so, and say which one that is: a real run went out on a model nobody chose.
-   - **Speed — three levers, each with its price, all the user's to choose:**
+   - **Speed — four levers, each with its price, all the user's to choose:**
      - **Lanes** (`"lanes"`): how many features are proved at once, each in its own git worktree. It
        only helps features that do not depend on each other; a chain gains nothing. Before setting it
        above 1, run `python3 <this-skill-dir>/scripts/bench-gate.py --root <project-root> --lanes 2`:
@@ -637,6 +637,22 @@ them for an unattended run:
        Recommend verify-first only when the gate is long beside a verification, and say it was
        measured on one project. The price: a feature the verifier passed and the gate then refuses
        leaves a PASS report on its branch that the gate did not back — the run's account says so.
+     - **How hard the verifier's sensor pushes** (`"verifier"`: `"sensor"`, a cap of mutants per tier
+       `{"A": n, "B": n, "C": n}`, and `"survivor"`, the severity of a mutant that survives). Both are
+       unset by default, and then the verifier follows the downstream skill's own depth. On one
+       measured project a surviving mutant was named in 12 of 26 refusals, and that project's own
+       rules record "an unbounded sensor and a new gap each round" as what spent seven attempts on
+       one feature. Capping the mutants bounds the first; `"survivor": "minor"` turns a survivor into a listed note that does not
+       refuse the feature — which gives up the guarantee that every assertion can fail, so say so and
+       leave it to the user. `"minor"` works only under `tlc-spec-driven` (`tlc-spec-lean`'s
+       completion gate refuses a PASS above a surviving mutant, and `plan-pipeline.py` refuses it).
+       And `"rounds"` (`"scoped"`, the default, or `"full"`): every verification after the first is
+       scoped to the rows the last report refused and to what changed since, as `tlc-spec-lean`'s
+       verify.md already prescribes, so a refusal fixed in one round is not followed by a fresh
+       sweep that finds something new elsewhere. The price is on the other side: a scoped round
+       trusts the earlier round's verdict on the rows it carries forward, so a first round that was
+       loose leaves its loose PASS rows standing. Say so, and offer `"full"` to a user who prefers
+       to re-verify everything each time at the cost of the loop.
 
    Write their answers and `"confirmed": true` into the file. If `plan-pipeline.py` then refuses
    with features the gate "cannot decide" — a report the gate refuses, or a pending feature a

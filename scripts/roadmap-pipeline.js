@@ -29,7 +29,7 @@ export const meta = {
 //
 // args (from plan-pipeline.py): { project, skillDir, downstream, downstreamDir, statusPath, mainBranch,
 //   gate, barrierGate?, barrierEvery?, model?, waitChunk?, testHint, setup, push, lanes, worktreeRoot,
-//   checklist, effort, maxAttempts, gateOrder?, barrierPending?: { base, head },
+//   checklist, effort, maxAttempts, gateOrder?, verifier?: { sensor?: { A, B, C }, survivor?, rounds? }, barrierPending?: { base, head },
 //   features: [{ name, roadmap, tier, dependsOn[], lane, worktree?, startAttempt?, feedback? }] }
 // `gateOrder` is 'gate-first' (the default: build, prove, verify) or 'verify-first' (build, verify, and the
 // full gate only for a feature the verifier passed): see VERIFY_FIRST below.
@@ -130,7 +130,7 @@ const ANGLES = [
 const IMPLEMENT = (f, attempt, feedback) => `${COMMON(f)}
 
 ROLE: BUILDER, attempt ${attempt} of ${MAX[tierOf(f)]}. ${ANGLES[Math.min(attempt, ANGLES.length) - 1]}
-${attempt > 1 ? `First rebase feat/${f.name} onto ${MAIN}. Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
+${attempt > 1 ? `First rebase feat/${f.name} onto ${MAIN}. Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}${attempt === 1 ? `If feat/${f.name} already exists and a refused ${REPORT} is committed in .specs/features/${f.name}/, an earlier run refused this feature: read that report first and resolve every gap it lists before anything else, as an attempt after a refusal does.\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
 While you work, run only the tests related to what you touched${A.testHint ? ` (${A.testHint})` : ''}. Do NOT run the full gate and do NOT write ${REPORT}: a fresh prover and an independent verifier come after you.
 ${LONG_COMMANDS}
 ${A.checklist ? `Before you finish, check your diff against every item of ${A.checklist} (the problems reviewers kept finding in this project) and fix what fails.\n` : ''}DEFERRED SCOPE: an issue that is the declared scope of a LATER feature in the build order is not yours: name that feature in your notes and move on.
@@ -150,11 +150,32 @@ const VERIFY_RECEIPT = f => `GATES BY RECEIPT: recompute the code hash (${HASH})
 // verify-first: no receipt exists yet, and the full gate belongs to the prover who follows a PASS.
 const VERIFY_GATE = f => `THE FULL GATE (${A.gate}) RUNS AFTER YOU, by a prover, and only for a feature you pass: do not run it and do not look for a receipt. Run only this feature's tests${A.testHint ? ` (${A.testHint})` : ''} and ${DS}'s own fault injection or discrimination sensor, and in the report's gate section write the command you ran and that the full gate follows.`
 
-const VERIFY = f => `${COMMON(f)}
+// 3.39.0, from the same project: a surviving mutant was named in 12 of 26 readable refusals, and the
+// project's own rules record "an unbounded sensor and a new gap each round" as what spent seven attempts
+// on one feature. Two controls, both off unless the project sets them:
+// `verifier` in pipeline.json (a cap on mutants per tier, and the severity of a survivor), and rounds
+// after the first scoped to what was refused and what changed, as tlc-spec-lean's verify.md already
+// prescribes ("Re-verifying after a fix") and tlc-spec-driven's validate.md does not.
+const VP = A.verifier || {}
+const SENSOR_POLICY = f => {
+  const cap = VP.sensor && VP.sensor[tierOf(f)]
+  const parts = []
+  if (cap) parts.push(`at most ${cap} mutants for this feature, each chosen so that a DIFFERENT proof has to fail (one per distinct assertion surface); stop once every proof carrying a criterion has been made to fail once`)
+  if (VP.survivor) parts.push(`a surviving mutant is a ${VP.survivor} issue${VP.survivor === 'minor' ? ': list it in the report, it does not refuse the feature' : ''}`)
+  return parts.length ? `SENSOR POLICY (this project's, over ${DS}'s own default): ${parts.join('; ')}.\n` : ''
+}
+const SCOPE = f => `its report is the committed ${REPORT} in .specs/features/${f.name}/ (its commit: git log -1 --format=%H -- .specs/features/${f.name}/${REPORT}); read it first. The round is SCOPED to (1) every row of that report whose verdict was not PASS and (2) what changed since that commit (git diff <that sha>..HEAD over the files outside .specs and docs — scope by the diff, not by the fix's intent: a fix to a shared helper, fixture or config reaches further than its description). Every other row carries forward and says so ("carried from <that sha>"). The proofs re-run in full at HEAD. Fault injection is scoped the same way: a previous mutant that was killed, on code and proofs this diff did not touch, carries forward; re-inject the ones that survived and every one on a surface the diff touched or created, and add new mutants only on such a surface — the code it changed, and the code that a test or assertion it added or changed exercises (a new assertion has never been made to fail once, and a fix that only adds a test changes no code). Never new mutants on code and tests that did not change. Anything you notice outside the scope is a minor issue: list it, it does not refuse the feature.${LEAN ? ' Write the Round line as verify.md prescribes (Round: N - scoped).' : ''}`
+// `rounds: 'full'` turns the scoping off: a scoped round trusts the earlier round's verdict on the rows it carries
+// forward, so a first round that was loose leaves its loose PASS rows standing. That is the price, and the user's.
+const ROUND = (f, attempt) => VP.rounds === 'full' ? '' : attempt > 1
+  ? `ROUND ${attempt}: a verifier already refused this feature; ${SCOPE(f)}\n`
+  : `ROUND 1: verify everything. If a refused ${REPORT} from an earlier run is already committed in .specs/features/${f.name}/, this is a later round instead: ${SCOPE(f)}\n`
+
+const VERIFY = (f, attempt) => `${COMMON(f)}
 
 ROLE: VERIFIER. You did not build this; try to show it is NOT done. Follow ${DS}'s ${LEAN ? 'references/verify.md' : 'references/validate.md'} over every ${LEAN ? 'check' : 'acceptance criterion'}. You change no code.
 ${VERIFY_FIRST ? VERIFY_GATE(f) : VERIFY_RECEIPT(f)}
-${MANAGED ? REVOKED_CHECK(f) + '\n' : ''}${LEAN ? 'Write verification.md exactly as verify.md prescribes, with **Verdict**: PASS or FAIL at the top.' : 'Write validation.md from validate.md\'s template with ONE line reading "## Validation: ' + f.name + ' — PASS" or "— FAIL" as the only verdict the gate can see: relabel the sensor and gate-check result fields (**Sensor verdict** —, **Gate outcome** —); per-criterion rows say MET or NOT MET, never PASS.'} Cite file:line evidence. Commit the report.
+${ROUND(f, attempt)}${SENSOR_POLICY(f)}${MANAGED ? REVOKED_CHECK(f) + '\n' : ''}${LEAN ? 'Write verification.md exactly as verify.md prescribes, with **Verdict**: PASS or FAIL at the top.' : 'Write validation.md from validate.md\'s template with ONE line reading "## Validation: ' + f.name + ' — PASS" or "— FAIL" as the only verdict the gate can see: relabel the sensor and gate-check result fields (**Sensor verdict** —, **Gate outcome** —); per-criterion rows say MET or NOT MET, never PASS.'} Cite file:line evidence. Commit the report.
 Then run the completion gate: python3 ${DSDIR}/scripts/${GATE_SCRIPT} ${f.name} --root ${wt(f)} — and report its exit code as the script returned it, never through a pipe.${tierOf(f) === 'C' ? '\nThis is a tier C feature and no reviewer follows you: review the diff for correctness, security and weak tests as well, and list those issues too.' : ''}
 Reply with gateExit, pass (true only if gateExit is 0, every ${LEAN ? 'check' : 'criterion'} holds and you found no blocker or major issue), notMet and issues.`
 
@@ -353,7 +374,7 @@ const runFeature = async f => {
       return false
     }
     if (!VERIFY_FIRST && !(await proveStep())) continue
-    const thunks = [() => agent(VERIFY(f), { phase: 'Verify', label: `verify:${f.name}:${attempt}`, schema: VERIFY_SCHEMA, effort: effortFor('verify', f), ...MODEL })]
+    const thunks = [() => agent(VERIFY(f, attempt), { phase: 'Verify', label: `verify:${f.name}:${attempt}`, schema: VERIFY_SCHEMA, effort: effortFor('verify', f), ...MODEL })]
     if (tier === 'A') thunks.push(() => agent(REVIEW(f), { phase: 'Verify', label: `review:${f.name}:${attempt}`, schema: REVIEW_SCHEMA, effort: effortFor('review', f), ...MODEL }))
     const [ver, rev] = await parallel(thunks)
     let pass = !!(ver && ver.pass && ver.gateExit === 0 && serious(ver.issues).length === 0 &&

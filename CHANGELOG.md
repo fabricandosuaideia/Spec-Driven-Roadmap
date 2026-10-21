@@ -9,6 +9,51 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.39.0 — 2026-10-21
+
+**The verifier's sensor can be capped and its survivors graded, and a refusal fixed in one round is
+re-verified by scope instead of by a fresh sweep** (Infinity-Agent-Creator, skill 3.38.0, third step of
+the time review). On that project a surviving mutant was named in 12 of 26 readable refusals, and its
+own rules record "an unbounded sensor and a new gap each round" as what spent seven attempts on one
+feature. `tlc-spec-driven`'s own default is 1-3 mutants per feature; the unbounded sensor came from the
+project's rules, so the control belongs to the pipeline, not to the downstream skill.
+
+- **`verifier` in `pipeline.json`**, all of it optional and absent by default:
+  - `sensor`: `{"A": n, "B": n, "C": n}`, the most mutants for a feature of that tier, each chosen so a
+    different proof has to fail (it names `tlc-spec-lean`'s own "one per distinct assertion surface").
+  - `survivor`: `blocker` | `major` | `minor`. `minor` lists a survivor without refusing the feature;
+    `plan-pipeline.py` refuses it under `tlc-spec-lean`, whose completion gate (`validate_verification.py`)
+    refuses a PASS above a fault row reading `no`. `tlc-spec-driven`'s gate does not read the sensor.
+  - `rounds`: `scoped` (default) or `full`. A verification after the first is scoped to the rows the last
+    report refused and to what changed since its commit, scoped by the diff and not by the fix's intent;
+    other rows say "carried from <sha>"; proofs re-run in full; a previous mutant killed on untouched
+    code carries forward, the ones that survived and those on a surface the diff touched or created are
+    re-injected, and new ones go only on such a surface. What is noticed elsewhere is a `minor` issue.
+    The builder of a branch an earlier run refused is told to read that report first, which replaces
+    the attempt counter the pipeline never persisted (`startAttempt` and `feedback` are accepted but
+    nothing ever wrote them).
+- **The price is on the unsafe side, and it is written down.** A scoped round trusts the earlier round's
+  verdict on the rows it carries forward, so a loose first round leaves its loose PASS rows standing: in
+  the fixture below the control found two real gaps in a criterion nobody had touched, and the scoped
+  rounds did not. That is why `rounds: "full"` exists, and why Step 10 says it to the user.
+- **`check-pipeline.mjs`:** 5 scenarios and 4 mutants (policy dropped, scoping dropped, `full` ignored,
+  the builder not sent to an earlier refusal); `plan-pipeline.py --selftest` 8 new assertions (values,
+  tiers, the lean refusal).
+
+**Executed, on a small fixture (three functions, three criteria, a round-1 FAIL and a fix that only
+adds a test), 4 blind Sonnet verifiers each in its own copy:** the **control**, with neither the round
+text nor the policy, refused with 19 mutants and a new `major` gap on code the fix had not touched
+(AC-3) — the pattern above, reproduced. With the text: 1 run found a defect in my wording (the fix
+added a test and changed no code, so "mutants only on code the diff touched" left the new test never
+made to fail — the verifier said so itself); I changed the text to the surface the diff touched *or
+created* and to carry forward killed mutants on untouched surfaces (the cap and the re-injection
+disagreed), then **2/2** passed scoped, cited the carried rows, injected the new mutant on the new
+test's surface and listed the untouched `clamp` guard as `minor`. **Not executed:** a real Workflow run;
+`rounds: "full"` and the `survivor: "minor"` path beyond stubs and the planner; any fixture where the
+scoped verifier should have refused. One fixture, one downstream skill (`tlc-spec-driven`).
+
+---
+
 ## 3.38.0 — 2026-10-21
 
 **The full gate can run after the verifier instead of before it — an option, not a new default**
