@@ -29,8 +29,10 @@ export const meta = {
 //
 // args (from plan-pipeline.py): { project, skillDir, downstream, downstreamDir, statusPath, mainBranch,
 //   gate, barrierGate?, barrierEvery?, model?, waitChunk?, testHint, setup, push, lanes, worktreeRoot,
-//   checklist, effort, maxAttempts, barrierPending?: { base, head },
+//   checklist, effort, maxAttempts, gateOrder?, barrierPending?: { base, head },
 //   features: [{ name, roadmap, tier, dependsOn[], lane, worktree?, startAttempt?, feedback? }] }
+// `gateOrder` is 'gate-first' (the default: build, prove, verify) or 'verify-first' (build, verify, and the
+// full gate only for a feature the verifier passed): see VERIFY_FIRST below.
 // `gate` is what every feature must pass before it merges; `barrierGate`, when a project keeps its
 // whole suite for a batch barrier, runs on the merged main branch every `barrierEvery` merges (0 =
 // once, at the end). `barrierPending` is set when code reached the main branch after the last green
@@ -53,6 +55,13 @@ const BARRIER_EVERY = Math.max(0, A.barrierEvery || 0)
 const CHUNK = Math.max(30, Math.min(540, A.waitChunk || 540))
 if (!P || !SKILL || !DS || !DSDIR || !A.gate) throw new Error('args incomplete: run plan-pipeline.py and pass its output as args')
 const MODEL = A.model ? { model: A.model } : {}
+// 3.38.0, from a project whose gate took 24 minutes (Infinity-Agent-Creator): the full gate ran before the
+// verifier on every attempt, and 28 of the 37 attempts that reached the verifier were refused, so 28 gates
+// bought a refusal that did not need them. 11 of 48 provers did catch a real failure first (lint, a stale
+// test, a regression elsewhere), so the order is a trade and the user's: verify-first spends a verifier
+// run on those 11 and saves a gate on every attempt the verifier refuses. It pays when the gate is long
+// beside a verification (bench-gate.py times it); a short gate loses by it.
+const VERIFY_FIRST = A.gateOrder === 'verify-first'
 // Set by manager-pipeline.js only. In manager mode nobody is there to authorise a test correction,
 // and on a real project two features in two days each spent five attempts and stopped the chain on
 // tests asserting behaviour the owner had revoked; the owner authorised the same correction by hand
@@ -129,18 +138,22 @@ Reply ready=true once every change is committed, even though the full gate has n
 
 const PROVE = f => `${COMMON(f)}
 
-ROLE: PROVER, on a fresh context. A builder already committed this feature on feat/${f.name}; you did not write it. Do not re-implement and do not widen scope.
+ROLE: PROVER, on a fresh context. A builder already committed this feature on feat/${f.name}${VERIFY_FIRST ? ' and an independent verifier has passed it' : ''}; you did not write it. Do not re-implement and do not widen scope${VERIFY_FIRST ? ', and do not verify again: you are the last step before the merge' : ''}.
 1. Rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
 2. Run the GATE once on this exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
    A failure is a defect, never "environmental": reply ready=false naming the failing test or file, and fix nothing.
 3. Write .specs/features/${f.name}/gate-receipt.json as {"codeHash":"<output of: ${HASH}>","gate":"pass","command":<the gate command>} and commit it.
 Reply ready=true only when the rebase is clean, the gate finished and passed, and the receipt is committed.`
 
+const VERIFY_RECEIPT = f => `GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, run the gate yourself (${A.gate}) — ${RUN_GATE(A.gate, wt(f))}
+   and report the mismatch as a minor issue.`
+// verify-first: no receipt exists yet, and the full gate belongs to the prover who follows a PASS.
+const VERIFY_GATE = f => `THE FULL GATE (${A.gate}) RUNS AFTER YOU, by a prover, and only for a feature you pass: do not run it and do not look for a receipt. Run only this feature's tests${A.testHint ? ` (${A.testHint})` : ''} and ${DS}'s own fault injection or discrimination sensor, and in the report's gate section write the command you ran and that the full gate follows.`
+
 const VERIFY = f => `${COMMON(f)}
 
 ROLE: VERIFIER. You did not build this; try to show it is NOT done. Follow ${DS}'s ${LEAN ? 'references/verify.md' : 'references/validate.md'} over every ${LEAN ? 'check' : 'acceptance criterion'}. You change no code.
-GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, run the gate yourself (${A.gate}) — ${RUN_GATE(A.gate, wt(f))}
-   and report the mismatch as a minor issue.
+${VERIFY_FIRST ? VERIFY_GATE(f) : VERIFY_RECEIPT(f)}
 ${MANAGED ? REVOKED_CHECK(f) + '\n' : ''}${LEAN ? 'Write verification.md exactly as verify.md prescribes, with **Verdict**: PASS or FAIL at the top.' : 'Write validation.md from validate.md\'s template with ONE line reading "## Validation: ' + f.name + ' — PASS" or "— FAIL" as the only verdict the gate can see: relabel the sensor and gate-check result fields (**Sensor verdict** —, **Gate outcome** —); per-criterion rows say MET or NOT MET, never PASS.'} Cite file:line evidence. Commit the report.
 Then run the completion gate: python3 ${DSDIR}/scripts/${GATE_SCRIPT} ${f.name} --root ${wt(f)} — and report its exit code as the script returned it, never through a pipe.${tierOf(f) === 'C' ? '\nThis is a tier C feature and no reviewer follows you: review the diff for correctness, security and weak tests as well, and list those issues too.' : ''}
 Reply with gateExit, pass (true only if gateExit is 0, every ${LEAN ? 'check' : 'criterion'} holds and you found no blocker or major issue), notMet and issues.`
@@ -323,6 +336,7 @@ const runFeature = async f => {
   const tier = tierOf(f)
   let feedback = f.feedback || null
   let passedAt = 0
+  let staleReport = false
   for (let attempt = f.startAttempt || 1; attempt <= MAX[tier] && !passedAt; attempt++) {
     if (barrierRed) { hold(f); return }
     const built = await agent(IMPLEMENT(f, attempt, feedback), { phase: 'Build', label: `build:${f.name}:${attempt}`, schema: BUILD_SCHEMA, effort: effortFor('implement', f), ...MODEL })
@@ -330,19 +344,27 @@ const runFeature = async f => {
       feedback = [{ severity: 'blocker', where: 'build', problem: 'the builder did not finish: ' + (built ? built.blockers.join('; ') : 'no result'), fix: 'finish the work on the existing branch' }]
       continue
     }
-    const proved = await agent(PROVE(f), { phase: 'Build', label: `prove:${f.name}:${attempt}`, schema: PROVE_SCHEMA, effort: effortFor('prove', f), ...MODEL })
-    if (!proved || !proved.ready) {
+    let gateRefused = false
+    const proveStep = async () => {
+      const proved = await agent(PROVE(f), { phase: 'Build', label: `prove:${f.name}:${attempt}`, schema: PROVE_SCHEMA, effort: effortFor('prove', f), ...MODEL })
+      if (proved && proved.ready) return true
       feedback = ((proved && proved.blockers.length) ? proved.blockers : ['the prover did not finish, or the gate failed'])
         .map(b => ({ severity: 'blocker', where: 'prove', problem: b, fix: 'make the gate pass on the rebased tree' }))
-      continue
+      return false
     }
+    if (!VERIFY_FIRST && !(await proveStep())) continue
     const thunks = [() => agent(VERIFY(f), { phase: 'Verify', label: `verify:${f.name}:${attempt}`, schema: VERIFY_SCHEMA, effort: effortFor('verify', f), ...MODEL })]
     if (tier === 'A') thunks.push(() => agent(REVIEW(f), { phase: 'Verify', label: `review:${f.name}:${attempt}`, schema: REVIEW_SCHEMA, effort: effortFor('review', f), ...MODEL }))
     const [ver, rev] = await parallel(thunks)
-    const pass = !!(ver && ver.pass && ver.gateExit === 0 && serious(ver.issues).length === 0 &&
+    let pass = !!(ver && ver.pass && ver.gateExit === 0 && serious(ver.issues).length === 0 &&
       (tier !== 'A' || (rev && serious(rev.issues).length === 0)))
-    log(`${f.name}: attempt ${attempt} ${pass ? 'passed' : 'refused'}`)
+    // verify-first: the full gate runs only now, for a feature that was passed. A refusal here leaves a PASS
+    // report on the branch that the gate did not back; it is said in the run's account, not hidden.
+    if (pass && VERIFY_FIRST) { pass = await proveStep(); gateRefused = !pass }
+    staleReport = gateRefused
+    log(`${f.name}: attempt ${attempt} ${pass ? 'passed' : gateRefused ? 'passed verification, refused by the gate' : 'refused'}`)
     if (pass) { passedAt = attempt; break }
+    if (gateRefused) continue
     feedback = [...serious(ver && ver.issues), ...serious(rev && rev.issues),
       ...((ver && ver.notMet) || []).map(n => ({ severity: 'blocker', where: 'criterion', problem: 'not met: ' + n, fix: 'meet it' }))]
     if (ver && ver.gateExit !== 0 && !feedback.length) feedback.push({ severity: 'blocker', where: 'gate', problem: `${GATE_SCRIPT} exited ${ver.gateExit}`, fix: 'read the report the verifier wrote' })
@@ -350,7 +372,8 @@ const runFeature = async f => {
   }
   if (!passedAt) {
     blocked.add(f.name)
-    outcomes.push({ name: f.name, result: 'blocked', lastIssues: (feedback || []).slice(0, 5) })
+    outcomes.push({ name: f.name, result: 'blocked', lastIssues: (feedback || []).slice(0, 5),
+      ...(staleReport ? { because: `branch feat/${f.name} carries a PASS report that the gate refused` } : {}) })
     log(`${f.name}: blocked after ${MAX[tier]} attempts`)
     return
   }

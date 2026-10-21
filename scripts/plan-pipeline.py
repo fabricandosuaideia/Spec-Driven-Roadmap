@@ -69,6 +69,7 @@ DEFAULT_CONFIG = {
     "gate": "",
     "barrierGate": None,
     "barrierEvery": 0,
+    "gateOrder": "gate-first",
     "model": None,
     "testHint": "",
     "setup": "",
@@ -292,6 +293,8 @@ def plan(root, roadmap_rel, cfg):
     entries = {n: f for n, f, _b in CR.parse_features(text)}
     status = os.path.join("docs", "ROADMAP-INDEX.md") if os.path.isfile(os.path.join(root, "docs", "ROADMAP-INDEX.md")) \
         else os.path.join("docs", "ROADMAP.md")
+    if (cfg.get("gateOrder") or "gate-first") not in GATE_ORDERS:
+        raise RuntimeError("%s gateOrder takes %s; not: %s" % (CONFIG, " or ".join(GATE_ORDERS), cfg.get("gateOrder")))
     done, pending, discharged, doubtful = classify(root, ds, ds_dir, entries, order, cfg, roadmap_rel)
     if doubtful:
         raise RuntimeError(doubtful_message(doubtful))
@@ -339,7 +342,7 @@ def plan(root, roadmap_rel, cfg):
         "project": root, "skillDir": SKILL_DIR, "downstream": ds, "downstreamDir": ds_dir,
         "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main", "gate": cfg["gate"],
         "barrierGate": cfg.get("barrierGate") or None, "barrierEvery": int(cfg.get("barrierEvery") or 0),
-        "model": cfg.get("model") or None,
+        "model": cfg.get("model") or None, "gateOrder": cfg.get("gateOrder") or "gate-first",
         "testHint": cfg.get("testHint") or "", "setup": cfg.get("setup") or "", "push": bool(cfg.get("push")),
         "lanes": lanes, "worktreeRoot": root.rstrip("/") + ".lanes", "checklist": cfg.get("checklist"),
         "effort": cfg.get("effort") or DEFAULT_CONFIG["effort"],
@@ -357,6 +360,7 @@ SLUG_RE = re.compile(r"`?docs/ROADMAP-([A-Za-z0-9][\w-]*)\.md`?")
 
 
 AUTONOMY = ("decide", "unblock")
+GATE_ORDERS = ("gate-first", "verify-first")
 
 
 def index_sections(root):
@@ -580,6 +584,15 @@ x
                args["barrierGate"] is None and args["barrierEvery"] == 0 and args["model"] is None)
         args2, _ = plan(root, os.path.join("docs", "ROADMAP.md"),
                         dict(cfg, barrierGate="make all", barrierEvery=3, model="sonnet"))
+        expect("the gate runs first unless the config says otherwise", args["gateOrder"] == "gate-first")
+        args3, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, gateOrder="verify-first"))
+        expect("gateOrder verify-first reaches the args", args3["gateOrder"] == "verify-first")
+        try:
+            plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, gateOrder="gate-last"))
+            ok_order = False
+        except RuntimeError as e:
+            ok_order = "gateOrder" in str(e)
+        expect("gateOrder takes only gate-first or verify-first", ok_order)
         expect("the barrier and the model reach the args",
                args2["barrierGate"] == "make all" and args2["barrierEvery"] == 3 and args2["model"] == "sonnet")
         rc = main(["--root", root])

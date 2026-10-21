@@ -96,11 +96,11 @@ section against the code as the previous ones left it.
 4. **How much per run.** `manager.sectionsPerRun` (default 4): a Workflow run caps its agents at 1000,
    and a section of ten tier-A features can use a hundred. The manager stops at the cap and says so;
    launching again continues.
-5. **Speed.** The same two levers as option C, with the same prices — handover-prompt.md, Step 10,
-   "Option C — the pipeline": `lanes` (measure first with `bench-gate.py --lanes 2`) and the
-   builder's effort at tier A. A third happens by itself: Phase 2 groups small same-area units into
-   one feature (decompose-phase.md Step 3), so a section of small fixes pays the per-feature cycle
-   fewer times.
+5. **Speed.** The same three levers as option C, with the same prices — handover-prompt.md, Step 10,
+   "Option C — the pipeline": `lanes` (measure first with `bench-gate.py --lanes 2`), the builder's
+   effort at tier A, and `gateOrder` (whether the full gate runs before or after the verifier). A
+   fourth happens by itself: Phase 2 groups small same-area units into one feature
+   (decompose-phase.md Step 3), so a section of small fixes pays the per-feature cycle fewer times.
 6. **The level.** `manager.autonomy`: `decide` (the default) or `unblock` — ask, with the price of each
    as "Two levels — how much permission the owner gives" above states it, and write the owner's answer; never raise it yourself.
 7. **Optionally, a stronger model for the decisions.** `manager.decomposeModel` sets the decomposer's

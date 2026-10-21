@@ -129,6 +129,31 @@ const scenarios = {
     return ['prove', 'merge', 'barrier', 'verify'].every(role => r.calls.filter(c => c.role === role).every(waits)) &&
       r.calls.some(c => c.role === 'barrier')
   },
+  // 3.38.0: verify-first spends the full gate only on a feature the verifier passed.
+  'verify-first runs builder, verifier, then the prover, then the merge': async src => {
+    const r = await run(src, { gateOrder: 'verify-first', features: [feat('a')] }, pass())
+    return r.calls.map(c => c.role).join() === 'build,verify,prove,merge,record'
+  },
+  'verify-first never runs the gate for a feature the verifier refuses': async src => {
+    const r = await run(src, { gateOrder: 'verify-first', features: [feat('a', 'C')] }, pass({ verify: () => ({ gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] }) }))
+    return r.calls.filter(c => c.role === 'build').length === 3 && !r.calls.some(c => c.role === 'prove') && line(r.out, 'a').includes('blocked')
+  },
+  'verify-first: a gate that refuses a passed feature costs an attempt and is said in the account': async src => {
+    const r = await run(src, { gateOrder: 'verify-first', features: [feat('a', 'C')] }, pass({ prove: () => ({ ready: false, notes: '', blockers: ['tests/test_x.py::test_y red'] }) }))
+    const b3 = r.calls.find(c => c.role === 'build' && c.attempt === 2)
+    return r.calls.filter(c => c.role === 'build').length === 3 && !r.calls.some(c => c.role === 'merge') &&
+      !!b3 && /test_y red/.test(b3.prompt) && /PASS report that the gate refused/.test(line(r.out, 'a'))
+  },
+  'verify-first: the verifier is told not to run the full gate and finds no receipt': async src => {
+    const r = await run(src, { gateOrder: 'verify-first', features: [feat('a')] }, pass())
+    const v = r.calls.find(c => c.role === 'verify'), p = r.calls.find(c => c.role === 'prove')
+    return !!v && /RUNS AFTER YOU/.test(v.prompt) && !/GATES BY RECEIPT/.test(v.prompt) && !!p && /an independent verifier has passed it/.test(p.prompt)
+  },
+  'by default the prover still comes first and the verifier reuses its receipt': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    const v = r.calls.find(c => c.role === 'verify')
+    return /GATES BY RECEIPT/.test(v.prompt) && !/RUNS AFTER YOU/.test(v.prompt) && !r.calls.find(c => c.role === 'prove').prompt.includes('has passed it')
+  },
   // 3.37.0: three builders ended with a job running ("waiting for the monitor"), which spends the attempt.
   'a builder is told to wait for what it starts, never to watch it and reply': async src => {
     const r = await run(src, { waitChunk: 60, features: [feat('a')] }, pass())
@@ -304,6 +329,9 @@ const mutants = {
   'red barrier ignored': ['if (!green) barrierRed = merged', 'if (false) barrierRed = merged'],
   'launch request not scoped': ['never ask.\n${LAUNCHED}', 'never ask.'],
   'gate not waited for': ['tail --pid=<that PID>', 'cat <that PID>'],
+  'verify-first ignored': ["const VERIFY_FIRST = A.gateOrder === 'verify-first'", 'const VERIFY_FIRST = false'],
+  'verify-first gate result ignored': ['if (pass && VERIFY_FIRST) { pass = await proveStep(); gateRefused = !pass }', 'if (pass && VERIFY_FIRST) { await proveStep() }'],
+  'verify-first runs the gate before the verdict anyway': ['if (!VERIFY_FIRST && !(await proveStep())) continue', 'if (!(await proveStep())) continue'],
   'builder not told to wait for a long command': ['${LONG_COMMANDS}\n${A.checklist ?', '${A.checklist ?'],
   'verifier not told to check test changes in manager mode': ["${MANAGED ? REVOKED_CHECK(f) + '\\n' : ''}", ''],
   'barrier only at the end': ['if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()', ''],

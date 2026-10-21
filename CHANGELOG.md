@@ -9,6 +9,40 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.38.0 — 2026-10-21
+
+**The full gate can run after the verifier instead of before it — an option, not a new default**
+(Infinity-Agent-Creator, skill 3.37.0, second step of the time review). On that project the gate took
+~24 minutes and ran before the verifier on every attempt that reached it: 28 of the 37 attempts the
+verifier saw were refused, so 28 gates bought a refusal that did not need them (~11 agent-hours of 38.7
+by arithmetic over the journals, not a measured outcome).
+
+- **It is a trade, so it is the user's.** The gate did catch something first in 11 of 48 prover runs
+  (3 lint, 5 a stale test, the rest a regression in a test the feature did not touch); verify-first
+  spends one verification on each of those and saves a gate on every attempt the verifier refuses. It
+  pays when the gate is long beside a verification (here 24 min against 7), and loses when the gate is
+  short — the same project's gate after a 4× faster suite would pay far less. So `pipeline.json` gets
+  `"gateOrder"`: `"gate-first"` (the default, behaviour unchanged) or `"verify-first"`;
+  `plan-pipeline.py` refuses any other value; Step 10 and manager mode ask about it with the numbers
+  above, saying they come from one project.
+- **verify-first runs** build, verify (and review for tier A), and only then the prover and its gate. The
+  verifier is told the full gate follows it and that there is no receipt to look for; the prover is told
+  a verifier has passed the feature and is the last step before the merge. A gate that refuses a passed
+  feature costs an attempt, its failure is the next builder's feedback, and a feature blocked that way
+  says in the run's account that its branch carries a PASS report the gate refused. `is_done` reads the
+  main working tree, so that report is not read as done once the record step has checked out main; it
+  would be if a run were killed first.
+- **`check-pipeline.mjs`:** 5 scenarios (the call order, no gate for a refused feature, a refused gate
+  costing an attempt and being reported, the two prompts, the default untouched) and 3 mutants, all
+  caught; `plan-pipeline.py --selftest` 3 new assertions.
+
+**Executed:** the stubbed control flow and the planner's self-test above; the release gate. **Not
+executed:** a real Workflow run with real agents in this order — the Workflow tool is launched only on
+the user's request, and the two new prompt paragraphs have not been read by a blind agent. What the
+option saves on a real project is to be read from its journals with `measure-agents.py`.
+
+---
+
 ## 3.37.0 — 2026-10-20
 
 **A builder no longer ends its attempt with a job still running** (Infinity-Agent-Creator, skill 3.36.0,

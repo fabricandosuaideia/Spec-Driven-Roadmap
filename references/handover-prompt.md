@@ -602,7 +602,7 @@ them for an unattended run:
      <project-root> --sha <commit>`.
    - **The model** (`"model"`), for every agent the pipeline starts. Left `null`, they all inherit the
      session's model — say so, and say which one that is: a real run went out on a model nobody chose.
-   - **Speed — two levers, each with its price, both the user's to choose:**
+   - **Speed — three levers, each with its price, all the user's to choose:**
      - **Lanes** (`"lanes"`): how many features are proved at once, each in its own git worktree. It
        only helps features that do not depend on each other; a chain gains nothing. Before setting it
        above 1, run `python3 <this-skill-dir>/scripts/bench-gate.py --root <project-root> --lanes 2`:
@@ -622,9 +622,21 @@ them for an unattended run:
        choice: a hook would be one more thing for every project to get right, and the gate already
        runs at every point a lane's resources are needed.
      - **The builder's effort at risk tier A** (`"effort"` → `"implement"` → `"A"`, `"xhigh"` by
-       default). Builders took two thirds of a measured run's time; `"high"` thinks less per turn. What
-       it does to quality and to refused attempts is not measured — say that, and offer to compare
-       with `measure-agents.py` after a few features.
+       default). Builders took two thirds of a measured run's time on one project and a quarter on
+       another (a long gate, see the next lever), so look at where the time goes before choosing;
+       `"high"` thinks less per turn. What it does to quality and to refused attempts is not
+       measured — say that, and offer to compare with `measure-agents.py` after a few features.
+     - **When the full gate runs** (`"gateOrder"`: `"gate-first"`, the default, or `"verify-first"`).
+       Gate-first runs the whole gate before the verifier, so a feature the gate refuses never costs a
+       verification. Verify-first runs the verifier first and the gate only on a feature it passed, so
+       a feature the verifier refuses never costs a gate. Which wins depends on two numbers of the
+       project: how long the gate takes beside a verification (`bench-gate.py` times the gate), and how
+       often each refuses. On one measured project (gate 24 minutes, a verification 7) the verifier
+       refused 28 of 37 attempts and the gate 11 of 48, so verify-first spends one extra verification
+       on each of those 11 and saves a gate on each of those 28; with a gate of a few minutes it loses.
+       Recommend verify-first only when the gate is long beside a verification, and say it was
+       measured on one project. The price: a feature the verifier passed and the gate then refuses
+       leaves a PASS report on its branch that the gate did not back — the run's account says so.
 
    Write their answers and `"confirmed": true` into the file. If `plan-pipeline.py` then refuses
    with features the gate "cannot decide" — a report the gate refuses, or a pending feature a
