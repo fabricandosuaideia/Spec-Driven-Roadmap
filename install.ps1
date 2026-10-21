@@ -16,6 +16,14 @@
 .PARAMETER Force
     Overwrite an existing install without prompting.
 
+.PARAMETER Diff
+    With the list of changed files, also print what each one changed (the lines that differ from the release, at
+    most 80 per file) - the way to learn what a local patch was for.
+
+.PARAMETER Check
+    Change nothing: print the installed version, the available one, and which files of the installed copy differ
+    from the release it claims to be.
+
 .EXAMPLE
     irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/main/install.ps1 | iex
 
@@ -27,7 +35,9 @@
 [CmdletBinding()]
 param(
     [switch]$Global,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$Check,
+    [switch]$Diff
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,6 +45,8 @@ $ErrorActionPreference = 'Stop'
 $Repo      = 'fabricandosuaideia/Spec-Driven-Roadmap'
 $Branch    = if ($env:SDR_BRANCH) { $env:SDR_BRANCH } else { 'main' }
 $SkillName = 'spec-driven-roadmap'
+# Where the release archives live. Only tests change it (a file:// folder), so nothing here needs the network.
+$ArchiveBase = if ($env:SDR_ARCHIVE_BASE) { $env:SDR_ARCHIVE_BASE } else { "https://github.com/$Repo/archive/refs" }
 
 # The skill is these files and nothing else. Used to validate the download
 # before anything on disk is touched.
@@ -48,6 +60,7 @@ $RequiredRefs = @(
     'loop-tlc-spec-driven.md',
     'loop-tlc-spec-lean.md',
     'upgrade-project.md',
+    'upgrade-notes.md',
     'manager-mode.md'
 )
 
@@ -99,7 +112,7 @@ if ($Global) {
 # `irm ... | iex` cannot pass parameters, so an interactive prompt is the only
 # way a piped user can confirm. When the host is non-interactive we refuse
 # loudly rather than guessing.
-if ((Test-Path -LiteralPath $Dest) -and -not $Force) {
+if ((Test-Path -LiteralPath $Dest) -and -not $Force -and -not $Check) {
     Write-Host "An existing install was found at: $Dest"
     $interactive = $Host.UI.RawUI -and -not [Console]::IsInputRedirected
     if ($interactive) {
@@ -116,6 +129,45 @@ if ((Test-Path -LiteralPath $Dest) -and -not $Force) {
     }
 }
 
+# --- What did the project change in its copy of the skill? ------------------
+# Same idea as install.sh: an installed copy patched locally is replaced by a plain install without a word, and
+# whatever setting depended on the patch stops working. The comparison is against the release the copy CLAIMS to be
+# (its own version's archive), over the files of the installed copy. Any failure only means "could not check".
+function Get-Archive {
+    param([string]$Url, [string]$OutFile)
+    if ($Url -like 'file://*') {
+        $local = ([Uri]$Url).LocalPath
+        Copy-Item -LiteralPath $local -Destination $OutFile -Force
+    } else {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
+    }
+}
+function Get-ReleaseTree {
+    param([string]$Version, [string]$Work)
+    if ($Version -eq 'unknown') { return $null }
+    try {
+        $zip = Join-Path $Work 'old.zip'
+        Get-Archive "$ArchiveBase/tags/v$Version.zip" $zip
+        $dir = Join-Path $Work 'old'
+        Expand-Archive -Path $zip -DestinationPath $dir -Force
+        $tree = Get-ChildItem -Path $dir -Directory | Where-Object { $_.Name -like 'Spec-Driven-Roadmap-*' } | Select-Object -First 1
+        if ($tree) { return $tree.FullName }
+    } catch { }
+    return $null
+}
+function Get-LocalChanges {
+    param([string]$Installed, [string]$Release)
+    $base = (Resolve-Path -LiteralPath $Installed).Path
+    foreach ($f in (Get-ChildItem -LiteralPath $base -Recurse -File | Sort-Object FullName)) {
+        $rel = $f.FullName.Substring($base.Length).TrimStart('\', '/')
+        if ($rel -match '\.pyc$' -or $rel -match '__pycache__' -or $rel -eq '.skill-meta.json') { continue }
+        $orig = Join-Path $Release $rel
+        if (-not (Test-Path -LiteralPath $orig)) { "added    $($rel -replace '\\', '/')" }
+        elseif ((Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $orig -Algorithm SHA256).Hash) { "modified $($rel -replace '\\', '/')" }
+    }
+}
+
 $Tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("sdr-" + [Guid]::NewGuid().ToString('N'))
 # Declared out here so `finally` can clean it too, and PID-suffixed to match
 # install.sh and survive two concurrent runs. $Stage is a sibling of $Dest -
@@ -126,12 +178,10 @@ New-Item -ItemType Directory -Path $Tmp -Force | Out-Null
 
 try {
     Write-Status "Downloading $SkillName ($Branch)..."
-    $zipUrl = "https://github.com/$Repo/archive/refs/heads/$Branch.zip"
+    $zipUrl = "$ArchiveBase/heads/$Branch.zip"
     $zip    = Join-Path $Tmp 'skill.zip'
     try {
-        # TLS 1.2 for older Windows PowerShell defaults.
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $zipUrl -OutFile $zip -UseBasicParsing
+        Get-Archive $zipUrl $zip
     } catch {
         Write-Fail "Failed to download $zipUrl"
         Write-Host 'If the repository is private, GitHub returns 404 to unauthenticated requests.' -ForegroundColor Yellow
@@ -166,15 +216,62 @@ try {
     # already on disk are both available - say it out loud, or a user sitting
     # on an old install has no way to tell.
     $newVersion = Get-SkillVersion (Join-Path $src.FullName 'SKILL.md')
+    $oldVersion = 'none'
     if (Test-Path -LiteralPath $Dest) {
         $oldVersion = Get-SkillVersion (Join-Path $Dest 'SKILL.md')
-        if ($oldVersion -eq $newVersion) {
+        if ($Check) {
+            if ($oldVersion -eq $newVersion) { Write-Status "installed $oldVersion is the version available" }
+            else { Write-Status "installed $oldVersion, available $newVersion" }
+        } elseif ($oldVersion -eq $newVersion) {
             Write-Status "already at $newVersion - reinstalling"
         } else {
             Write-Status "installing $newVersion (replacing $oldVersion)"
         }
+    } elseif ($Check) {
+        Write-Status "nothing installed here; available $newVersion"
     } else {
         Write-Status "installing $newVersion"
+    }
+
+    $changes = @()
+    if (Test-Path -LiteralPath $Dest) {
+        $relTree = Get-ReleaseTree $oldVersion $Tmp
+        if ($relTree) {
+            $changes = @(Get-LocalChanges $Dest $relTree)
+            if ($changes.Count -gt 0) {
+                Write-Host "! $($changes.Count) file(s) of the installed copy differ from the released v$oldVersion, and an install REPLACES them:" -ForegroundColor Yellow
+                $changes | ForEach-Object { Write-Host "    $_" }
+                if ($Diff) {
+                    foreach ($c in ($changes | Where-Object { $_ -like 'modified *' })) {
+                        $rel = ($c -replace '^modified\s+', '')
+                        Write-Host ''; Write-Host "--- $rel (release v$oldVersion -> installed copy)"
+                        $a = Get-Content -LiteralPath (Join-Path $relTree $rel); $b = Get-Content -LiteralPath (Join-Path $Dest $rel)
+                        Compare-Object $a $b | Select-Object -First 80 | ForEach-Object { ($(if ($_.SideIndicator -eq '=>') { '+ ' } else { '- ' }) + $_.InputObject) } | ForEach-Object { Write-Host $_ }
+                    }
+                }
+                Write-Host '  If a setting of the project depended on a local patch, it stops working after this install.'
+            } else {
+                Write-Status "the installed copy is the released v$oldVersion, unchanged - nothing local to lose"
+            }
+        } else {
+            Write-Status "could not check the installed copy for local changes (no archive of v$oldVersion to compare with)"
+        }
+    }
+    if ($Check) {
+        Write-Host "--check: nothing was changed. installed: $oldVersion  available: $newVersion"
+        return
+    }
+    # A local change is the one thing in an install that cannot be undone from the archive: ask again, with the list
+    # in front of the person, unless they already said -Force.
+    if ($changes.Count -gt 0 -and -not $Force) {
+        $interactive2 = $Host.UI.RawUI -and -not [Console]::IsInputRedirected
+        if ($interactive2) {
+            $reply2 = Read-Host 'Replace them anyway? (y/N)'
+            if ($reply2 -notmatch '^[Yy]') { Write-Host 'Installation cancelled.'; return }
+        } else {
+            Write-Fail 'Non-interactive session and the installed copy has local changes. Re-run with -Force to replace them.'
+            exit 1
+        }
     }
 
     # Stage into a sibling, then swap. The destination is never left half-written.

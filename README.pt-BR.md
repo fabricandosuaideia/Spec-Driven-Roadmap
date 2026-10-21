@@ -229,7 +229,10 @@ com um conferente independente antes de qualquer merge. Experimental.
 Projetos novos não precisam de nada aqui. Um projeto que uma versão anterior planejou recebe o
 comportamento novo em uma execução:
 
-1. Instale a versão nova nesse projeto — rode o instalador de novo, ou `/plugin update` no caso de plugin.
+1. Instale a versão nova nesse projeto — rode o instalador de novo, ou `/plugin update` no caso de plugin. Antes,
+   rode o instalador com `--check` (`-Check` no `install.ps1`): ele não muda nada e lista os arquivos da sua cópia
+   instalada que diferem da versão publicada que ela diz ser, porque um remendo que você fez localmente é
+   substituído por uma reinstalação simples, e a configuração que dependia dele para de funcionar.
 2. Nesse projeto, peça *"atualiza este projeto"* (ou digite `/spec-driven-roadmap upgrade this project`).
 
 A skill então salva uma linha de base de custo a partir dos transcritos do próprio projeto

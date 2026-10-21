@@ -7,6 +7,7 @@
 # With flags (note the `-s --`, required when piping into bash):
 #   curl -fsSL .../install.sh | bash -s -- --global
 #   curl -fsSL .../install.sh | bash -s -- --force
+#   curl -fsSL .../install.sh | bash -s -- --check      (change nothing: say what an install would replace)
 #
 # Installs SKILL.md + references/ + scripts/ into .claude/skills/spec-driven-roadmap/ in
 # the current project, or ~/.claude/skills/... with --global. Needs curl + tar.
@@ -16,13 +17,17 @@ set -euo pipefail
 
 REPO="fabricandosuaideia/Spec-Driven-Roadmap"
 BRANCH="${SDR_BRANCH:-main}"
+# Where the release archives live. Only tests change it (a file:// folder), so nothing here needs the network.
+ARCHIVE_BASE="${SDR_ARCHIVE_BASE:-https://github.com/${REPO}/archive/refs}"
 SKILL_NAME="spec-driven-roadmap"
 SCOPE="project"
 FORCE="false"
+CHECK="false"
+SHOW_DIFF="false"
 
 # The skill is these files and nothing else. Used to validate the download
 # before anything on disk is touched.
-REQUIRED_REFS=(scope-phase.md index-phase.md decompose-phase.md handoff-seed.md handover-prompt.md loop-tlc-spec-driven.md loop-tlc-spec-lean.md upgrade-project.md manager-mode.md)
+REQUIRED_REFS=(scope-phase.md index-phase.md decompose-phase.md handoff-seed.md handover-prompt.md loop-tlc-spec-driven.md loop-tlc-spec-lean.md upgrade-project.md upgrade-notes.md manager-mode.md)
 # Runtime scripts the skill itself invokes. Maintainer-only tooling (bump-version.sh)
 # deliberately stays in the repo and is not installed.
 REQUIRED_SCRIPTS=(convert-to-multi.py check-roadmap.py measure-agents.py feature-brief.py status-block.py write-agents.py plan-pipeline.py roadmap-pipeline.js manager-pipeline.js triage-probe.py record-barrier.py bench-gate.py)
@@ -76,6 +81,10 @@ Options:
     --global      Install to ~/.claude/skills/${SKILL_NAME}/
                    (default: ./.claude/skills/${SKILL_NAME}/)
     --force       Overwrite an existing install without prompting
+    --check       Change nothing: print the installed version, the available one, and
+                  which files of the installed copy differ from the release it claims to be
+    --diff        With the list of changed files, also print what each one changed (a unified diff against
+                  the release, at most 80 lines per file) - the way to learn what a local patch was for
     -h, --help    Show this help message
 
 Examples:
@@ -94,6 +103,8 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --global) SCOPE="global"; shift ;;
         --force)  FORCE="true"; shift ;;
+        --check)  CHECK="true"; shift ;;
+        --diff)   SHOW_DIFF="true"; shift ;;
         -h|--help) show_help 0 ;;
         *) print_error "Unknown option: $1"; show_help 2 ;;
     esac
@@ -130,7 +141,7 @@ done
 # input. With no tty (CI, nested pipe) we refuse rather than guess, so the
 # failure is visible instead of masquerading as a user cancellation.
 # ---------------------------------------------------------------------------
-if [[ -d "$DEST" && "$FORCE" != "true" ]]; then
+if [[ -d "$DEST" && "$FORCE" != "true" && "$CHECK" != "true" ]]; then
     echo "An existing install was found at: $DEST"
     # Test by OPENING /dev/tty, not by `[[ -r /dev/tty ]]`: in containers the
     # path can exist and still fail to open, and a failed redirect would fall
@@ -151,12 +162,39 @@ if [[ -d "$DEST" && "$FORCE" != "true" ]]; then
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# What did the project change in its copy of the skill? An installed copy that was patched locally (a fix the
+# project needed before it reached a release) is replaced by a plain install without a word, and the setting
+# that depended on the patch silently stops working. The comparison is against the release the copy CLAIMS to be:
+# its own version's archive. The files of the installed copy are the ones compared, so maintainer-only files of
+# the release are never reported as missing. Any failure here (no network, no such tag) only means "could not
+# check": it never stops an install.
+# ---------------------------------------------------------------------------
+fetch_release_tree() {          # $1 = version; prints the extracted tree, or nothing
+    local version="$1" out="$TMP_DIR/old.tar.gz" dir="$TMP_DIR/old"
+    [[ "$version" != "unknown" ]] || return 1
+    curl -fsSL "${ARCHIVE_BASE}/tags/v${version}.tar.gz" -o "$out" 2>/dev/null || return 1
+    mkdir -p "$dir" && tar -xzf "$out" -C "$dir" 2>/dev/null || return 1
+    find "$dir" -maxdepth 1 -mindepth 1 -type d -name 'Spec-Driven-Roadmap-*' -print -quit
+}
+
+local_changes() {               # $1 = installed dir, $2 = the release's tree; prints "<kind> <path>" lines
+    local f rel
+    while IFS= read -r -d '' f; do
+        rel="${f#"$1"/}"
+        case "$rel" in *.pyc|*__pycache__*|.skill-meta.json) continue ;; esac
+        if [[ ! -f "$2/$rel" ]]; then echo "added    $rel"
+        elif ! cmp -s "$f" "$2/$rel"; then echo "modified $rel"; fi
+    done < <(find "$1" -type f -print0 | sort -z)
+    return 0
+}
+
 TMP_DIR="$(mktemp -d)"
 STAGE="${DEST}.tmp.$$"
 trap 'rm -rf "$TMP_DIR" "$STAGE"' EXIT
 
 print_status "Downloading $SKILL_NAME ($BRANCH)..."
-TARBALL_URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.tar.gz"
+TARBALL_URL="${ARCHIVE_BASE}/heads/${BRANCH}.tar.gz"
 if ! curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/skill.tar.gz"; then
     print_error "Failed to download $TARBALL_URL"
     echo "If the repository is private, GitHub returns 404 to unauthenticated" >&2
@@ -189,15 +227,61 @@ done
 # disk are both available — say it out loud, or a user sitting on an old install
 # has no way to tell.
 NEW_VERSION="$(skill_version "$SRC_DIR/SKILL.md")"
+OLD_VERSION="none"
 if [[ -d "$DEST" ]]; then
     OLD_VERSION="$(skill_version "$DEST/SKILL.md")"
-    if [[ "$OLD_VERSION" == "$NEW_VERSION" ]]; then
+    if [[ "$CHECK" == "true" ]]; then
+        if [[ "$OLD_VERSION" == "$NEW_VERSION" ]]; then print_status "installed $OLD_VERSION is the version available"
+        else print_status "installed $OLD_VERSION, available $NEW_VERSION"; fi
+    elif [[ "$OLD_VERSION" == "$NEW_VERSION" ]]; then
         print_status "already at $NEW_VERSION — reinstalling"
     else
         print_status "installing $NEW_VERSION (replacing $OLD_VERSION)"
     fi
+elif [[ "$CHECK" == "true" ]]; then
+    print_status "nothing installed here; available $NEW_VERSION"
 else
     print_status "installing $NEW_VERSION"
+fi
+
+CHANGES=""
+if [[ -d "$DEST" ]]; then
+    if REL_TREE="$(fetch_release_tree "$OLD_VERSION")" && [[ -n "$REL_TREE" ]]; then
+        CHANGES="$(local_changes "$DEST" "$REL_TREE")"
+        if [[ -n "$CHANGES" ]]; then
+            echo "! $(printf '%s\n' "$CHANGES" | wc -l | tr -d ' ') file(s) of the installed copy differ from the released v${OLD_VERSION}, and an install REPLACES them:"
+            printf '%s\n' "$CHANGES" | sed 's/^/    /'
+            echo "  If a setting of the project depended on a local patch, it stops working after this install."
+            if [[ "$SHOW_DIFF" == "true" ]]; then
+                while IFS= read -r line; do
+                    kind="${line%% *}"; rel="${line#* }"; rel="${rel#"${rel%%[![:space:]]*}"}"
+                    [[ "$kind" == "modified" ]] || continue
+                    echo ""; echo "--- $rel (release v${OLD_VERSION} -> installed copy)"
+                    diff -u "$REL_TREE/$rel" "$DEST/$rel" | tail -n +3 | head -n 80 || true
+                done <<< "$CHANGES"
+            fi
+        else
+            print_status "the installed copy is the released v${OLD_VERSION}, unchanged - nothing local to lose"
+        fi
+    else
+        print_status "could not check the installed copy for local changes (no archive of v${OLD_VERSION} to compare with)"
+    fi
+fi
+if [[ "$CHECK" == "true" ]]; then
+    echo "--check: nothing was changed. installed: ${OLD_VERSION:-none}  available: $NEW_VERSION"
+    exit 0
+fi
+# A local change is the one thing in an install that cannot be undone from the archive: ask again, with the list in
+# front of the person, unless they already said --force.
+if [[ -n "$CHANGES" && "$FORCE" != "true" ]]; then
+    if { exec 3< /dev/tty; } 2>/dev/null; then
+        read -r -p "Replace them anyway? (y/N) " REPLY <&3 || REPLY=""
+        exec 3<&-
+        [[ "$REPLY" =~ ^[Yy]$ ]] || { echo "Installation cancelled."; exit 0; }
+    else
+        print_error "Non-interactive shell and the installed copy has local changes. Re-run with --force to replace them."
+        exit 1
+    fi
 fi
 
 # Stage into a sibling, then swap. The destination is never left half-written.

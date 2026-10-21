@@ -401,7 +401,7 @@ midió es una suposición.
 Un proyecto que planificó una versión anterior recibe el comportamiento nuevo pidiendo *"upgrade this
 project"* tras instalar allí la nueva versión: guarda esa línea base, revisa el roadmap con el linter,
 vuelve a ejecutar la siembra — que vacía el bloque de Status viejo y el handoff viejo hacia `docs/roadmap-history.md` —,
-ofrece reemplazar las líneas puente antiguas en tu `CLAUDE.md` y pregunta cómo quieres construir.
+ofrece reemplazar las líneas puente antiguas en tu `CLAUDE.md` y pregunta cómo quieres construir. Antes de reinstalar ejecuta el `--check` del instalador, que lista cualquier archivo que hayas parcheado en tu copia de la skill (una reinstalación simple lo reemplazaría), y valida `docs/process/pipeline.json` y te dice qué cambió por defecto desde la versión de la que viene tu proyecto.
 Nunca regenera el roadmap.
 
 ## Lo que deliberadamente *no* hace

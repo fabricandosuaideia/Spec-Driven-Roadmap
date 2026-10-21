@@ -233,6 +233,9 @@ Los proyectos nuevos no necesitan nada de esto. Un proyecto que planificó una v
 el comportamiento nuevo en una sola ejecución:
 
 1. Instala la nueva versión en ese proyecto — vuelve a ejecutar el instalador, o `/plugin update` si es un plugin.
+   Antes, ejecuta el instalador con `--check` (`-Check` en `install.ps1`): no cambia nada y lista los archivos de tu
+   copia instalada que difieren de la versión publicada que dice ser, porque un parche que aplicaste en local se
+   reemplaza con una reinstalación simple, y la configuración que dependía de él deja de funcionar.
 2. En ese proyecto, pide *"upgrade this project"* (o escribe `/spec-driven-roadmap upgrade this project`).
 
 Entonces la skill guarda una línea base de costos a partir de las transcripciones del propio proyecto

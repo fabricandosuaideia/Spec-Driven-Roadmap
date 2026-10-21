@@ -400,6 +400,22 @@ def check_pipeline_config_keys(root):
     check("the roles `models` accepts are the roles the pipeline reads and Step 10 names", not problems, "\n".join(problems))
 
 
+def check_upgrade_notes(root):
+    """references/upgrade-notes.md has a row for every release since 3.37.0. It is what an upgrade tells a person
+    about what changed by itself, and a table that stops one release short tells them nothing about the newest one;
+    the CHANGELOG is the list of releases, so the table is held to it."""
+    notes = read(root, "references", "upgrade-notes.md") or ""
+    log = read(root, "CHANGELOG.md") or ""
+    versions = re.findall(r"^## (\d+\.\d+\.\d+) ", log, re.M)
+
+    def key(v): return tuple(int(x) for x in v.split("."))
+    wanted = [v for v in versions if key(v) >= (3, 37, 0)]
+    missing = [v for v in wanted if not re.search(r"^\| %s \|" % re.escape(v), notes, re.M)]
+    check("upgrade-notes.md has a row for every release since 3.37.0",
+          bool(notes) and bool(wanted) and not missing,
+          "no upgrade-notes.md" if not notes else "no release found in CHANGELOG.md" if not wanted else "no row for: " + ", ".join(missing))
+
+
 def check_no_orphan_constants(root):
     """Every module-level constant must be read somewhere in its own file.
 
@@ -617,7 +633,7 @@ def main():
     print("trilingual parity")
     check_trilingual_parity(root, "guide", scope(root)["guides"], "guide")
     check_trilingual_parity(root, "", scope(root)["readmes"], "README")
-    print("procedure"); check_step_numbering(root); check_step_pointers(root); check_no_orphan_constants(root); check_pipeline_config_keys(root)
+    print("procedure"); check_step_numbering(root); check_step_pointers(root); check_no_orphan_constants(root); check_pipeline_config_keys(root); check_upgrade_notes(root)
     check_step_8_reminder(root)
     print("benchmark"); check_benchmark(root)
     print("loop templates"); check_loop_templates(root)

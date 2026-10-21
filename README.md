@@ -222,7 +222,10 @@ barrier by script and repairs it, with an independent checker before anything me
 New projects need nothing here. A project an earlier version planned gets the new behaviour in one
 run:
 
-1. Install the new version in that project — re-run the installer, or `/plugin update` for a plugin.
+1. Install the new version in that project — re-run the installer, or `/plugin update` for a plugin. First run
+   the installer with `--check` (`-Check` for `install.ps1`): it changes nothing and lists the files of your
+   installed copy that differ from the release it claims to be, because a fix you once patched in locally is
+   replaced by a plain reinstall, and the setting that depended on it stops working.
 2. In that project, ask *"upgrade this project"* (or type `/spec-driven-roadmap upgrade this project`).
 
 The skill then saves a cost baseline from the project's own transcripts

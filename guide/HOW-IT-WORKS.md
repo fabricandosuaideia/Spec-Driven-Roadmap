@@ -378,7 +378,9 @@ change how agents run and compare after; a saving nobody measured is a guess.
 A project an earlier version planned gets the new behaviour by asking *"upgrade this project"* after
 installing the new version there: it saves that baseline, lints the roadmap, re-runs the seed — which
 empties the old Status block and the old handoff into `docs/roadmap-history.md` — offers to replace old bridge lines in
-your `CLAUDE.md`, and asks how you want to build. It never regenerates the roadmap.
+your `CLAUDE.md`, and asks how you want to build. It never regenerates the roadmap. Before reinstalling it runs the installer's `--check`, which lists any file you
+patched in your own copy of the skill (a plain reinstall would replace it), and it validates
+`docs/process/pipeline.json` and tells you what changed by default since the version your project came from.
 
 ## What it deliberately does *not* do
 

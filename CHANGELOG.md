@@ -9,6 +9,65 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.45.0 — 2026-10-21
+
+**The upgrade route knows what 3.37.0 to 3.44.0 changed, and refuses to replace a project's own patch of the skill without
+showing it** (the question that started this series: *can the agent bring every older project up to date?*). The
+route of 3.29.0 handled the roadmap (Status, handoff, bridge lines) and left three gaps, each found in the real
+projects by the review of 3.43.1: a plain reinstall replaces a locally patched copy of the skill and the setting that
+depended on it stops working without a message (the WordPress project's `postMerge`); an existing, confirmed
+`pipeline.json` is never shown the options added since (`--init` refuses to run when the file exists, and Step 10 depends
+on it); and two defaults changed under every project that upgrades (scoped verification rounds, the wider test rule in
+manager mode) without anyone being told.
+
+- **The installers have `--check` / `-Check` and `--diff` / `-Diff`.** `--check` changes nothing: it prints the version
+  installed, the version available and, comparing the installed copy with the release **it claims to be** (that
+  version's own archive), one line per file the project changed (`modified`, `added`); `--diff` adds what each modified
+  file changed. A plain install, interactive, now asks again with that list in front of the person; `--force` prints it and
+  goes on. A version with no archive, or none at all, is reported as "could not check", never as "unchanged". It is the
+  installer, fetched fresh from `main` each time, that carries this: it works for a project whose installed copy is
+  older than this release, which does not know the new route yet.
+- **`plan-pipeline.py --check-config`** validates `docs/process/pipeline.json` alone (every problem at once, exit 1;
+  no file, exit 2), prints what it sets, and warns, without failing, about a script the config runs that is not in the
+  project (the `migrate.sh` of a patch that was never committed was exactly that).
+- **`references/upgrade-notes.md`**, installed with the skill: one row per release since 3.37.0 with what changes by
+  itself and which keys are new, and a rule for what to tell. `check-consistency.py` holds it to the CHANGELOG: a
+  release without a row fails the gate.
+- **The route** (`upgrade-project.md`) gets Step 0 (look before replacing; reinstall only on a yes, with the list in front
+  of the person) and Step 2 (the config check, the rows since the version in the `## Status` header, each new key
+  offered once, `"confirmed"`, `"mergeGate"` and `"verifier.survivor"` never written on its own initiative).
+- **`scripts/check-installers.py`** (maintainer, in the release gate) builds release archives from the working tree and
+  runs both installers against them with no network: 24 assertions, covering the list of changes, `--check` writing nothing,
+  `--force`, the non-interactive refusal, a version with no archive, a copy with no version line, a fresh install,
+  and the same on `install.ps1` under PowerShell 7. Six deliberate breakages of the two installers were all caught.
+  `plan-pipeline.py --selftest` 113 to 117 assertions.
+
+**Executed by blind agents (Sonnet), each in its own copy, the route followed from its text in a project with the real
+v3.36.0 installed:** (1) with a local patch and a config holding `manager.passes`: the patch was shown **before**
+reinstalling, with the question it would put to the person; it reinstalled only as if told yes, found the config
+problem and explained it with the row of the table, told the rows of 3.37.0 to 3.44.0 that describe a change and
+skipped the two that say `Nothing`, offered `models`, `verifier.rounds: "full"` and, conditionally, `gateOrder`, not
+`mergeGate` (the project has no barrier), wrote nothing into `pipeline.json`, and left `docs/` untouched. That first run
+reported nine frictions, now fixed: the history does not separate a patch committed with the whole copy (hence
+`--diff`), "nothing to decide" read as "skip", no default for `maxAttempts`, "installing" printed by a check that
+installs nothing, a `postMerge` script that does not exist and nothing noticed. (2) With those fixes, a patched
+project and a clean one. In the patched one the installer's `--diff` let the agent say what the patch was for (it passed
+`postMerge` through), and a `grep` of the installed copy showed that **nothing in the old copy ever read the
+value**; it saw that after the reinstall the key stops being inert and, because `docs/process/migrate.sh` does not exist,
+can hold the pipeline — the kind of trap an upgrade creates, noticed because the route made it look. In the clean one
+(a copy equal to its release, a config with no problem) it reinstalled with `--force` without asking, found 0 problems,
+skipped exactly the two `Nothing:` rows and offered `models`, `verifier.rounds` and `mergeGate` (the project has a
+barrier), writing nothing. The clean run reported fourteen frictions; those about the text were fixed afterwards **without** repeating the run: who says yes when the copy is
+unchanged (the request to upgrade) and when it is not (a yes to those files; `--force`'s own warning is no approval), keys of
+a skipped row still offered, the installer's first-install "Next steps" not relayed, a commit offered for a project that tracks
+its copy of the skill, `<this-skill-dir>` after a reinstall, the baseline taken after it, the consequence of a missing script
+in the `--check-config` warning, and its count of warnings. **Not executed:** the steps after 2 of the route (seed, bridge lines, Steps 8 to 10;
+unchanged since 3.29.0); a real reinstall from GitHub (every test used a local archive folder); `install.ps1` on
+Windows proper (PowerShell 7 on Linux only); the first upgrade of a project whose installed copy predates the route
+of this release, which has to be told to run `--check` by hand (the README now says so).
+
+---
+
 ## 3.44.0 — 2026-10-21
 
 **`postMerge` enters the skill, and a key that nothing reads is refused** (found by the review of 3.43.1, which read the

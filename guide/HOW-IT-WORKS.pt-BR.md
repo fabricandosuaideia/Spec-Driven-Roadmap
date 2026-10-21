@@ -402,7 +402,9 @@ Um projeto que uma versão anterior planejou recebe o comportamento novo ao pedi
 projeto"* depois de instalar a versão nova nele: ela salva essa linha de base, confere o roadmap, roda o
 seed de novo — que esvazia o bloco de Status antigo e o handoff antigo para `docs/roadmap-history.md` —, oferece trocar as
 linhas de ponte antigas no seu `CLAUDE.md` e pergunta como você quer construir. Ela nunca regenera o
-roadmap.
+roadmap. Antes de reinstalar, roda o `--check` do instalador, que lista qualquer arquivo que você remendou na sua
+cópia da skill (uma reinstalação simples o substituiria), e valida o `docs/process/pipeline.json` e diz o que
+mudou por padrão desde a versão de que o seu projeto vem.
 
 ## O que ela deliberadamente *não* faz
 

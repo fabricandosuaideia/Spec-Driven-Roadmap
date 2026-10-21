@@ -481,7 +481,7 @@ def config_problems(cfg, ds=None):
         stray = sorted(k for k in mgr if k not in MANAGER_KEYS)
         if stray:
             note = (" \"passes\" was a local patch of one project: a second pass would restart every unfinished feature at attempt 1, "
-                    "which is only a second full budget - delete the key and raise the top-level maxAttempts instead" if "passes" in stray else "")
+                    "which is only a second full budget - delete the key and raise the top-level maxAttempts instead (its default is A 5, B 4, C 3)" if "passes" in stray else "")
             out.append("manager has no key %s; the keys are %s.%s" % (", ".join(stray), ", ".join(MANAGER_KEYS), note))
         one_of(mgr, "autonomy", AUTONOMY, "manager.autonomy")
         if given(mgr, "sectionsPerRun") and not _whole(mgr["sectionsPerRun"], 1):
@@ -855,6 +855,31 @@ x
             expect("%s is refused" % label, refused)
         expect("the barrier and the model reach the args",
                args2["barrierGate"] == "make all" and args2["barrierEvery"] == 3 and args2["model"] == "sonnet")
+        import io
+        import contextlib
+        os.makedirs(os.path.dirname(os.path.join(root, CONFIG)), exist_ok=True)
+        json.dump(cfg, open(os.path.join(root, CONFIG), "w"))
+        out_cc = io.StringIO()
+        with contextlib.redirect_stdout(out_cc), contextlib.redirect_stderr(io.StringIO()):
+            rc_cc = main(["--root", root, "--check-config"])
+        expect("--check-config on a valid file says so and plans nothing", rc_cc == 0 and "0 problem(s)" in out_cc.getvalue())
+        json.dump(dict(cfg, passes=1, manager={"delegation": "x", "passes": 2}, postMerg="y", gateOrder="x"), open(os.path.join(root, CONFIG), "w"))
+        out_cc = io.StringIO()
+        with contextlib.redirect_stdout(out_cc), contextlib.redirect_stderr(io.StringIO()):
+            rc_cc = main(["--root", root, "--check-config"])
+        said = out_cc.getvalue()
+        expect("--check-config lists every problem of a bad file at once",
+               rc_cc == 1 and "passes" in said and "postMerg" in said and "gateOrder" in said and said.count("PROBLEM") >= 2)
+        json.dump(dict(cfg, postMerge="bash docs/process/migrate.sh", setup="npm ci && make"), open(os.path.join(root, CONFIG), "w"))
+        out_cc = io.StringIO()
+        with contextlib.redirect_stdout(out_cc), contextlib.redirect_stderr(io.StringIO()):
+            rc_cc = main(["--root", root, "--check-config"])
+        expect("--check-config warns about a script the project does not have, and still exits 0",
+               rc_cc == 0 and "WARNING  postMerge runs docs/process/migrate.sh" in out_cc.getvalue() and "WARNING  setup" not in out_cc.getvalue())
+        os.remove(os.path.join(root, CONFIG))
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            rc_cc = main(["--root", root, "--check-config"])
+        expect("--check-config without a file is exit 2, not a pass", rc_cc == 2)
         rc = main(["--root", root])
         expect("without a confirmed pipeline.json nothing is printed", rc == 1)
         rc = main(["--root", root, "--init"])
@@ -1028,12 +1053,62 @@ x
     return 1 if failures else 0
 
 
+WARNED = [0]  # warnings printed by the last check_config call
+
+
+def check_config(root, cfg_path):
+    """Everything the planner would refuse in pipeline.json, listed at once, without planning anything: the check an
+    upgrade runs first, because a key that a locally patched copy of the skill read and this version does not is only
+    found, otherwise, by a run that stops. Exit 0: no problem. 1: problems, one per line. 2: no readable file."""
+    if not os.path.isfile(cfg_path):
+        print("no %s under %s: nothing to check (option C and manager mode write it with --init)" % (CONFIG, root), file=sys.stderr)
+        return 2
+    try:
+        with open(cfg_path, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+    except (OSError, ValueError) as e:
+        print("%s cannot be read: %s" % (CONFIG, e), file=sys.stderr)
+        return 2
+    if not isinstance(cfg, dict):
+        print("%s must hold a JSON object" % CONFIG, file=sys.stderr)
+        return 1
+    ds, _d = downstream(root)
+    problems = config_problems(cfg, ds)
+    WARNED[0] = 0
+    for pr in problems:
+        print("PROBLEM  " + pr)
+    # Not a problem of the file, but the commonest reason a command it names fails at the first run: the script it
+    # runs is not there (a patch's migration script that was never committed). A warning; the exit code ignores it.
+    for key in ("gate", "barrierGate", "postMerge", "setup"):
+        cmd = cfg.get(key)
+        parts = cmd.split() if isinstance(cmd, str) else []
+        if len(parts) >= 2 and parts[0] in ("bash", "sh", "python3", "python", "node") and not parts[1].startswith(("-", "/", "$", "~")) \
+                and not re.search(r"[|&;<>`$()*?\"']", parts[1]) and not os.path.exists(os.path.join(root, parts[1])):
+            what = {"postMerge": "the first post-merge command fails: the merge stays, the features after it are held and no barrier runs",
+                    "gate": "every gate run fails, so no feature can pass", "barrierGate": "every barrier fails, so the main branch is held red",
+                    "setup": "a new worktree cannot be prepared"}[key]
+            WARNED[0] += 1
+            print("WARNING  %s runs %s, which is not in the project (%s): %s" % (key, parts[1], root, what))
+    v = cfg.get("verifier") if isinstance(cfg.get("verifier"), dict) else {}
+    print("downstream: %s%s" % (ds or "none installed", "" if ds else " (verifier.survivor could not be checked against it)"))
+    print("confirmed: %s%s" % (bool(cfg.get("confirmed")), "" if cfg.get("confirmed") else "  (nothing runs until the person confirms the gate)"))
+    print("gateOrder: %s | mergeGate: %s | verifier.rounds: %s | verifier.sensor: %s | verifier.survivor: %s" % (
+          cfg.get("gateOrder") or "gate-first (default)", cfg.get("mergeGate") or "rerun (default)", v.get("rounds") or "scoped (default)",
+          v.get("sensor") or "no cap", v.get("survivor") or "the downstream's own"))
+    print("models: %s | postMerge: %s | barrierGate: %s | lanes: %s" % (
+          cfg.get("models") or "one model for every role", cfg.get("postMerge") or "none", "set" if cfg.get("barrierGate") else "none", cfg.get("lanes") or 1))
+    print("%d problem(s), %d warning(s)" % (len(problems), WARNED[0]))
+    return 1 if problems else 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", help="the project root")
     ap.add_argument("--roadmap", help="the one roadmap to build (default docs/ROADMAP.md)")
     ap.add_argument("--init", action="store_true", help="write docs/process/pipeline.json to confirm")
     ap.add_argument("--manager", action="store_true", help="print manager-pipeline.js's args (manager mode)")
+    ap.add_argument("--check-config", action="store_true",
+                    help="validate docs/process/pipeline.json alone and print what it sets; plans nothing, writes nothing")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
@@ -1043,6 +1118,8 @@ def main(argv=None):
         return 2
     root = os.path.abspath(a.root)
     cfg_path = os.path.join(root, CONFIG)
+    if a.check_config:
+        return check_config(root, cfg_path)
     if a.init:
         if os.path.exists(cfg_path):
             print("%s exists; edit it rather than regenerating it" % CONFIG, file=sys.stderr)

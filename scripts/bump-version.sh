@@ -254,6 +254,16 @@ release_gate() {
         fi
     done
 
+    # The installers, against release archives built from this tree: the one place where a project's local change to its
+    # copy of the skill is replaced for good. PowerShell is run when it exists and reported as skipped when it does not.
+    if [[ -f "$REPO_ROOT/scripts/check-installers.py" ]]; then
+        printf '\n%s\n' "Running the installer check..."
+        python3 "$REPO_ROOT/scripts/check-installers.py" || ok=1
+    else
+        printf '\n! %s\n' "scripts/check-installers.py is missing - the installers were not exercised." >&2
+        ok=1
+    fi
+
     # The pipeline's control flow, against stubbed agents: free to run, and the only way
     # to prove who runs after whom before a run spends the owner's quota for hours.
     if command -v node >/dev/null 2>&1; then
