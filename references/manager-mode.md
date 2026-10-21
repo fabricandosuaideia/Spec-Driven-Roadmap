@@ -66,20 +66,30 @@ tests asserting behaviour that the feature's own spec had changed (one project's
 owner authorised the same correction by hand each time. So in manager mode an existing test is
 **updated, not obeyed** when its assertion states a behaviour that this feature's spec changes — an
 acceptance criterion, an answered question or a settled Cross-Cutting Decision states the new
-behaviour and the old assertion contradicts it. The builder corrects **that assertion and only it**:
-in a commit of its own quoting the criterion or decision and where it is recorded, the new assertion
-as strong as the old, and declared as `REVOKED-TEST <file>:<test name>`. A test red for any other reason
-is a defect in the builder's change: it fixes the code, not the test. The independent verifier checks
-every change to an existing test on the branch, reads the criterion or decision cited, and refuses the
-feature for any change that is not such a correction — an undeclared edit, a criterion that the old
-assertion does not contradict, a weaker assertion, a skip or a deletion.
+behaviour and the old assertion contradicts it, **and was decided before the build**: it comes from
+the roadmap behind the feature (what `feature-brief.py` prints), never from a spec, plan or check the
+builder wrote on its own branch. The builder corrects **that assertion and only it**, as strong as
+before, in a commit of its own whose **first line** is `REVOKED-TEST <file>:<test name>` and whose body
+quotes the criterion or decision and where it is recorded. A test red for any other reason is a defect
+in the builder's change: it fixes the code, not the test. The independent verifier checks every change
+to an existing test on the branch (test sources, fixtures, conftest, test configuration, the gate
+script), reads the criterion or decision cited, checks with `git log` that the branch did not write it,
+and refuses the feature for any change that is not such a correction — an undeclared edit, a criterion
+that the old assertion does not contradict or that the branch itself wrote, a weaker assertion, a skip
+or an expected-failure mark, a deletion. A deletion is always refused, so a spec that removes a
+behaviour stops the feature for the owner to settle: that is the safe direction, and a known limit.
+
+The unblock repairer keeps the **narrow** form (an owner decision recorded in the roadmap revokes exactly
+that assertion), because a regression belongs to a feature whose own spec did not change; it may also
+fix a test that is wrong about timing, ordering or shared state at that cause, never by loosening.
 
 This is wider than the first version of the exception (3.33.0), which asked that an owner decision
 revoke exactly the assertion. In manager mode the manager writes the feature's criteria and answers its
-questions under the owner's delegation, so the wider rule lets it correct a test against its own
-criterion; that is why each correction is declared, sits in its own commit and is checked by a verifier
-that did not write it. **Review the `REVOKED-TEST` lines after a run** (they are in the builders' notes
-and the commit log): a correction the owner would not have made is a change request, not a wording fix.
+questions under the owner's delegation, so the wider rule would let it correct a test against its own
+criterion; that is why the criterion must predate the branch, each correction is declared in its own
+commit, and a verifier that did not write it checks both. **Review them after a run** with
+`git log main --grep=REVOKED-TEST`: a correction the owner would not have made is a change request, not
+a wording fix.
 
 **Why a script and not a prompt.** A manager that is a conversation grows with every section: on a
 measured multi-agent build the coordinator went from 41k to 88k tokens of context in 25 turns, and a
@@ -111,8 +121,9 @@ section against the code as the previous ones left it.
 5. **Speed.** The same five levers as option C, with the same prices — handover-prompt.md, Step 10,
    "Option C — the pipeline": `lanes` (measure first with `bench-gate.py --lanes 2`), the builder's
    effort at tier A, `gateOrder` (whether the full gate runs before or after the verifier),
-   `mergeGate` (whether the merge runs the gate again) and `verifier` (a cap on the sensor's mutants,
-   and what a survivor is). A sixth happens by itself: Phase 2 groups small same-area units into one feature
+   `mergeGate` (whether the merge runs the gate again; `receipt` needs a `barrierGate` and a
+   `barrierEvery` of at least 1) and `verifier` (a cap on the sensor's mutants, what a survivor is —
+   `minor` only under `tlc-spec-driven` — and `rounds`, scoped or full). A sixth happens by itself: Phase 2 groups small same-area units into one feature
    (decompose-phase.md Step 3), so a section of small fixes pays the per-feature cycle fewer times.
 6. **The level.** `manager.autonomy`: `decide` (the default) or `unblock` — ask, with the price of each
    as "Two levels — how much permission the owner gives" above states it, and write the owner's answer; never raise it yourself.
@@ -190,6 +201,8 @@ line, and commits. The run's result lists the same decisions when that record co
 - **Review the decisions.** They are the price of the run: search the roadmaps for `Decided by the
   manager`, or read the run's account in `docs/roadmap-history.md`. A decision the owner would have
   made differently is a change request against built code, not a wording fix — say so when reporting.
+- **Review the test corrections.** `git log main --grep=REVOKED-TEST` lists every existing test a builder
+  updated because its feature's spec changed what it asserts, each with the criterion it quoted.
 - **Continue** by launching again: decomposed sections and passing features are read from disk, so a
   new run starts where the last one stopped.
 - **Measure** with *"measure my agent cost"*: every agent is labelled by role, so the cost of deciding

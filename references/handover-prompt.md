@@ -69,8 +69,9 @@ default to the loop because it looks faster.** Ask, in the confirmed output lang
   it costs to set up: the project's gate command has to be confirmed once, because every PASS the
   pipeline records rests on it. Same precondition as B — zero open questions — and the same scope,
   one roadmap. Say why it spends less than a loop without sub-agents: every role is a short fresh
-  conversation, the verifier reuses the prover's receipt instead of re-running the suite, and this
-  session only receives one line per feature at the end.
+  conversation, by default the verifier reuses the prover's receipt instead of re-running the suite
+  (Step 10's speed levers change that order and what the merge re-runs), and this session only
+  receives one line per feature at the end.
 
 - **Option D — manager mode, experimental; Claude Code only.** Not one roadmap but every section still
   to do, in build order, unattended: a Workflow decomposes each section just before building it and
@@ -82,8 +83,10 @@ default to the loop because it looks faster.** Ask, in the confirmed output lang
   permissions for an agent: **decide** stops when something breaks (a red barrier, a feature the gate
   cannot decide) and waits for them; **unblock** also triages and repairs those — by script where it
   classifies, with an independent checker before anything merges — at the price of more calls made
-  for them, test and code repairs included. Say that it is experimental: first run on a real project
-  on 2026-09-29.
+  for them, test and code repairs included. At **both** levels a builder may also update an existing
+  test whose assertion the feature's own spec changes: declared in a commit of its own whose first
+  line is `REVOKED-TEST`, and checked by a verifier that did not write it — the user reviews those
+  commits afterwards. Say that it is experimental: first run on a real project on 2026-09-29.
 
 Everywhere below, **"the roadmap"** means that one file and its build order — `<ROADMAP-PATH>` and
 `<BUILD-ORDER-TXT>` exactly as Step 6's table resolves them for the target section.
@@ -584,7 +587,7 @@ them for an unattended run:
    ```
 
    It writes `docs/process/pipeline.json` with a guessed gate command and `"confirmed": false`.
-   Show the user the guess and ask three things, in this order:
+   Show the user the guess and ask four things, in this order:
    - **The command every feature must pass before it merges** (`"gate"`) — typecheck, lint and the
      whole suite, unless the project runs its whole suite only at a batch barrier, in which case this
      is the project's own per-feature gate (its affected tests). Read the project's own rules
@@ -603,9 +606,11 @@ them for an unattended run:
    - **The model** (`"model"`), for every agent the pipeline starts. Left `null`, they all inherit the
      session's model — say so, and say which one that is: a real run went out on a model nobody chose.
      **A model per role** (`"models"`, optional): `{"build": "<model>", "verify": "<model>", ...}` over
-     the roles `build`, `prove`, `verify`, `review`, `merge`, `record`, `triage` and `barrier`; a role it
-     does not name uses `"model"`. The repairer is a builder, the triage checker a verifier, the triage
-     merger a merger. The roles do not need the same care: `prove`, `merge`, `record` and `barrier` only
+     the roles `build`, `prove`, `verify`, `review`, `merge`, `record`, `triage` and `barrier` — `build`
+     here where `"effort"` says `implement`; a role it does not name uses `"model"`. The repairer is a
+     builder, the triage checker a verifier, the triage merger a merger. It covers the agents of one
+     section's pipeline only: manager mode's decomposer, planner and recorder take
+     `manager.decomposeModel` or `"model"`. The roles do not need the same care: `prove`, `merge`, `record` and `barrier` only
      run a command and report, while `build` and `verify` decide. Which split costs less without costing
      quality is not measured — say that, and offer `measure-agents.py` to compare. `plan-pipeline.py`
      refuses a role it does not know instead of ignoring it.
@@ -629,47 +634,61 @@ them for an unattended run:
        choice: a hook would be one more thing for every project to get right, and the gate already
        runs at every point a lane's resources are needed.
      - **The builder's effort at risk tier A** (`"effort"` → `"implement"` → `"A"`, `"xhigh"` by
-       default). Builders took two thirds of a measured run's time on one project and a quarter on
-       another (a long gate, see the next lever), so look at where the time goes before choosing;
-       `"high"` thinks less per turn. What it does to quality and to refused attempts is not
+       default). Where the time goes differs by project: builders were 52% of the cost on one
+       (WordPress, measured by tokens) and 24% of the agent time on another (Infinity-Agent-Creator,
+       where a 24-minute gate made the prover and the merger about 60% of it), so run
+       `measure-agents.py` and look before choosing; `"high"` thinks less per turn. What it does to quality and to refused attempts is not
        measured — say that, and offer to compare with `measure-agents.py` after a few features.
      - **When the full gate runs** (`"gateOrder"`: `"gate-first"`, the default, or `"verify-first"`).
        Gate-first runs the whole gate before the verifier, so a feature the gate refuses never costs a
        verification. Verify-first runs the verifier first and the gate only on a feature it passed, so
        a feature the verifier refuses never costs a gate. Which wins depends on two numbers of the
        project: how long the gate takes beside a verification (`bench-gate.py` times the gate), and how
-       often each refuses. On one measured project (gate 24 minutes, a verification 7) the verifier
-       refused 28 of 37 attempts and the gate 11 of 48, so verify-first spends one extra verification
-       on each of those 11 and saves a gate on each of those 28; with a gate of a few minutes it loses.
-       Recommend verify-first only when the gate is long beside a verification, and say it was
-       measured on one project. The price: a feature the verifier passed and the gate then refuses
-       leaves a PASS report on its branch that the gate did not back — the run's account says so.
+       often each refuses. On one measured project (gate 24 minutes, a verification 7) 28 of 37
+       attempts were refused (26 by the verifier, 2 more by the tier A reviewer) and the gate refused
+       11 of 48, so verify-first spends one extra verification on each of those 11 and saves a gate on
+       the attempts that are refused; with a gate of a few minutes it loses. Recommend verify-first
+       only when the gate is long beside a verification, and say it was measured on one project.
+       Its prices: a feature the verifier passed and the gate then refuses leaves a PASS report on its
+       branch that the gate did not back (the run's account says so, the prover leaves a short
+       `gate-failure.md` for the next builder, and the next verification is a later round scoped by
+       the diff); and with several lanes the verifier sees the tree before the prover rebases it onto
+       a main branch another lane may have moved, so only the gate sees the merged result.
      - **Whether the merge runs the gate again** (`"mergeGate"`: `"rerun"`, the default, or `"receipt"`).
        The merger rebases the branch and runs the whole gate on the exact tree before it fast-forwards
        the main branch; the prover already ran it on the same tree a moment earlier. With `"receipt"`
-       the merger skips it when the prover's receipt proves that tree: gate `pass`, the same code hash,
-       and the main branch exactly where the prover rebased onto it (so the rebase replayed nothing).
-       On one measured project the merges were 9 runs of ~24 minutes, 10% of the time. The price: a
-       receipt is written by an agent, and one branch of a real project carried a receipt written by
-       hand. So `plan-pipeline.py` refuses `"receipt"` without a `barrierGate`, the run of the project's
-       checks on the merged main branch that no one's word stands in for — say that, and say the
-       barrier then carries the guarantee the second gate used to give.
-     - **How hard the verifier's sensor pushes** (`"verifier"`: `"sensor"`, a cap of mutants per tier
-       `{"A": n, "B": n, "C": n}`, and `"survivor"`, the severity of a mutant that survives). Both are
-       unset by default, and then the verifier follows the downstream skill's own depth. On one
-       measured project a surviving mutant was named in 12 of 26 refusals, and that project's own
-       rules record "an unbounded sensor and a new gap each round" as what spent seven attempts on
-       one feature. Capping the mutants bounds the first; `"survivor": "minor"` turns a survivor into a listed note that does not
-       refuse the feature — which gives up the guarantee that every assertion can fail, so say so and
-       leave it to the user. `"minor"` works only under `tlc-spec-driven` (`tlc-spec-lean`'s
-       completion gate refuses a PASS above a surviving mutant, and `plan-pipeline.py` refuses it).
-       And `"rounds"` (`"scoped"`, the default, or `"full"`): every verification after the first is
-       scoped to the rows the last report refused and to what changed since, as `tlc-spec-lean`'s
-       verify.md already prescribes, so a refusal fixed in one round is not followed by a fresh
-       sweep that finds something new elsewhere. The price is on the other side: a scoped round
-       trusts the earlier round's verdict on the rows it carries forward, so a first round that was
-       loose leaves its loose PASS rows standing. Say so, and offer `"full"` to a user who prefers
-       to re-verify everything each time at the cost of the loop.
+       the merger skips it when the prover's receipt proves that tree: gate `pass`, the same command as the
+       pipeline's gate, a clean tree, the same code hash, and the main branch exactly at the commit the
+       prover's tree was built on. On
+       one measured project the merges were 9 runs of ~24 minutes, 10% of the time; with several
+       lanes `main` often moves between the prover and the merge, and then the receipt does not match
+       and the gate runs, so the saving shrinks. The price: a receipt is written by an agent (the
+       Status of one real project, Infinity-Agent-Creator, records a branch whose receipt was written
+       by hand), so the second gate was a check on the prover, and what replaces it is the barrier
+       **after** the merge, not before it. `plan-pipeline.py` therefore refuses `"receipt"` without a
+       `barrierGate` and a `barrierEvery` of at least 1. If the barrier question above was answered
+       "none", this lever means adding one — the whole suite, run every few merges — and the saving is
+       the merge gates minus those barrier runs. Say all of that, and leave it to the user.
+     - **How hard the verifier's sensor pushes** (`"verifier"`: `"sensor"`, a cap of mutants per tier,
+       `{"A": n, "B": n, "C": n}` or only the tiers to cap; `"survivor"`, the severity of a mutant that
+       survives, `blocker`, `major` or `minor`; and `"rounds"`). The first two are unset by default,
+       and then the verifier follows the downstream skill's own depth. On one measured project a
+       surviving mutant was named in 12 of the 26 refusals the verifiers themselves returned, and that
+       project's own rules record "an unbounded sensor and a new gap each round" as what spent seven
+       attempts on one feature. Capping the mutants bounds the first; `"survivor": "minor"` turns a
+       survivor into a listed note that does not refuse the feature — which gives up the guarantee
+       that every assertion can fail, so say so and leave it to the user. `"minor"` works only under
+       `tlc-spec-driven` (`tlc-spec-lean`'s completion gate refuses a PASS above a surviving mutant,
+       and `plan-pipeline.py` refuses it; with both skills installed the planner uses `tlc-spec-lean`).
+       `"rounds"` is `"scoped"` (the default) or `"full"`: every verification after the first is scoped
+       to the rows the last report did not pass and to what changed since (and to what a rebase
+       brought in), as `tlc-spec-lean`'s verify.md already prescribes, so a refusal fixed in one
+       round is not followed by a fresh sweep that finds something new elsewhere. A defect noticed
+       outside the scope keeps its true severity; only a weakness that is not a defect is minor. The
+       price is on the other side: a scoped round trusts the earlier round's verdict on the rows it
+       carries forward, so a first round that was loose leaves its loose PASS rows standing. Say so,
+       and offer `"full"` to a user who prefers to re-verify everything each time at the cost of the
+       loop.
 
    Write their answers and `"confirmed": true` into the file. If `plan-pipeline.py` then refuses
    with features the gate "cannot decide" — a report the gate refuses, or a pending feature a
@@ -682,8 +701,9 @@ them for an unattended run:
    one. Then offer, once, to time it:
    `python3 <this-skill-dir>/scripts/bench-gate.py --root <project-root>` runs the confirmed gate as
    written and, when it is `a && b && c`, with its parts at once, alternating the order, recording the
-   machine's load and refusing to compare a run that failed. The gate runs twice per feature, so its
-   duration is paid on every feature; the script changes nothing — adopting a faster form is theirs.
+   machine's load and refusing to compare a run that failed. By default the gate runs twice per feature
+   (the prover and the merger), so its duration is paid on every feature; the script changes nothing —
+   adopting a faster form is theirs.
 2. If the session can spawn sub-agents at all, nothing else is needed; the pipeline sets each role's
    effort itself (`effort` in `pipeline.json`, per role and tier) and does not use the agent files.
 

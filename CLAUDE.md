@@ -95,7 +95,8 @@ none of it is yours to decide unprompted.
 declarations (`bump-version.sh` writes them together, and refuses when they already disagree). In a
 user's project the skill's own equivalents: `## Status` and `docs/roadmap-history.md` are
 `status-block.py`'s, and `docs/process/pipeline.json`'s `"confirmed"`, `"featureStatus"`,
-`"manager.delegation"` and `"manager.autonomy"` are the user's alone — the one exception being manager
+`"manager.delegation"`, `"manager.autonomy"`, `"mergeGate"` and `"verifier.survivor"` (the last two trade a
+guarantee for speed) are the user's alone — the one exception being manager
 mode at level `unblock` writing `featureStatus` under that delegation, recorded as its own decision.
 
 **What is never touched without saying so:** the 13 non-negotiable rules in `SKILL.md`, the prompt
@@ -103,7 +104,10 @@ templates Step 10 emits — options A and C in `references/handover-prompt.md`, 
 in `references/loop-tlc-spec-*.md` — and the Handoff schemas in `handoff-seed.md` Step 6 (eight fields
 for `tlc-spec-driven`, seven for `tlc-spec-lean`). Three rule changes have happened in this repository's history; each is named
 in the `CHANGELOG.md` entry that made them — the third, 3.32.0, gave rules 1 and 10 manager mode's
-exception.
+exception. Two prompt clauses of `scripts/roadmap-pipeline.js` are protected the same way even though they are
+not among the 13 — the `TESTS` clause of the builder and of the unblock repairer (3.33.0, widened in 3.40.0 and
+bounded in 3.43.1) and the verifier's check of every change to an existing test: loosening either lets an
+unattended agent edit a test to pass.
 
 **Reading the downstream skill.** `references/handoff-seed.md` requires reading the downstream skill's
 real schema from disk, never from memory — `tlc-spec-lean` by default, `tlc-spec-driven` also

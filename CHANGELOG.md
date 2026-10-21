@@ -9,6 +9,94 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.43.1 — 2026-10-21
+
+**Corrections after an independent review of 3.37.0 to 3.43.0.** Four reviewers with fresh context, none given
+the author's conclusions, each a different cut: the pipeline's control flow, the planner and the measurer
+(including their compatibility with the four real `pipeline.json` files), the documentation against the code,
+and an independent recount of every measured number from the transcripts. They found defects in the author's
+own work, two of them in the direction that passes unfinished work. All are fixed; each fix that changes what
+an agent reads was re-executed by blind agents.
+
+**Fixed in the pipeline (`roadmap-pipeline.js`):**
+
+- **The receipt could skip a gate that never ran on the merged tree.** The prover recorded `base` (the main
+  branch) after the ~24-minute gate; with several lanes another lane could merge meanwhile and `base` then
+  equalled a main branch the gate had not seen. It is now `git merge-base <main> HEAD`, the commit the tree was
+  built on. The merger also checks that the receipt's `command` is the pipeline's gate, not a lighter one (found by
+  accident, from a mismatch in a test fixture), runs its checks with `git -C <worktree>` (at lanes above 1 they could
+  run in the project root and compare `main` with itself), and the skip is shown in the run's account
+  (`[gate skipped: receipt]`). `mergeGate: receipt` also needs `barrierEvery` of at least 1.
+- **A verification's "round" was chosen by the attempt counter, not by whether a report exists.** The first
+  verifier ever to see a feature after a builder that did not finish was told "a verifier already refused this
+  feature" and had nothing in scope. It now looks (`git log -1 -- <report>`): nothing printed means a first
+  verification, judged by the downstream skill's own rules; a sha means a later round.
+- **Scoped rounds demoted real defects, and the demotion leaked into the first round.** Anything noticed outside the
+  scope was forced to `minor`. Now scope limits what is re-run, never what may be refused: a criterion not met or a
+  correctness or security flaw keeps its severity; only a weakness that lies outside the scope and is not a defect
+  is `minor`. A rebase's incoming changes are brought into the scope. The first version of this fix still let a
+  verifier apply the `minor` rule to a first verification (12 of 25 mutants survived and it returned PASS, with no
+  test at all for a stated clause); the text now separates the two branches explicitly.
+- **The test-correction rule could be satisfied by the builder's own spec.** The criterion must now come from the
+  roadmap behind the feature (what `feature-brief.py` prints), decided before the build, and the verifier checks
+  with `git log` that the branch did not write it. The correction commit's first line is `REVOKED-TEST <file>:<test
+  name>`, so `git log --grep=REVOKED-TEST` finds them (the notes that the old wording pointed to were never kept).
+  The verifier's "test files" now name fixtures, conftest, configuration and the gate script.
+- **The unblock repairer received two contradictory test rules** (the wide one and its own narrow bullets, and
+  "fix the code, not the test" against "fix the test when it is flaky"). It has its own clause: the narrow
+  exception and a timing fix at its cause.
+- **With `verify-first`**, a prover that fails a passed feature leaves `gate-failure.md` for the next builder, who
+  is sent to read it; the "PASS report the gate refused" note is no longer cleared when a verifier returns nothing.
+- A sentence in the verifier's receipt paragraph that attached to nothing ("and report the mismatch…", two blind
+  agents tripped on it) is rewritten; "at most 1 mutants" and the stale "refused" wording are gone.
+
+**Fixed in the planner (`plan-pipeline.py`):** one `config_problems` that reports every problem at once and is
+called by `plan()` and by `manager_args()` (manager mode validated none of the new keys before it paid the first
+decomposer); a value that is present but falsy (`0`, `false`, `""`, `[]`) is an error, not an absence; names are
+trimmed; typos inside `verifier` and `manager.effort` and a bare-string `stopAt` or negative `sectionsPerRun` are
+refused instead of crashing or being ignored; the downstream message says which skill was chosen and why.
+
+**Fixed in `measure-agents.py`:** the parallelism figure was **wrong on the data it was built for** (1.38 where the
+paired figure is 1.01): it divided every agent in the window by only the runs that had a journal. It is now paired
+per journal (the agents of that run's own folder inside that run's interval), and the report says how many agents
+were left out. The verdict counts are labelled as what each verifier itself returned, next to the pipeline's own
+decisions read from the journals' logs (the two differ by the reviewer's refusals and the gate's: 26 and 28 of 37
+in the two runs measured). Fractions of a second of any length are read on Python 3.8 to 3.10. The self-test
+broke on seven of eight deliberate mutations; the eighth (the fraction fallback) cannot be seen on Python 3.12 and
+was run on 3.8, 3.9 and 3.10.
+
+**Fixed in the documents:** Step 8 and Step 10 say what changed by default (the verifier reuses the receipt "by
+default"; the manager may update tests at both levels), name the receipt's real conditions and the barrier it
+needs, the prices of `verify-first` (the tree seen before the rebase, with several lanes), the values `survivor`
+and a partial `sensor` accept, that `models` does not reach manager mode's own agents and says `build` where
+`effort` says `implement`, "four things" for four bullets; manager mode says how to review test corrections; the
+three READMEs and three guides say time as well as tokens; `CLAUDE.md` names `mergeGate` and `verifier.survivor`
+as the user's alone and the test clauses as protected; `check-consistency.py` ties `MODEL_ROLES`, the JS
+`modelFor()` calls and Step 10 together. **Numbers corrected** in 3.37.0 to 3.43.0 above: "turns" were logged
+events; "28 of 37" and "26 of 37" are both right for what they count; "61% of the time and about 2% of the
+tokens" is 58.9% and 12.9% by the tool on a wider window; "builders take two thirds of the time" was never
+measured. 3.40.0 is relabelled a behaviour change, not a rule change (no rule of `SKILL.md` moved).
+
+**Tests:** `check-pipeline.mjs` 201 checks, 87 of them mutants, 27 s (154 s before the mutants ran side by side):
+every clause of the prompts added since 3.36.0 is asserted in the prompt of its role and has a mutant that
+replaces it by a neutral word (a reviewer had deleted 28 clauses and no scenario failed). `plan-pipeline.py
+--selftest` 73 to 100 assertions, `measure-agents.py` 19 to 26. Mutations of the planner broke by hand: seven
+of eight caught; the eighth was a test that iterated the constant it was meant to check, rewritten.
+
+**Executed by blind agents (Sonnet for verifiers, Haiku for mergers, each in its own copy, the exact prompt
+rendered from the script):** a first verification with no report → **FAIL**, the untested clauses named (after
+the fix above; before it, PASS); a scoped round with a real defect planted in code the fix had not touched
+(a regression that drops digits) → found twice and refused as a blocker, with the commit that introduced it; a
+manager-mode correction whose criterion the builder wrote on its own branch → refused; the same correction with
+the criterion on the main branch → not refused; mergers: a valid receipt → gate skipped (no mark on disk), the
+main branch moved → gate ran, a receipt with a zeroed hash → gate ran. **Not executed:** a real Workflow run;
+lanes above 1 in the merge fixture; the rebase clause of the scoped round (no fixture with a rebase); the
+`gate-failure.md` note; the new `command` condition beyond the stubs. Fixtures not kept (rebuilt by hand and
+deleted). One side effect of a reviewer, reported: interpreters for Python 3.8 to 3.10 installed under
+`~/.local/share/uv`.
+
+---
+
 ## 3.43.0 — 2026-10-21
 
 **The merge can take the prover's receipt for the gate, when it proves the exact tree** (Infinity-Agent-Creator,
@@ -20,9 +108,12 @@ the default — the receipt is written by an agent.
   only if ALL hold: the receipt's gate is `pass`; its `base` equals the main branch now (so the rebase
   replayed nothing); its `codeHash` equals the hash recomputed on the tree; and `git status --porcelain` is
   empty. Anything else, or no file: it runs the gate, detached and waited for as before. The prover's
-  receipt now records `base` (`git rev-parse <main>`) beside `codeHash`.
+  receipt now records `base` beside `codeHash`. (3.43.1: a review showed `git rev-parse <main>` taken after the
+  gate lets `base` equal a main branch that moved during it; it is now `git merge-base <main> HEAD`, taken as the
+  tree was built.)
 - **It needs a `barrierGate`**: `plan-pipeline.py` refuses `"receipt"` without one. A receipt proves what its
-  writer says it proves, a branch of a real project carried a receipt written by hand, and the barrier is the
+  writer says it proves, a branch of a real project carried a receipt written by hand (Infinity-Agent-Creator's Status of 2026-10-20
+  names `gate-ci-barrier`), and the barrier is the
   one run of the project's checks on the merged main branch that no one's word stands in for. What this
   option cannot catch is a prover that never ran the gate and wrote a coherent receipt; the barrier, every
   N merges, is what catches that late.
@@ -38,7 +129,8 @@ rebase replayed the commits, `base` differed, gate ran (one mark), merged; a rec
 `codeHash` → gate ran (one mark), merged, and the agent flagged the bad receipt now on `main`. 3/3. A
 wording seam in my first text ("you run it — Run the GATE…") was read before the run and fixed.
 **Not executed:** a real Workflow run; a receipt that is wrong in `gate` or in a dirty tree (stubs only);
-whether the barrier catches a lying prover in practice.
+whether the barrier catches a lying prover in practice; lanes above 1 (the fixture was one repository). Fixture not
+kept (rebuilt by hand and deleted).
 
 ---
 
@@ -65,8 +157,10 @@ and a 1-minute verifier, a 4-minute run → 3.25 agents at once, one passed and 
 outside the window left out, a subagent folder named `workflows` not mistaken for a journal), and a run
 over the Infinity-Agent-Creator transcripts, read only, which reproduced the shares measured by hand
 before this existed (prove 49.4% of agent time and merge 9.5%, against 51% and 10% by hand; parallelism 1.08) and
-added what was not measured then (59% of the verifications refused). That window included the agents of a
-run still going, which inflates the agent-hours a little; the report says so. **Not executed:** a
+counted the verifiers' own verdicts (26 of 44 said refuse, 59% — 3.43.1 relabelled this as what the verifiers
+returned, since the pipeline's 28 of 37 attempts also counts the reviewer and the gate). That window included the
+agents of a run still going, which inflates the agent-hours a little; the report says so.
+Corrected in 3.43.1: the parallelism figure was wrong on this very data (1.38 against 1.01 paired per journal). **Not executed:** a
 before/after on a real change, which needs a second run.
 
 ---
@@ -105,8 +199,9 @@ front of it is exercised by stubs only). Whether a stronger builder or verifier 
 
 ## 3.40.0 — 2026-10-21
 
-**Rule change, manager mode only: an existing test is updated, not obeyed, when the feature's own spec
-changes what it asserts** (Infinity-Agent-Creator, skill 3.39.0, fourth step of the time review; widened
+**Behaviour change, manager mode only: an existing test is updated, not obeyed, when the feature's own spec
+changes what it asserts** (no rule of `SKILL.md` changed; the 13 are untouched and 3.32.0 is still the last
+rule change — this widens a prompt clause 3.33.0 added to the pipeline) (Infinity-Agent-Creator, skill 3.39.0, fourth step of the time review; widened
 at the owner's explicit confirmation of 2026-10-20). It widens the exception 3.33.0 gave a builder in
 manager mode, which required that *an owner decision* revoke exactly the assertion. The owner of that
 project had already made the wider rule their own (their `AGENTS.md`, "Teste antigo que contradiz a spec é
@@ -144,6 +239,9 @@ three refused as `blocker`. **Not executed:** a real Workflow run, so the `manag
 re-run; a builder tempted to cite a criterion that does not contradict the test (the verifier clause for
 it is read by a stub only); the unblock repairer, which shares the text. **Review the `REVOKED-TEST` lines
 after a run** — a correction the owner would not have made is a change request, not a wording fix.
+Fixture not kept (rebuilt by hand and deleted). Corrected in 3.43.1: the unblock repairer did NOT share this
+rule as written here — it received both the wide rule and its own narrow bullets, which contradicted each other;
+and the criterion could be one the builder wrote on its own branch, which 3.43.1 closes.
 
 ---
 
@@ -151,10 +249,10 @@ after a run** — a correction the owner would not have made is a change request
 
 **The verifier's sensor can be capped and its survivors graded, and a refusal fixed in one round is
 re-verified by scope instead of by a fresh sweep** (Infinity-Agent-Creator, skill 3.38.0, third step of
-the time review). On that project a surviving mutant was named in 12 of 26 readable refusals, and its
-own rules record "an unbounded sensor and a new gap each round" as what spent seven attempts on one
-feature. `tlc-spec-driven`'s own default is 1-3 mutants per feature; the unbounded sensor came from the
-project's rules, so the control belongs to the pipeline, not to the downstream skill.
+the time review). On that project a surviving mutant was named in 12 of the 26 refusals the verifiers
+themselves returned, and its own rules record "an unbounded sensor and a new gap each round" as what spent seven attempts on one
+feature. `tlc-spec-driven`'s own default is 1-3 mutants per standard feature and at least 5 on critical paths; the
+unbounded sensor came from the project's rules, so the control belongs to the pipeline, not to the downstream skill.
 
 - **`verifier` in `pipeline.json`**, all of it optional and absent by default:
   - `sensor`: `{"A": n, "B": n, "C": n}`, the most mutants for a feature of that tier, each chosen so a
@@ -172,8 +270,8 @@ project's rules, so the control belongs to the pipeline, not to the downstream s
     nothing ever wrote them).
 - **The price is on the unsafe side, and it is written down.** A scoped round trusts the earlier round's
   verdict on the rows it carries forward, so a loose first round leaves its loose PASS rows standing: in
-  the fixture below the control found two real gaps in a criterion nobody had touched, and the scoped
-  rounds did not. That is why `rounds: "full"` exists, and why Step 10 says it to the user.
+  the fixture below the control found two new `major` gaps in a criterion nobody had touched (digits and a leading strip with no test),
+  and the scoped rounds did not. That is why `rounds: "full"` exists, and why Step 10 says it to the user.
 - **`check-pipeline.mjs`:** 5 scenarios and 4 mutants (policy dropped, scoping dropped, `full` ignored,
   the builder not sent to an earlier refusal); `plan-pipeline.py --selftest` 8 new assertions (values,
   tiers, the lean refusal).
@@ -188,7 +286,7 @@ created* and to carry forward killed mutants on untouched surfaces (the cap and 
 disagreed), then **2/2** passed scoped, cited the carried rows, injected the new mutant on the new
 test's surface and listed the untouched `clamp` guard as `minor`. **Not executed:** a real Workflow run;
 `rounds: "full"` and the `survivor: "minor"` path beyond stubs and the planner; any fixture where the
-scoped verifier should have refused. One fixture, one downstream skill (`tlc-spec-driven`).
+scoped verifier should have refused. One fixture, one downstream skill (`tlc-spec-driven`). Fixture not kept: it was rebuilt by hand in a scratch folder and deleted.
 
 ---
 
@@ -197,11 +295,14 @@ scoped verifier should have refused. One fixture, one downstream skill (`tlc-spe
 **The full gate can run after the verifier instead of before it — an option, not a new default**
 (Infinity-Agent-Creator, skill 3.37.0, second step of the time review). On that project the gate took
 ~24 minutes and ran before the verifier on every attempt that reached it: 28 of the 37 attempts the
-verifier saw were refused, so 28 gates bought a refusal that did not need them (~11 agent-hours of 38.7
+verifier saw were refused (26 by the verifier itself and 2 more by the tier A reviewer — an independent
+recount in 3.43.1 found both numbers right for what they count), so 28 gates bought a refusal that did not
+need them (~11 agent-hours of 38.7
 by arithmetic over the journals, not a measured outcome).
 
 - **It is a trade, so it is the user's.** The gate did catch something first in 11 of 48 prover runs
-  (3 lint, 5 a stale test, the rest a regression in a test the feature did not touch); verify-first
+  (3 lint, 4 or 5 a stale test, the rest a failure in a test the feature did not own — the grouping is a
+judgement and two readings differ by one); verify-first
   spends one verification on each of those and saves a gate on every attempt the verifier refuses. It
   pays when the gate is long beside a verification (here 24 min against 7), and loses when the gate is
   short — the same project's gate after a 4× faster suite would pay far less. So `pipeline.json` gets
@@ -214,7 +315,9 @@ by arithmetic over the journals, not a measured outcome).
   feature costs an attempt, its failure is the next builder's feedback, and a feature blocked that way
   says in the run's account that its branch carries a PASS report the gate refused. `is_done` reads the
   main working tree, so that report is not read as done once the record step has checked out main; it
-  would be if a run were killed first.
+  would be if a run were killed first. Two prices were found by review and fixed or written down in 3.43.1:
+the verifier sees the tree before the prover rebases it onto a main branch another lane may have moved, and
+the next verification used to be told the feature was "refused" when its report said PASS.
 - **`check-pipeline.mjs`:** 5 scenarios (the call order, no gate for a refused feature, a refused gate
   costing an attempt and being reported, the two prompts, the default untouched) and 3 mutants, all
   caught; `plan-pipeline.py --selftest` 3 new assertions.
@@ -230,13 +333,14 @@ option saves on a real project is to be read from its journals with `measure-age
 
 **A builder no longer ends its attempt with a job still running** (Infinity-Agent-Creator, skill 3.36.0,
 Haiku). First step of a time review of that project's two last manager runs (176 agents, 38.7 agent-hours,
-read only). Wall-clock there is not where the build kit assumed: prove 51%, build 24%, verify 13%, merge
-10% — the gate is 61% of the time and about 2% of the tokens, so the "builders take two thirds of the
-time" premise of the effort lever (measured on WordPress) does not hold on every project. The rest of the
+read only; recounted independently in 3.43.1). Wall-clock there is not where the build kit assumed:
+prove 50.9%, build 24.1%, verify 13.0%, merge 10.1% of the agent-hours (and `measure-agents.py`, in 3.42.0,
+puts prove and merge at 58.9% of the time and 12.9% of the relative cost on a wider window), so the "builders
+take two thirds of the time" premise of the effort lever does not hold on every project. The rest of the
 review is planned as the next releases; this one is the defect with a certain cause.
 
 - **Cause, measured.** 8 of 56 builders never reached the prover. Three of them (`stop-async-runner`,
-  `stop-yaml-gate`, `ver-golden-llm`, all attempt 1, 107–138 turns, 150–220k tokens of context) had loaded
+  `stop-yaml-gate`, `ver-golden-llm`, all attempt 1, 107–138 logged assistant events — about half as many API turns —, 150–220k tokens of context) had loaded
   the Monitor tool through ToolSearch, armed a watcher on a background test batch or a lock
   regeneration, and answered `ready=false` "waiting for the monitor". A workflow agent is finished the
   moment it replies, so the result was read by nobody and the attempt was spent. The prover has had
@@ -244,11 +348,11 @@ review is planned as the next releases; this one is the defect with a certain ca
   behaviour — a later step.)
 - **`LONG_COMMANDS`** in the builder's and the repairer's prompts: never `run_in_background`, never
   load or arm Monitor, never `ready=false` because something is still running; a command that surely ends
-  within 2 minutes (the Bash tool's own limit) runs in the foreground, anything longer or of unknown
+  within 2 minutes (the Bash tool's default timeout) runs in the foreground, anything longer or of unknown
   length runs detached and is waited for with `timeout N tail --pid`, with the Bash call's `timeout`
   parameter set above the wait.
-- **The timeout clause comes from a blind run.** Real provers set it unprompted in 159 of 162 waits
-  (`timeout=560000`); the first blind builder run showed the wait moved to the background without it.
+- **The timeout clause comes from a blind run.** Real provers set it unprompted in 159 of the 162
+  `tail --pid` waits of the two runs (`timeout=560000`); the first blind builder run showed the wait moved to the background without it.
 - **`check-pipeline.mjs`:** 1 scenario and 1 mutant (the rule removed from the builder), caught.
 
 **Executed:** 4 blind Haiku agents, two rounds, each in its own copy, a command that takes 150 s: 4/4
@@ -257,7 +361,7 @@ Round 1 (2/2) found the missing tool-timeout clause and the unclear 2-minute-to-
 (2/2) ran with the clause. **Not executed:** the last edit (the foreground limit from "about 5 minutes" to
 2 minutes — it only sends more commands down the path the four runs exercised), and a real Workflow run
 with a real builder; whether builders now finish is to be read from the next run's journals with
-`measure-agents.py`.
+`measure-agents.py`. Fixture not kept: the 150-second script was built by hand in a scratch folder and deleted.
 
 ---
 

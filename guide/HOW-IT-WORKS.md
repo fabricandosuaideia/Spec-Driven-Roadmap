@@ -276,8 +276,8 @@ back, the skill re-seeds, and the next section gets its own loop.
 
 **C — a pipeline run, Claude Code only.** The same one roadmap, built by a Workflow script the skill
 ships: per feature a builder, a fresh prover that runs your full gate once and writes a receipt, your
-build skill's verifier — which reuses that receipt instead of re-running the suite — a reviewer for
-risk-tier A features, and a merger that runs the gate on the exact tree before merging. Attempts are
+build skill's verifier — which by default reuses that receipt instead of re-running the suite — a reviewer
+for risk-tier A features, and a merger that by default runs the gate on the exact tree before merging. Attempts are
 capped by tier, and the third is told to name the invariant its predecessors kept missing before it
 writes code. The skill asks you once for the gate every feature must pass — your whole gate, or, if
 your project keeps its whole suite for a batch barrier, your per-feature gate plus that barrier
@@ -370,8 +370,9 @@ honest. Those stay a read.
 ## Measuring what the agents cost, and upgrading a project
 
 Ask *"measure my agent cost"* and the skill reads your project's own Claude Code transcripts and shows
-where the tokens went: by role, by retry, by the model and effort each role ran at, and how much of
-each conversation was context piling up turn after turn. It edits nothing. Save a baseline before you
+where the tokens and the time went: by role, by retry, by the model and effort each role ran at, how long
+each role's agents ran, how many ran at once, and how much of each conversation was context piling up turn
+after turn. It edits nothing. Save a baseline before you
 change how agents run and compare after; a saving nobody measured is a guess.
 
 A project an earlier version planned gets the new behaviour by asking *"upgrade this project"* after

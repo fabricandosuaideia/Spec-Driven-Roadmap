@@ -374,6 +374,32 @@ def check_step_pointers(root):
     check("every `<file> Step N` pointer lands", not bad, "\n".join(sorted(set(bad))))
 
 
+def check_pipeline_config_keys(root):
+    """The roles `models` may name are written in three places and must be the same set: MODEL_ROLES in
+    plan-pipeline.py (what the planner accepts), the modelFor('<role>') calls in roadmap-pipeline.js (what the
+    pipeline looks up) and the sentence in handover-prompt.md Step 10 that tells the user which roles exist.
+    A role the planner accepts and the pipeline never reads is a setting that does nothing, which is the failure
+    the planner's unknown-key checks exist to prevent; a review of 3.41.0 found no check tied them."""
+    py = read(root, "scripts", "plan-pipeline.py") or ""
+    js = read(root, "scripts", "roadmap-pipeline.js") or ""
+    hp = read(root, "references", "handover-prompt.md") or ""
+    m = re.search(r"^MODEL_ROLES\s*=\s*\(([^)]*)\)", py, re.M)
+    planner = set(re.findall(r"\"(\w+)\"", m.group(1))) if m else set()
+    used = set(re.findall(r"modelFor\('(\w+)'\)", js))
+    # the repairer is a builder, the triage checker a verifier, the triage merger a merger: they reuse a role's key
+    documented = {r for r in planner if re.search(r"`%s`" % re.escape(r), hp)}
+    problems = []
+    if not planner:
+        problems.append("read no MODEL_ROLES from plan-pipeline.py")
+    if planner - used:
+        problems.append("the planner accepts %s but roadmap-pipeline.js never looks them up" % ", ".join(sorted(planner - used)))
+    if used - planner:
+        problems.append("roadmap-pipeline.js looks up %s but the planner refuses them" % ", ".join(sorted(used - planner)))
+    if planner - documented:
+        problems.append("handover-prompt.md does not name the role(s) %s" % ", ".join(sorted(planner - documented)))
+    check("the roles `models` accepts are the roles the pipeline reads and Step 10 names", not problems, "\n".join(problems))
+
+
 def check_no_orphan_constants(root):
     """Every module-level constant must be read somewhere in its own file.
 
@@ -591,7 +617,7 @@ def main():
     print("trilingual parity")
     check_trilingual_parity(root, "guide", scope(root)["guides"], "guide")
     check_trilingual_parity(root, "", scope(root)["readmes"], "README")
-    print("procedure"); check_step_numbering(root); check_step_pointers(root); check_no_orphan_constants(root)
+    print("procedure"); check_step_numbering(root); check_step_pointers(root); check_no_orphan_constants(root); check_pipeline_config_keys(root)
     check_step_8_reminder(root)
     print("benchmark"); check_benchmark(root)
     print("loop templates"); check_loop_templates(root)

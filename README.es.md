@@ -92,8 +92,9 @@ La Fase 2 ejecuta las mismas comprobaciones al cerrar un roadmap; esto es para p
 ### ¿Adónde fue mi cuota?
 
 Pide — *"mide el costo de mis agentes"* — y la skill lee los transcritos de Claude Code de este
-proyecto y muestra adónde fueron los tokens: por rol, por reintento, y cuánto de cada conversación es
-contexto que se acumula turno tras turno. No edita nada ni ejecuta nada más. Guarda una línea base
+proyecto y muestra adónde fueron los tokens y el tiempo: por rol, por reintento, cuánto tiempo corrieron los
+agentes de cada rol, cuántos corrieron a la vez, y cuánto de cada conversación es contexto que se acumula
+turno tras turno. No edita nada ni ejecuta nada más. Guarda una línea base
 antes de cambiar cómo corren los agentes, y compara después: un ahorro que nadie midió es una
 suposición.
 

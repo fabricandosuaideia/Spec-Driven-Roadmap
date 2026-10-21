@@ -89,8 +89,8 @@ Phase 2 runs the same checks whenever it closes a roadmap, so this is for asking
 ### Where did my quota go?
 
 Ask — *"measure my agent cost"* — and the skill reads this project's own Claude Code transcripts and
-shows where the tokens went: by role, by retry, and how much of each conversation is context piling
-up turn after turn. It edits nothing and runs nothing else. Save a baseline before you change how
+shows where the tokens and the time went: by role, by retry, how long each role's agents ran, how many ran
+at once, and how much of each conversation is context piling up turn after turn. It edits nothing and runs nothing else. Save a baseline before you change how
 agents run, and compare after: a saving nobody measured is a guess.
 
 ### Which version do I have?

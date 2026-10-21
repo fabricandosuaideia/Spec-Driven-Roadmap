@@ -295,13 +295,7 @@ def plan(root, roadmap_rel, cfg):
     entries = {n: f for n, f, _b in CR.parse_features(text)}
     status = os.path.join("docs", "ROADMAP-INDEX.md") if os.path.isfile(os.path.join(root, "docs", "ROADMAP-INDEX.md")) \
         else os.path.join("docs", "ROADMAP.md")
-    if (cfg.get("gateOrder") or "gate-first") not in GATE_ORDERS:
-        raise RuntimeError("%s gateOrder takes %s; not: %s" % (CONFIG, " or ".join(GATE_ORDERS), cfg.get("gateOrder")))
-    if (cfg.get("mergeGate") or "rerun") not in MERGE_GATES:
-        raise RuntimeError("%s mergeGate takes %s; not: %s" % (CONFIG, " or ".join(MERGE_GATES), cfg.get("mergeGate")))
-    if cfg.get("mergeGate") == "receipt" and not cfg.get("barrierGate"):
-        raise RuntimeError("%s mergeGate \"receipt\" needs a barrierGate: the receipt is written by an agent, and the barrier is "
-                           "the one run of the project's checks that nobody's word stands in for" % CONFIG)
+    validate_config(cfg, ds)
     done, pending, discharged, doubtful = classify(root, ds, ds_dir, entries, order, cfg, roadmap_rel)
     if doubtful:
         raise RuntimeError(doubtful_message(doubtful))
@@ -348,9 +342,9 @@ def plan(root, roadmap_rel, cfg):
     args = {
         "project": root, "skillDir": SKILL_DIR, "downstream": ds, "downstreamDir": ds_dir,
         "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main", "gate": cfg["gate"],
-        "barrierGate": cfg.get("barrierGate") or None, "barrierEvery": int(cfg.get("barrierEvery") or 0),
+        "barrierGate": (cfg.get("barrierGate") or "").strip() or None, "barrierEvery": int(cfg.get("barrierEvery") or 0),
         "model": cfg.get("model") or None, "gateOrder": cfg.get("gateOrder") or "gate-first", "mergeGate": cfg.get("mergeGate") or "rerun",
-        "verifier": verifier_policy(cfg, ds),
+        "verifier": verifier_policy(cfg),
         **({"models": models_policy(cfg)} if models_policy(cfg) else {}),
         "testHint": cfg.get("testHint") or "", "setup": cfg.get("setup") or "", "push": bool(cfg.get("push")),
         "lanes": lanes, "worktreeRoot": root.rstrip("/") + ".lanes", "checklist": cfg.get("checklist"),
@@ -373,58 +367,130 @@ GATE_ORDERS = ("gate-first", "verify-first")
 MERGE_GATES = ("rerun", "receipt")
 SURVIVOR_SEVERITIES = ("blocker", "major", "minor")
 ROUND_MODES = ("scoped", "full")
+TIERS = ("A", "B", "C")
 MODEL_ROLES = ("build", "prove", "verify", "review", "merge", "record", "triage", "barrier")
+VERIFIER_KEYS = ("sensor", "survivor", "rounds")
 # Keys of `manager` that mean something. A key outside this list was silently ignored before 3.41.0, which
 # is how a setting that does nothing gets trusted: "passes" was a local patch of one project, and is
 # refused by name because ignoring it would let its owner believe a second pass happens.
 MANAGER_KEYS = ("delegation", "delegatedOn", "autonomy", "stopAt", "sectionsPerRun", "decomposeModel", "effort")
+MANAGER_EFFORT_KEYS = ("decompose", "plan", "final")
+
+
+def _whole(n, least):
+    return isinstance(n, int) and not isinstance(n, bool) and n >= least
+
+
+def config_problems(cfg, ds=None):
+    """Every problem with the pipeline.json values this script reads, as a list of sentences — each starts with
+    the key it is about. A value that is present but falsy (0, false, "", [], {}) is a problem, not an absence:
+    only a missing key or null means "unset". `ds` is the downstream skill, when known."""
+    out = []
+
+    def given(d, k):
+        return isinstance(d, dict) and d.get(k) is not None
+
+    def one_of(d, k, allowed, label):
+        if given(d, k) and d[k] not in allowed:
+            out.append("%s takes %s; not: %r" % (label, " or ".join(allowed), d[k]))
+    one_of(cfg, "gateOrder", GATE_ORDERS, "gateOrder")
+    one_of(cfg, "mergeGate", MERGE_GATES, "mergeGate")
+    for key in ("barrierEvery", "lanes"):
+        if given(cfg, key) and not _whole(cfg[key], 0 if key == "barrierEvery" else 1):
+            out.append("%s takes a whole number%s; not: %r" % (key, " (0 = once, at the end)" if key == "barrierEvery" else " of at least 1", cfg[key]))
+    if cfg.get("mergeGate") == "receipt":
+        if not (isinstance(cfg.get("barrierGate"), str) and cfg["barrierGate"].strip()):
+            out.append("mergeGate \"receipt\" needs a barrierGate: the receipt is written by an agent, and the barrier is the one run "
+                       "of the project's checks that nobody's word stands in for")
+        if not _whole(cfg.get("barrierEvery"), 1):
+            out.append("mergeGate \"receipt\" needs barrierEvery of at least 1: with 0 the barrier runs once, at the end, and a run that "
+                       "stops early would leave receipt-merged features that no barrier ever ran on")
+    v = cfg.get("verifier")
+    if v is not None and not isinstance(v, dict):
+        out.append("verifier takes an object: {\"sensor\": {\"A\": n, \"B\": n, \"C\": n}, \"survivor\": ..., \"rounds\": ...}; not: %r" % (v,))
+    elif isinstance(v, dict):
+        stray = sorted(k for k in v if k not in VERIFIER_KEYS)
+        if stray:
+            out.append("verifier has no key %s; the keys are %s" % (", ".join(stray), ", ".join(VERIFIER_KEYS)))
+        if given(v, "sensor"):
+            sen = v["sensor"]
+            if not isinstance(sen, dict):
+                out.append("verifier.sensor takes an object of mutant caps per tier, such as {\"A\": 5, \"B\": 3}; not: %r" % (sen,))
+            else:
+                badtier = sorted(k for k in sen if k not in TIERS)
+                badnum = sorted(k for k, n in sen.items() if k in TIERS and not _whole(n, 1))
+                if badtier:
+                    out.append("verifier.sensor has no tier %s; the tiers are A, B and C" % ", ".join(badtier))
+                if badnum:
+                    out.append("verifier.sensor.%s must be a whole number of at least 1 (a tier it does not name has no cap)" % ", ".join(badnum))
+        one_of(v, "survivor", SURVIVOR_SEVERITIES, "verifier.survivor")
+        one_of(v, "rounds", ROUND_MODES, "verifier.rounds")
+        if v.get("survivor") == "minor" and ds == "tlc-spec-lean":
+            out.append("verifier.survivor \"minor\" cannot be used with tlc-spec-lean (the downstream here, because it is installed: "
+                       "when both skills are installed tlc-spec-lean is the one used): its completion gate refuses a PASS written above "
+                       "a surviving mutant. Cap the mutants instead, or install only tlc-spec-driven")
+    m = cfg.get("models")
+    if m is not None and not isinstance(m, dict):
+        out.append("models takes an object: {\"build\": \"<model>\", ...}; not: %r" % (m,))
+    elif isinstance(m, dict):
+        bad = sorted(k for k in m if k not in MODEL_ROLES)
+        if bad:
+            out.append("models has no role %s; the roles are %s" % (", ".join(bad), ", ".join(MODEL_ROLES)))
+        empty = sorted(k for k, x in m.items() if k in MODEL_ROLES and not (isinstance(x, str) and x.strip()))
+        if empty:
+            out.append("models.%s must be a model name" % ", models.".join(empty))
+    mgr = cfg.get("manager")
+    if mgr is not None and not isinstance(mgr, dict):
+        out.append("manager takes an object; not: %r" % (mgr,))
+    elif isinstance(mgr, dict):
+        stray = sorted(k for k in mgr if k not in MANAGER_KEYS)
+        if stray:
+            note = (" \"passes\" was a local patch of one project: a second pass would restart every unfinished feature at attempt 1, "
+                    "which is only a second full budget - delete the key and raise the top-level maxAttempts instead" if "passes" in stray else "")
+            out.append("manager has no key %s; the keys are %s.%s" % (", ".join(stray), ", ".join(MANAGER_KEYS), note))
+        one_of(mgr, "autonomy", AUTONOMY, "manager.autonomy")
+        if given(mgr, "sectionsPerRun") and not _whole(mgr["sectionsPerRun"], 1):
+            out.append("manager.sectionsPerRun takes a whole number of at least 1; not: %r" % (mgr["sectionsPerRun"],))
+        if given(mgr, "stopAt") and not (isinstance(mgr["stopAt"], list) and all(isinstance(x, str) for x in mgr["stopAt"])):
+            out.append("manager.stopAt takes a list of section slugs; not: %r" % (mgr["stopAt"],))
+        for k in ("delegation", "delegatedOn", "decomposeModel"):
+            if given(mgr, k) and not isinstance(mgr[k], str):
+                out.append("manager.%s takes a string; not: %r" % (k, mgr[k]))
+        if given(mgr, "effort"):
+            ef = mgr["effort"]
+            if not isinstance(ef, dict):
+                out.append("manager.effort takes an object with %s; not: %r" % (", ".join(MANAGER_EFFORT_KEYS), ef))
+            else:
+                badk = sorted(k for k in ef if k not in MANAGER_EFFORT_KEYS)
+                if badk:
+                    out.append("manager.effort has no key %s; the keys are %s" % (", ".join(badk), ", ".join(MANAGER_EFFORT_KEYS)))
+    return out
+
+
+def validate_config(cfg, ds=None):
+    problems = config_problems(cfg, ds)
+    if problems:
+        raise RuntimeError("%s: %s" % (CONFIG, "; ".join(problems)))
 
 
 def models_policy(cfg):
-    """`models`: a model per role, validated. A role it does not name uses `model`."""
+    """`models`, normalised (names trimmed) after validate_config accepted it. A role it does not name uses `model`."""
     m = cfg.get("models")
-    if not m:
-        return None
-    if not isinstance(m, dict):
-        raise RuntimeError("%s models takes an object: {\"build\": \"<model>\", ...}" % CONFIG)
-    bad = sorted(k for k in m if k not in MODEL_ROLES)
-    if bad:
-        raise RuntimeError("%s models has no role %s; the roles are %s" % (CONFIG, ", ".join(bad), ", ".join(MODEL_ROLES)))
-    empty = sorted(k for k, v in m.items() if not (isinstance(v, str) and v.strip()))
-    if empty:
-        raise RuntimeError("%s models.%s must be a model name" % (CONFIG, ", models.".join(empty)))
-    return dict(m)
+    return {k: v.strip() for k, v in m.items()} if isinstance(m, dict) and m else None
 
 
-def verifier_policy(cfg, ds):
-    """The `verifier` block, checked: a cap on mutants per tier and the severity of a survivor. Both
-    optional. `minor` is refused under tlc-spec-lean, whose completion gate refuses a PASS written
-    above a surviving mutant, so the verifier could not write the report the policy asks for."""
-    v = cfg.get("verifier") or {}
+def verifier_policy(cfg):
+    """`verifier`, normalised after validate_config accepted it: the cap of mutants per tier that was named, the
+    severity of a survivor, and how a round after the first is verified."""
+    v = cfg.get("verifier")
     if not isinstance(v, dict):
-        raise RuntimeError("%s verifier takes an object: {\"sensor\": {\"A\": n, \"B\": n, \"C\": n}, \"survivor\": ...}" % CONFIG)
+        return None
     out = {}
-    sensor = v.get("sensor")
-    if sensor:
-        bad = [k for k in sensor if k not in ("A", "B", "C")] if isinstance(sensor, dict) else ["sensor"]
-        bad += [k for k, n in (sensor.items() if isinstance(sensor, dict) else [])
-                if k in ("A", "B", "C") and not (isinstance(n, int) and not isinstance(n, bool) and n >= 1)]
-        if bad:
-            raise RuntimeError("%s verifier.sensor takes a whole number of at least 1 for A, B and C; not: %s" % (CONFIG, ", ".join(sorted(set(bad)))))
-        out["sensor"] = dict(sensor)
-    survivor = v.get("survivor")
-    if survivor:
-        if survivor not in SURVIVOR_SEVERITIES:
-            raise RuntimeError("%s verifier.survivor takes %s; not: %s" % (CONFIG, ", ".join(SURVIVOR_SEVERITIES), survivor))
-        if survivor == "minor" and ds == "tlc-spec-lean":
-            raise RuntimeError("%s verifier.survivor \"minor\" cannot be used with tlc-spec-lean: its completion gate refuses a PASS "
-                               "written above a surviving mutant. Cap the mutants instead, or use tlc-spec-driven." % CONFIG)
-        out["survivor"] = survivor
-    rounds = v.get("rounds")
-    if rounds:
-        if rounds not in ROUND_MODES:
-            raise RuntimeError("%s verifier.rounds takes %s; not: %s" % (CONFIG, " or ".join(ROUND_MODES), rounds))
-        out["rounds"] = rounds
+    if isinstance(v.get("sensor"), dict) and v["sensor"]:
+        out["sensor"] = dict(v["sensor"])
+    for k in ("survivor", "rounds"):
+        if v.get(k):
+            out[k] = v[k]
     return out or None
 
 
@@ -483,12 +549,9 @@ def section_states(root, cfg=None):
 
 
 def manager_args(root, cfg):
+    ds_now, _d = downstream(root)
+    validate_config(cfg, ds_now)
     mgr = dict(DEFAULT_CONFIG["manager"], **(cfg.get("manager") or {}))
-    stray = sorted(k for k in mgr if k not in MANAGER_KEYS)
-    if stray:
-        note = (" \"passes\" was a local patch: a second pass would restart every unfinished feature at attempt 1, "
-                "which is only a second full budget — raise maxAttempts instead" if "passes" in stray else "")
-        raise RuntimeError("%s manager has no key %s; the keys are %s.%s" % (CONFIG, ", ".join(stray), ", ".join(MANAGER_KEYS), note))
     if not (mgr.get("delegation") or "").strip():
         raise RuntimeError("%s has no manager.delegation: manager mode decides what would otherwise be asked, "
                            "and only the owner can hand that over, in their own words" % CONFIG)
@@ -658,7 +721,7 @@ x
         args3, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, gateOrder="verify-first"))
         expect("gateOrder verify-first reaches the args", args3["gateOrder"] == "verify-first")
         expect("the merge reruns the gate unless the config says otherwise", args["mergeGate"] == "rerun")
-        mg, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, mergeGate="receipt", barrierGate="make all"))
+        mg, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, mergeGate="receipt", barrierGate="make all", barrierEvery=2))
         expect("mergeGate receipt reaches the args when a barrier exists", mg["mergeGate"] == "receipt")
         for label, bad in (("receipt without a barrierGate", dict(mergeGate="receipt")), ("an unknown mergeGate", dict(mergeGate="trust"))):
             try:
@@ -684,6 +747,45 @@ x
             except RuntimeError as e:
                 refused = "models" in str(e)
             expect("models: %s is refused" % label, refused)
+        def refused_with(label, over, word):
+            try:
+                plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, **over))
+                said = ""
+            except RuntimeError as e:
+                said = str(e)
+            expect("%s is refused, naming %s" % (label, word), word in said)
+            return said
+        for label, over, word in (
+                ("a verifier that is 0", {"verifier": 0}, "verifier"), ("a verifier that is false", {"verifier": False}, "verifier"),
+                ("a sensor that is 0", {"verifier": {"sensor": 0}}, "verifier.sensor"), ("a survivor that is an empty string", {"verifier": {"survivor": ""}}, "verifier.survivor"),
+                ("a rounds that is false", {"verifier": {"rounds": False}}, "verifier.rounds"), ("a typo inside verifier", {"verifier": {"sensr": {"A": 3}}}, "sensr"),
+                ("a sensor cap that is true", {"verifier": {"sensor": {"A": True}}}, "verifier.sensor.A"), ("a sensor cap of 3.0", {"verifier": {"sensor": {"A": 3.0}}}, "verifier.sensor.A"),
+                ("models as a list", {"models": []}, "models"), ("a model name that is only spaces", {"models": {"build": "  "}}, "models.build"),
+                ("barrierEvery that is a word", {"barrierEvery": "x"}, "barrierEvery"), ("lanes that is 0", {"lanes": 0}, "lanes"),
+                ("receipt with a barrierGate that is only spaces", {"mergeGate": "receipt", "barrierGate": "  ", "barrierEvery": 1}, "barrierGate"),
+                ("receipt with a barrier that runs once at the end", {"mergeGate": "receipt", "barrierGate": "make all", "barrierEvery": 0}, "barrierEvery"),
+                ("a manager.effort with a role it does not have", {"manager": {"effort": {"deciding": "high"}}}, "deciding"),
+                ("a manager.sectionsPerRun of -3", {"manager": {"sectionsPerRun": -3}}, "sectionsPerRun"),
+                ("a manager.stopAt that is a bare string", {"manager": {"stopAt": "live"}}, "stopAt")):
+            refused_with(label, over, word)
+        many = refused_with("three mistakes together", {"gateOrder": "x", "models": {"zzz": "m"}, "verifier": {"rounds": "partial"}}, "gateOrder")
+        expect("every problem is reported in one go, not one per run", "models has no role zzz" in many and "verifier.rounds" in many)
+        trimmed, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, models={"build": " sonnet "}))
+        expect("a model name is trimmed", trimmed["models"] == {"build": "sonnet"})
+        expect("a barrierGate of spaces is no barrierGate", plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, barrierGate="  "))[0]["barrierGate"] is None)
+        expect("an empty verifier object and an empty models object are no policy",
+               plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, verifier={}, models={}))[0].get("verifier") is None)
+        roles_all = {r: "m-" + r for r in ("build", "prove", "verify", "review", "merge", "record", "triage", "barrier")}
+        expect("every role the pipeline can name is accepted", plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, models=roles_all))[0]["models"] == roles_all)
+        expect("a sensor naming only one tier is accepted", plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, verifier={"sensor": {"A": 3}}))[0]["verifier"]["sensor"] == {"A": 3})
+        said_ds = refused_with("a survivor that is only minor under tlc-spec-lean", {"verifier": {"survivor": "minor"}}, "tlc-spec-lean")
+        expect("and the message says why this downstream was chosen", "because it is installed" in said_ds)
+        try:
+            manager_args(root, dict(cfg, manager={"delegation": "decide"}, gateOrder="gate-last", models={"bogus": "m"}))
+            said_m = ""
+        except RuntimeError as e:
+            said_m = str(e)
+        expect("manager mode checks the same keys before it spends anything", "gateOrder" in said_m and "models has no role bogus" in said_m)
         expect("no mutant cap and no survivor severity unless the config sets them",
                not (args["verifier"] or {}).get("sensor") and not (args["verifier"] or {}).get("survivor"))
         v1, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, verifier={"sensor": {"A": 5, "B": 3, "C": 1}, "survivor": "major"}))

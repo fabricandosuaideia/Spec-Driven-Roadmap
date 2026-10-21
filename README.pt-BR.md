@@ -91,8 +91,8 @@ A Phase 2 roda as mesmas checagens sempre que fecha um roadmap; isto aqui é par
 ### Para onde foi minha cota?
 
 Peça — *"mede o custo dos meus agentes"* — e a skill lê os transcritos do Claude Code deste projeto e
-mostra para onde os tokens foram: por papel, por nova tentativa, e quanto de cada conversa é contexto
-se acumulando turno após turno. Não edita nada e não roda mais nada. Salve uma linha de base antes de
+mostra para onde os tokens e o tempo foram: por papel, por nova tentativa, quanto tempo os agentes de cada
+papel rodaram, quantos rodaram ao mesmo tempo, e quanto de cada conversa é contexto se acumulando turno após turno. Não edita nada e não roda mais nada. Salve uma linha de base antes de
 mudar como os agentes rodam, e compare depois: economia que ninguém mediu é chute.
 
 ### Qual versão eu tenho?

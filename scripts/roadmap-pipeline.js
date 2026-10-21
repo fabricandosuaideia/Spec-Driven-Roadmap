@@ -3,9 +3,9 @@ export const meta = {
   description: 'Build pending roadmap features: implement, prove on a fresh context, verify (and review for tier A), merge only on pass',
   whenToUse: 'Run with the args printed by spec-driven-roadmap scripts/plan-pipeline.py, only when the user asked to run the pipeline',
   phases: [
-    { title: 'Build', detail: 'a builder implements on feat/<name>; a fresh prover rebases, runs the full gate once and writes the receipt' },
+    { title: 'Build', detail: 'a builder implements on feat/<name>; a fresh prover rebases, runs the full gate once and writes the receipt (after the verifier, with gateOrder verify-first)' },
     { title: 'Verify', detail: 'the downstream skill verifier (and, for tier A, an independent reviewer) — never the builder' },
-    { title: 'Merge', detail: 'the authoritative gate on the exact tree, then a fast-forward into the main branch' },
+    { title: 'Merge', detail: 'the authoritative gate on the exact tree (or the prover\'s receipt, with mergeGate receipt), then a fast-forward into the main branch' },
     { title: 'Barrier', detail: 'only when barrierGate is set: the whole suite on the merged main branch; red stops further merges' },
     { title: 'Record', detail: 'one Last run line in ## Status, the account in docs/roadmap-history.md' },
   ],
@@ -71,7 +71,7 @@ const VERIFY_FIRST = A.gateOrder === 'verify-first'
 // project that measured it (10% of its time). `mergeGate: 'receipt'` lets the receipt stand in when it proves
 // the exact tree: same code hash, and the main branch where the prover rebased onto it. A receipt is written by
 // an agent, so plan-pipeline.py refuses this without a barrierGate, the one gate nobody's word stands in for.
-const BY_RECEIPT = A.mergeGate === 'receipt'
+const BY_RECEIPT = A.mergeGate === 'receipt' && !!A.barrierGate
 // Set by manager-pipeline.js only. In manager mode nobody is there to authorise a test correction,
 // and on a real project two features in two days each spent five attempts and stopped the chain on
 // tests asserting behaviour the owner had revoked; the owner authorised the same correction by hand
@@ -116,7 +116,7 @@ const RUN_GATE = (cmd, where) => `run it DETACHED and wait for it — a single c
 // watcher on a background test run or a lock regeneration, and answered ready=false "waiting for the
 // monitor". A workflow agent is finished the moment it replies, so the job's result was read by nobody
 // and the attempt was spent. The prover has had RUN_GATE since 3.31.0; the builder had nothing.
-const LONG_COMMANDS = `LONG COMMANDS: you are finished the moment you reply or call StructuredOutput, and nothing wakes you later — a background job, a Monitor or a watcher is read by nobody. Never run_in_background, never load or arm Monitor, never reply ready=false because something is still running. Wait for it in this same turn: a command you are sure ends within 2 minutes (the tool's own limit) runs in the foreground; anything that may take longer, or whose length you cannot tell (a test batch, a lock regeneration, a build), runs detached and is waited for:
+const LONG_COMMANDS = `LONG COMMANDS: you are finished the moment you reply or call StructuredOutput, and nothing wakes you later — a background job, a Monitor or a watcher is read by nobody. Never run_in_background, never load or arm Monitor, never reply ready=false because something is still running. Wait for it in this same turn: a command you are sure ends within 2 minutes (the Bash tool's default timeout) runs in the foreground; anything that may take longer, or whose length you cannot tell (a test batch, a lock regeneration, a build), runs detached and is waited for:
    a) D=$(mktemp -d); nohup bash -c 'cd "$1" && ( <the command> ); echo $? > "$0/exit"' "$D" "<your working tree>" > "$D/log" 2>&1 & echo "$D $!"
    b) timeout ${CHUNK} tail --pid=<that PID> -f /dev/null — never sleep — repeated until $D/exit exists (exit code 124 only means keep waiting). Give that Bash call a timeout parameter of ${(CHUNK + 20) * 1000} milliseconds: the tool's default is 120 seconds, and a wait that outlasts it is moved to the background, which is the thing to avoid.
    c) the exit code is the content of $D/exit; read only the tail and the failures of $D/log.`
@@ -130,7 +130,12 @@ CONTEXT BUDGET: every turn re-reads your whole conversation. Read files with off
 ${MANAGED ? REVOKED_RULE : 'TESTS: never edit, weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green. A test that is genuinely wrong stays red, with the reason written down.'}`
 
 const REVOKED_RULE = `TESTS: never weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green.
-MANAGER MODE — one exception, because nobody is there to authorise it: an existing test is updated, not obeyed, when its assertion states a behaviour that this feature's spec changes — an acceptance criterion, an answered open question or a settled Cross-Cutting Decision states the new behaviour, and the old assertion contradicts it. Update THAT assertion, and only it, to the behaviour the spec now states, at the same strength — as specific, no looser matcher, no removed check, no skip — in a commit of its own whose message quotes the criterion or decision and names where it is recorded. List each in your notes as REVOKED-TEST <file>:<test name> — <the criterion or decision, quoted>. A test red for any other reason is a defect in your change: fix the code, not the test, and if it truly cannot be fixed inside this feature's scope say exactly why in your notes. The independent verifier refuses every test change that is not such a correction.`
+MANAGER MODE — one exception, because nobody is there to authorise it: an existing test is updated, not obeyed, when its assertion states a behaviour that this feature's spec changes — an acceptance criterion, an answered open question or a settled Cross-Cutting Decision states the new behaviour, and the old assertion contradicts it. The criterion or decision must come from the roadmap behind this feature (the entry, the answered questions and the Cross-Cutting Decisions that feature-brief.py prints), decided before you started — never from a spec, plan or check that you wrote on this branch. Update THAT assertion, and only it, to the behaviour the spec now states, at the same strength — as specific, no looser matcher, no removed check, no skip — in a commit of its own whose FIRST LINE is REVOKED-TEST <file>:<test name> (so that git log --grep=REVOKED-TEST finds it) and whose body quotes the criterion or decision and names where it is recorded. List each in your notes as well. A test red for any other reason is a defect in your change: fix the code, not the test, and if it truly cannot be fixed inside this feature's scope say exactly why in your notes. The independent verifier refuses every test change that is not such a correction.`
+
+// The triage repairer keeps the narrow exception (an owner decision revokes exactly the assertion) and may fix a
+// test that is wrong about timing, ordering or shared state at that cause: a regression belongs to a feature whose
+// own spec did not change, so "this feature's spec" gives it nothing to stand on.
+const REPAIR_TESTS = `TESTS: never weaken, skip, delete or add a test to reach a pass, never raise a timeout, never add a retry. A test that is wrong about timing, ordering or shared state is fixed at that cause (the PREEXISTING item above), keeping its name and its strength. The one other exception: an owner decision recorded in the roadmap that revokes exactly an assertion lets that assertion be corrected, in a commit of its own whose first line is REVOKED-TEST <file>:<test name> and whose body quotes the decision and where it is recorded, as strong as before.`
 
 const ANGLES = [
   'Build the feature exactly as its spec source states.',
@@ -143,7 +148,7 @@ const ANGLES = [
 const IMPLEMENT = (f, attempt, feedback) => `${COMMON(f)}
 
 ROLE: BUILDER, attempt ${attempt} of ${MAX[tierOf(f)]}. ${ANGLES[Math.min(attempt, ANGLES.length) - 1]}
-${attempt > 1 ? `First rebase feat/${f.name} onto ${MAIN}. Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}${attempt === 1 ? `If feat/${f.name} already exists and a refused ${REPORT} is committed in .specs/features/${f.name}/, an earlier run refused this feature: read that report first and resolve every gap it lists before anything else, as an attempt after a refusal does.\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
+${attempt > 1 ? `First rebase feat/${f.name} onto ${MAIN}. Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}${attempt === 1 ? `If feat/${f.name} already exists and a refused ${REPORT} (or a gate-failure.md note) is committed in .specs/features/${f.name}/, an earlier run refused this feature: read that report or note first and resolve every gap it lists before anything else, as an attempt after a refusal does.\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
 While you work, run only the tests related to what you touched${A.testHint ? ` (${A.testHint})` : ''}. Do NOT run the full gate and do NOT write ${REPORT}: a fresh prover and an independent verifier come after you.
 ${LONG_COMMANDS}
 ${A.checklist ? `Before you finish, check your diff against every item of ${A.checklist} (the problems reviewers kept finding in this project) and fix what fails.\n` : ''}DEFERRED SCOPE: an issue that is the declared scope of a LATER feature in the build order is not yours: name that feature in your notes and move on.
@@ -154,18 +159,18 @@ const PROVE = f => `${COMMON(f)}
 ROLE: PROVER, on a fresh context. A builder already committed this feature on feat/${f.name}${VERIFY_FIRST ? ' and an independent verifier has passed it' : ''}; you did not write it. Do not re-implement and do not widen scope${VERIFY_FIRST ? ', and do not verify again: you are the last step before the merge' : ''}.
 1. Rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
 2. Run the GATE once on this exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
-   A failure is a defect, never "environmental": reply ready=false naming the failing test or file, and fix nothing.
-3. Write .specs/features/${f.name}/gate-receipt.json as {"codeHash":"<output of: ${HASH}>","base":"<output of: git rev-parse ${MAIN}>","gate":"pass","command":<the gate command>} and commit it.
+   A failure is a defect, never "environmental": reply ready=false naming the failing test or file, and fix nothing.${VERIFY_FIRST ? ` Because a verifier already passed this feature, first leave a note for the next builder: write .specs/features/${f.name}/gate-failure.md (the failing tests and the command, at most 10 lines) and commit only that file.` : ''}
+3. Write .specs/features/${f.name}/gate-receipt.json as {"codeHash":"<output of: ${HASH}>","base":"<output of: git merge-base ${MAIN} HEAD>","gate":"pass","command":<the gate command>} and commit it. (The base is the commit of ${MAIN} your tree is built on: if ${MAIN} moved while the gate ran, it is the older one, which is what makes the receipt honest.)
 Reply ready=true only when the rebase is clean, the gate finished and passed, and the receipt is committed.`
 
-const VERIFY_RECEIPT = f => `GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, run the gate yourself (${A.gate}) — ${RUN_GATE(A.gate, wt(f))}
-   and report the mismatch as a minor issue.`
+const VERIFY_RECEIPT = f => `GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, report that as a minor issue and run the gate yourself (${A.gate}) — ${RUN_GATE(A.gate, wt(f))}`
 // verify-first: no receipt exists yet, and the full gate belongs to the prover who follows a PASS.
 const VERIFY_GATE = f => `THE FULL GATE (${A.gate}) RUNS AFTER YOU, by a prover, and only for a feature you pass: do not run it and do not look for a receipt. Run only this feature's tests${A.testHint ? ` (${A.testHint})` : ''} and ${DS}'s own fault injection or discrimination sensor, and in the report's gate section write the command you ran and that the full gate follows.`
 
 // 3.39.0, from the same project: a surviving mutant was named in 12 of 26 readable refusals, and the
 // project's own rules record "an unbounded sensor and a new gap each round" as what spent seven attempts
-// on one feature. Two controls, both off unless the project sets them:
+// on one feature. Two controls: the cap and the survivor severity are off unless the project sets them; the scoped rounds are ON
+// unless `rounds` is 'full':
 // `verifier` in pipeline.json (a cap on mutants per tier, and the severity of a survivor), and rounds
 // after the first scoped to what was refused and what changed, as tlc-spec-lean's verify.md already
 // prescribes ("Re-verifying after a fix") and tlc-spec-driven's validate.md does not.
@@ -173,16 +178,16 @@ const VP = A.verifier || {}
 const SENSOR_POLICY = f => {
   const cap = VP.sensor && VP.sensor[tierOf(f)]
   const parts = []
-  if (cap) parts.push(`at most ${cap} mutants for this feature, each chosen so that a DIFFERENT proof has to fail (one per distinct assertion surface); stop once every proof carrying a criterion has been made to fail once`)
+  if (cap) parts.push(`at most ${cap} mutant${cap === 1 ? '' : 's'} for this feature, each chosen so that a DIFFERENT proof has to fail (one per distinct assertion surface); stop once every proof carrying a criterion has been made to fail once`)
   if (VP.survivor) parts.push(`a surviving mutant is a ${VP.survivor} issue${VP.survivor === 'minor' ? ': list it in the report, it does not refuse the feature' : ''}`)
   return parts.length ? `SENSOR POLICY (this project's, over ${DS}'s own default): ${parts.join('; ')}.\n` : ''
 }
-const SCOPE = f => `its report is the committed ${REPORT} in .specs/features/${f.name}/ (its commit: git log -1 --format=%H -- .specs/features/${f.name}/${REPORT}); read it first. The round is SCOPED to (1) every row of that report whose verdict was not PASS and (2) what changed since that commit (git diff <that sha>..HEAD over the files outside .specs and docs — scope by the diff, not by the fix's intent: a fix to a shared helper, fixture or config reaches further than its description). Every other row carries forward and says so ("carried from <that sha>"). The proofs re-run in full at HEAD. Fault injection is scoped the same way: a previous mutant that was killed, on code and proofs this diff did not touch, carries forward; re-inject the ones that survived and every one on a surface the diff touched or created, and add new mutants only on such a surface — the code it changed, and the code that a test or assertion it added or changed exercises (a new assertion has never been made to fail once, and a fix that only adds a test changes no code). Never new mutants on code and tests that did not change. Anything you notice outside the scope is a minor issue: list it, it does not refuse the feature.${LEAN ? ' Write the Round line as verify.md prescribes (Round: N - scoped).' : ''}`
+const SCOPE = f => `its report is the committed ${REPORT} in .specs/features/${f.name}/ (its commit: the sha above); read it first. The round is SCOPED to (1) every row of that report whose result is not PASS or MET and (2) what changed since that commit (git diff <that sha>..HEAD over the files outside .specs and docs — scope by the diff, not by the fix's intent: a fix to a shared helper, fixture or config reaches further than its description). If the branch was rebased since (the base the report's Diff range names is no longer git merge-base ${MAIN} HEAD), what main gained in that rebase is new code too: add git diff <that base>..$(git merge-base ${MAIN} HEAD) over the files this feature touches. Every other row carries forward and says so ("carried from <that sha>"). The proofs re-run in full at HEAD. Fault injection is scoped the same way: a previous mutant that was killed, on code and proofs this diff did not touch, carries forward; re-inject the ones that survived and every one on a surface the diff touched or created, and add new mutants only on such a surface — the code it changed, and the code that a test or assertion it added or changed exercises (a new assertion has never been made to fail once, and a fix that only adds a test changes no code). Never new mutants on code and tests that did not change. Scope limits what you re-run, never what you may refuse: a defect you notice outside it — a criterion not met, a security or correctness flaw — keeps its true severity; only a weakness that lies OUTSIDE the scope and is not a defect (a test that could assert more, a mutant that survives there) is a minor issue: list it, it does not refuse the feature. Inside the scope, and in a first verification, nothing is demoted.${LEAN ? ' Write the Round line as verify.md prescribes (Round: N - scoped).' : ''}`
 // `rounds: 'full'` turns the scoping off: a scoped round trusts the earlier round's verdict on the rows it carries
 // forward, so a first round that was loose leaves its loose PASS rows standing. That is the price, and the user's.
-const ROUND = (f, attempt) => VP.rounds === 'full' ? '' : attempt > 1
-  ? `ROUND ${attempt}: a verifier already refused this feature; ${SCOPE(f)}\n`
-  : `ROUND 1: verify everything. If a refused ${REPORT} from an earlier run is already committed in .specs/features/${f.name}/, this is a later round instead: ${SCOPE(f)}\n`
+// Whether a round is a later one depends on a report existing, never on the attempt counter: attempt 2 after a builder
+// that did not finish, or after a prover that failed first, is the first time a verifier sees the feature.
+const ROUND = (f, attempt) => VP.rounds === 'full' ? '' : `ROUND ${attempt}. Step 1: run git log -1 --format=%H -- .specs/features/${f.name}/${REPORT} . If it prints NOTHING, this is a FIRST verification: ignore the rest of this paragraph and verify everything by ${DS}'s own rules — a clause of a criterion that no test exercises is not proven, and a surviving mutant is a finding, exactly as those rules say. If it prints a sha, this is a LATER ROUND, that sha is the report's commit, and the rest of this paragraph applies — ${SCOPE(f)}\n`
 
 const VERIFY = (f, attempt) => `${COMMON(f)}
 
@@ -192,7 +197,7 @@ ${ROUND(f, attempt)}${SENSOR_POLICY(f)}${MANAGED ? REVOKED_CHECK(f) + '\n' : ''}
 Then run the completion gate: python3 ${DSDIR}/scripts/${GATE_SCRIPT} ${f.name} --root ${wt(f)} — and report its exit code as the script returned it, never through a pipe.${tierOf(f) === 'C' ? '\nThis is a tier C feature and no reviewer follows you: review the diff for correctness, security and weak tests as well, and list those issues too.' : ''}
 Reply with gateExit, pass (true only if gateExit is 0, every ${LEAN ? 'check' : 'criterion'} holds and you found no blocker or major issue), notMet and issues.`
 
-const REVOKED_CHECK = f => `REVOKED TESTS (manager mode): list every change on this branch to a test that already existed on ${MAIN} (git diff ${MAIN}...feat/${f.name}, over the project's test files). Each must be a REVOKED-TEST the builder declared, in a commit of its own that quotes an acceptance criterion, an answered question or a settled Cross-Cutting Decision; read it where the commit says it is, and confirm that it states a behaviour the OLD assertion contradicts and that the new assertion states that behaviour at the same strength. Every change that fails any of this — an undeclared edit, no such criterion or decision, one the old assertion does not contradict, a weaker assertion, a skip or an expected-failure mark, a deletion — is a blocker issue at that file:line. A criterion that was written only to explain the edit, and states nothing the product needed, is the same blocker.`
+const REVOKED_CHECK = f => `REVOKED TESTS (manager mode): list every change on this branch to a test that already existed on ${MAIN} (git diff ${MAIN}...feat/${f.name}, over the project's test files: test sources, fixtures, conftest, test configuration and the gate script). Each must be a REVOKED-TEST the builder declared, in a commit of its own whose first line is REVOKED-TEST <file>:<test name> (git log ${MAIN}..feat/${f.name} --grep=REVOKED-TEST finds them) and whose body quotes an acceptance criterion, an answered question or a settled Cross-Cutting Decision. Read it where the commit says it is, and confirm (1) that it states a behaviour the OLD assertion contradicts, (2) that the new assertion states that behaviour at the same strength, and (3) that it was decided BEFORE this branch: run git log ${MAIN}..feat/${f.name} -- <the file it is recorded in>, and if the branch itself added or edited that text, or it appears only in a spec, plan or check the builder wrote on this branch with nothing in the roadmap behind it (python3 ${SKILL}/scripts/feature-brief.py ${f.name} --root ${P}), it is not a decision. Every change that fails any of this — an undeclared edit, no such criterion or decision, one the old assertion does not contradict, one the branch wrote itself, a weaker assertion, a skip or an expected-failure mark, a deletion — is a blocker issue at that file:line. A criterion that was written only to explain the edit, and states nothing the product needed, is the same blocker.`
 
 const REVIEW = f => `${COMMON(f)}
 
@@ -201,9 +206,9 @@ Look for: correctness and unhandled edge cases; non-atomic read-then-write on sh
 The builder's and the prover's notes are claims: spot-check the few most likely to be wrong instead of re-deriving everything.
 Report each issue with severity blocker | major | minor, where (file:line), problem and fix.`
 
-const MERGE_RECEIPT = f => `The gate receipt may stand in for it. Read .specs/features/${f.name}/gate-receipt.json. Only if ALL of these hold does it prove this exact tree: its gate is "pass"; its base equals the output of git -C ${P} rev-parse ${MAIN} (so the rebase in step 1 replayed nothing); its codeHash equals the output of: ${HASH}; and git status --porcelain prints nothing. Then do NOT run the gate: write "gate skipped: receipt" in notes. If any one of them fails, or the file is missing, the receipt proves nothing: `
+const MERGE_RECEIPT = f => `The gate receipt may stand in for the gate below. Run these checks in ${wt(f)}. Read .specs/features/${f.name}/gate-receipt.json: it proves this exact tree only if ALL of these hold — its gate is "pass"; its command is the same command as the gate named below, not a lighter one; it has a base, and the base equals the output of git -C ${wt(f)} rev-parse ${MAIN} (the prover recorded the commit of ${MAIN} its tree was built on, so a match means ${MAIN} has not moved since); git -C ${wt(f)} status --porcelain prints nothing; and its codeHash equals the hash this command prints: git -C ${wt(f)} diff ${MAIN}...HEAD -- . ':!.specs' ':!docs' | sha256sum | cut -d' ' -f1 . If they all hold, do NOT run the gate: write "gate skipped: receipt" in notes. If any one of them fails, or the file is missing or has no base, the receipt proves nothing: `
 
-const MERGE = f => `You are the MERGER for feature ${f.name} in the project at ${P}. Verification passed. Nothing reaches ${MAIN} without the gate below. Stop with ok=false at the first failure and change nothing further.
+const MERGE = f => `You are the MERGER for feature ${f.name} in the project at ${P}. Verification passed. Nothing reaches ${MAIN} without the gate below${BY_RECEIPT ? ', or a receipt that proves this exact tree' : ''}. Stop with ok=false at the first failure and change nothing further.
 ${LAUNCHED}
 0. Note the commit ${MAIN} points at now (git -C ${P} rev-parse ${MAIN}): that is \`before\`.
 1. In ${wt(f)}: rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
@@ -230,7 +235,7 @@ ${JSON.stringify(items, null, 1)}
 Identify a test by its name, never a file:line, when you write a command or a note about it: a line moves when you add one above it. Your fix keeps the test's name, so a command that selects by name still finds the test.
 Prove each fix: run its test 10 times in a row with no retries; all 10 must pass. Commit each fix on its own, message "TRIAGE <kind> <test>: <cause>".
 ${LONG_COMMANDS}
-${REVOKED_RULE}
+${REPAIR_TESTS}
 Reply ready (true only when every item is fixed and proved), fixed (one line each: test, cause, change, proof) and blockers.`
 
 const CHECK = (items, cycle) => `You are the CHECKER of a triage repair in the project at ${P}. You did not write it; try to show it is wrong. You change nothing.
@@ -397,7 +402,7 @@ const runFeature = async f => {
     // verify-first: the full gate runs only now, for a feature that was passed. A refusal here leaves a PASS
     // report on the branch that the gate did not back; it is said in the run's account, not hidden.
     if (pass && VERIFY_FIRST) { pass = await proveStep(); gateRefused = !pass }
-    staleReport = gateRefused
+    if (ver) staleReport = gateRefused
     log(`${f.name}: attempt ${attempt} ${pass ? 'passed' : gateRefused ? 'passed verification, refused by the gate' : 'refused'}`)
     if (pass) { passedAt = attempt; break }
     if (gateRefused) continue
@@ -417,7 +422,7 @@ const runFeature = async f => {
     if (barrierRed) return { held: true }
     const m = await agent(MERGE(f), { phase: 'Merge', label: `merge:${f.name}`, schema: MERGE_SCHEMA, effort: effortFor('merge', f), ...modelFor('merge') })
     if (m && m.ok) {
-      outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit })
+      outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit, ...(/gate skipped/i.test(m.notes || '') ? { gateSkipped: true } : {}) })
       mergedAt[f.name] = { before: m.before, after: m.commit }
       log(`${f.name}: merged`)
       sinceBarrier.push(f.name)
@@ -447,4 +452,4 @@ return outcomes.map(o => o.name === 'barrier'
   ? `barrier: ${o.result} after ${o.after.join(', ')}${o.result === 'red' ? ' — ' + (o.failures || []).slice(0, 5).join('; ') : ''}`
   : o.name === 'triage'
   ? `triage: ${o.result} (cycle ${o.cycle})${o.items ? ' — ' + o.items.join('; ') : ''}${o.because ? ' — ' + o.because : ''}`
-  : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)
+  : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.gateSkipped ? ' [gate skipped: receipt]' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)

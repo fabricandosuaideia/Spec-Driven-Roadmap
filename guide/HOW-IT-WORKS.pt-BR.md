@@ -292,9 +292,9 @@ Quando a seção termina, você volta, a skill re-semeia, e a próxima seção g
 
 **C — uma execução da esteira, só no Claude Code.** O mesmo único roadmap, construído por um script de
 Workflow que a skill traz: por feature, um construtor, um provador novo que roda o seu gate completo uma
-vez e escreve um recibo, o verificador da sua skill de build — que reaproveita esse recibo em vez de
-rodar a suíte de novo —, um revisor para as features de nível de risco A, e um mesclador que roda o gate
-na árvore exata antes de mesclar. As tentativas têm teto por nível, e a terceira é instruída a nomear a
+vez e escreve um recibo, o verificador da sua skill de build — que por padrão reaproveita esse recibo em
+vez de rodar a suíte de novo —, um revisor para as features de nível de risco A, e um mesclador que por padrão
+roda o gate na árvore exata antes de mesclar. As tentativas têm teto por nível, e a terceira é instruída a nomear a
 invariante que suas antecessoras continuaram deixando passar antes de escrever código. A skill te pede
 uma vez o gate que toda feature precisa passar — o seu gate inteiro, ou, se o seu projeto deixa a suíte
 inteira para uma barreira do lote, o gate por feature mais essa barreira (`barrierGate`), que então roda
@@ -392,8 +392,9 @@ disposição da tabela de cobertura é honesta. Isso continua leitura.
 ## Medindo o que os agentes custam, e atualizando um projeto
 
 Peça *"mede o custo dos meus agentes"* e a skill lê os transcritos do Claude Code do seu próprio projeto
-e mostra para onde os tokens foram: por papel, por nova tentativa, pelo modelo e esforço com que cada
-papel rodou, e quanto de cada conversa foi contexto se acumulando turno após turno. Não edita nada. Salve
+e mostra para onde os tokens e o tempo foram: por papel, por nova tentativa, pelo modelo e esforço com que
+cada papel rodou, quanto tempo os agentes de cada papel rodaram, quantos rodaram ao mesmo tempo, e quanto de
+cada conversa foi contexto se acumulando turno após turno. Não edita nada. Salve
 uma linha de base antes de mudar como os agentes rodam e compare depois; economia que ninguém mediu é
 chute.
 

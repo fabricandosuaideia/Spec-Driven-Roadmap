@@ -134,11 +134,18 @@ const scenarios = {
     const r = await run(src, { features: [feat('a')] }, pass())
     return !/gate receipt may stand in/.test(r.calls.find(c => c.role === 'merge').prompt)
   },
-  'with mergeGate receipt the merger is told when the receipt stands in, and otherwise to run the gate': async src => {
+  'with mergeGate receipt (and a barrier) the merger is told when the receipt stands in, and the prover records the base before the gate': async src => {
     const r = await run(src, { mergeGate: 'receipt', barrierGate: 'make all', waitChunk: 60, features: [feat('a')] }, pass())
     const m = r.calls.find(c => c.role === 'merge').prompt, p = r.calls.find(c => c.role === 'prove').prompt
-    return /gate receipt may stand in/.test(m) && /rev-parse main/.test(m) && /codeHash equals/.test(m) && /If any one of them fails, or the file is missing, the receipt proves nothing/.test(m) &&
-      /DETACHED/.test(m) && /"base":"<output of: git rev-parse main>"/.test(p)
+    return /gate receipt may stand in/.test(m) && /DETACHED/.test(m) && /"base":"<output of: git merge-base main HEAD>"/.test(p)
+  },
+  'without a barrierGate the receipt never stands in, whatever mergeGate says': async src => {
+    const r = await run(src, { mergeGate: 'receipt', features: [feat('a')] }, pass())
+    return !/gate receipt may stand in/.test(r.calls.find(c => c.role === 'merge').prompt)
+  },
+  'a merge that skipped the gate says so in the account': async src => {
+    const r = await run(src, { mergeGate: 'receipt', barrierGate: 'make all', features: [feat('a')] }, pass({ merge: () => ({ ok: true, before: 'b0', commit: 'c', notes: 'gate skipped: receipt' }) }))
+    return line(r.out, 'a').includes('[gate skipped: receipt]')
   },
   // 3.41.0: a model per role.
   'models name a model per role, and a role they do not name uses the one model': async src => {
@@ -168,22 +175,21 @@ const scenarios = {
   'a verifier policy caps the mutants by tier and sets what a survivor is': async src => {
     const r = await run(src, { verifier: { sensor: { A: 5, B: 3, C: 1 }, survivor: 'minor' }, features: [feat('a', 'A'), feat('b', 'C')] }, pass())
     const va = r.calls.find(c => c.role === 'verify' && c.name === 'a').prompt, vb = r.calls.find(c => c.role === 'verify' && c.name === 'b').prompt
-    return /at most 5 mutants/.test(va) && /at most 1 mutants/.test(vb) && /surviving mutant is a minor issue/.test(va)
+    return /at most 5 mutants/.test(va) && /at most 1 mutant for/.test(vb) && /surviving mutant is a minor issue/.test(va)
   },
-  'the first round verifies everything; a later round is scoped to the refused rows and the diff': async src => {
-    const r = await run(src, { features: [feat('a', 'C')] }, pass({ verify: (n, att) => att < 3 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }))
-    const v = n => r.calls.find(c => c.role === 'verify' && c.attempt === n).prompt
-    return /ROUND 1: verify everything/.test(v(1)) && !/ROUND 2/.test(v(1)) &&
-      /ROUND 2: a verifier already refused this feature/.test(v(2)) && /SCOPED to/.test(v(2)) && /a surface the diff touched or created/.test(v(3)) && /carries forward/.test(v(3)) && /Never new mutants on code and tests that did not change/.test(v(3))
+  'whether a round is a later one depends on a report, not on the attempt number': async src => {
+    const r = await run(src, { features: [feat('a', 'C')] }, pass({ build: (n, att) => att < 2 ? { ready: false, summary: '', blockers: ['x'] } : undefined, verify: (n, att) => att < 3 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }))
+    const v = n => (r.calls.find(c => c.role === 'verify' && c.attempt === n) || {}).prompt || ''
+    // attempt 2 is the first verification there has ever been: it must be told to look, not told it was refused
+    return /Step 1: run git log/.test(v(2)) && /If it prints NOTHING, this is a FIRST verification/.test(v(2)) && !/already refused/.test(v(2)) && /ROUND 3\./.test(v(3)) && /SCOPED to/.test(v(3))
   },
   'rounds full turns the scoping off': async src => {
     const r = await run(src, { verifier: { rounds: 'full' }, features: [feat('a', 'C')] }, pass({ verify: (n, att) => att < 2 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }))
     return r.calls.filter(c => c.role === 'verify').every(c => !/ROUND \d/.test(c.prompt))
   },
-  'a builder on a branch an earlier run refused is told to read that report first': async src => {
+  'a builder on a branch an earlier run refused is told to read that report or note first': async src => {
     const r = await run(src, { features: [feat('a')] }, pass())
-    const b = r.calls.find(c => c.role === 'build').prompt
-    return /an earlier run refused this feature: read that report first/.test(b)
+    return /an earlier run refused this feature: read that report or note first/.test(r.calls.find(c => c.role === 'build').prompt)
   },
   // 3.38.0: verify-first spends the full gate only on a feature the verifier passed.
   'verify-first runs builder, verifier, then the prover, then the merge': async src => {
@@ -387,13 +393,15 @@ const mutants = {
   'launch request not scoped': ['never ask.\n${LAUNCHED}', 'never ask.'],
   'gate not waited for': ['tail --pid=<that PID>', 'cat <that PID>'],
   'receipt merge ignored': ["const BY_RECEIPT = A.mergeGate === 'receipt'", 'const BY_RECEIPT = false'],
-  'receipt does not record the base': ['\"base\":\"<output of: git rev-parse ${MAIN}>\",', ''],
+  'receipt records the base after the gate instead of the commit the tree was built on': ['git merge-base ${MAIN} HEAD>"', 'git rev-parse ${MAIN}>"'],
+  'receipt without a barrier still stands in': ["A.mergeGate === 'receipt' && !!A.barrierGate", "A.mergeGate === 'receipt'"],
+  'a skipped gate is not shown': ["${o.gateSkipped ? ' [gate skipped: receipt]' : ''}", ''],
   'models ignored': ["const modelFor = role => (A.models && A.models[role]) ? { model: A.models[role] } : MODEL", 'const modelFor = role => MODEL'],
   'the repairer not given the builder model': ["label: `repair:${cycle}`, schema: REPAIR_SCHEMA, effort: effortFor('implement', { tier: 'A' }), ...modelFor('build')", "label: `repair:${cycle}`, schema: REPAIR_SCHEMA, effort: effortFor('implement', { tier: 'A' }), ...MODEL"],
-  'rounds full ignored': ["VP.rounds === 'full' ? '' : attempt > 1", 'attempt > 1'],
+  'rounds full ignored': ["VP.rounds === 'full' ? '' : `ROUND", "false ? '' : `ROUND"],
   'verifier policy dropped': ['${ROUND(f, attempt)}${SENSOR_POLICY(f)}', '${ROUND(f, attempt)}'],
-  'a later round not scoped': ['? `ROUND ${attempt}: a verifier already refused this feature; ${SCOPE(f)}\\n`', '? `ROUND ${attempt}: verify everything\\n`'],
-  'builder not sent to an earlier refusal': ['an earlier run refused this feature: read that report first', 'the feature is new'],
+  'a round is decided by the attempt counter again': ['`ROUND ${attempt}. Step 1: run git log', '`ROUND ${attempt}. a verifier already refused this feature; run git log'],
+  'builder not sent to an earlier refusal': ['an earlier run refused this feature: read that report or note first', 'the feature is new'],
   'verify-first ignored': ["const VERIFY_FIRST = A.gateOrder === 'verify-first'", 'const VERIFY_FIRST = false'],
   'verify-first gate result ignored': ['if (pass && VERIFY_FIRST) { pass = await proveStep(); gateRefused = !pass }', 'if (pass && VERIFY_FIRST) { await proveStep() }'],
   'verify-first runs the gate before the verdict anyway': ['if (!VERIFY_FIRST && !(await proveStep())) continue', 'if (!(await proveStep())) continue'],
@@ -415,6 +423,114 @@ const mutants = {
   'triage allowed a line selector': ['never a file:line', 'any selector'],
   'a not-reproduced failure repaired anyway': ["if (items.some(i => i.kind === 'not-reproduced')) return stop(", "if (false) return stop("],
 }
+
+// ---- 3.43.1: clause by clause. A phrase of a prompt that no scenario reads can be deleted and nothing notices
+// (a review deleted 28 of them and no scenario failed). Each clause below is asserted in the prompt of its role,
+// and a mutant replaces the same text in the source by a neutral word, so the failure is the assertion's and not a
+// syntax error. The text must occur once in the source: otherwise deleting the first copy proves nothing.
+const refusedOnce = { verify: (n, att) => att < 2 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }
+const unblockRun = (src, over) => {
+  let n = 0
+  return run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')], ...over },
+    pass({ barrier: () => (n++ === 0 ? { ok: false, exitCode: 1, failures: ['t::x'] } : undefined),
+           triage: () => ({ items: [{ test: 't::x', command: 'pytest x', kind: 'preexisting', evidence: '{}' }] }),
+           repair: () => ({ ready: true, fixed: ['t'], blockers: [] }), check: () => ({ ok: true, issues: [] }) }))
+}
+const MERGE_ARGS = { mergeGate: 'receipt', barrierGate: 'make all' }
+const CLAUSES = [
+  ['merge: the receipt may stand in', 'merge', 'The gate receipt may stand in for the gate below', { args: MERGE_ARGS }],
+  ['merge: the gate must be pass', 'merge', 'its gate is "pass"', { args: MERGE_ARGS }],
+  ['merge: the receipt\'s command must be the pipeline\'s gate', 'merge', 'its command is the same command as the gate named below, not a lighter one', { args: MERGE_ARGS }],
+  ['merge: the base must exist and equal main', 'merge', 'it has a base, and the base equals the output of', { args: MERGE_ARGS }],
+  ['merge: the tree must be clean and the hash equal', 'merge', 'prints nothing; and its codeHash equals the hash this command prints', { args: MERGE_ARGS }],
+  ['merge: all must hold, then skip', 'merge', 'If they all hold, do NOT run the gate', { args: MERGE_ARGS }],
+  ['merge: the skip is written down', 'merge', 'write "gate skipped: receipt" in notes', { args: MERGE_ARGS }],
+  ['merge: otherwise the receipt proves nothing', 'merge', 'or the file is missing or has no base, the receipt proves nothing', { args: MERGE_ARGS }],
+  ['prove: the base is the commit the tree was built on', 'prove', 'which is what makes the receipt honest', {}],
+  ['prove: verify-first does not verify again', 'prove', 'do not verify again', { args: { gateOrder: 'verify-first' } }],
+  ['prove: verify-first leaves a note for the next builder', 'prove', 'gate-failure.md (the failing tests and the command', { args: { gateOrder: 'verify-first' } }],
+  ['build: an earlier gate-failure note is read', 'build', 'or a gate-failure.md note) is committed', {}],
+  ['verify: no report means verify everything and ignore the scope', 'verify', 'this is a FIRST verification: ignore the rest of this paragraph and verify everything', {}],
+  ['verify: a first verification demotes nothing', 'verify', 'a clause of a criterion that no test exercises is not proven', {}],
+  ['verify: inside the scope and in a first verification nothing is demoted', 'verify', 'Inside the scope, and in a first verification, nothing is demoted', { round2: true }],
+  ['verify: a rebase brings main into scope', 'verify', 'what main gained in that rebase is new code too', { round2: true }],
+  ['verify: other rows carry forward and say so', 'verify', 'Every other row carries forward and says so', { round2: true }],
+  ['verify: proofs re-run in full', 'verify', 'The proofs re-run in full at HEAD', { round2: true }],
+  ['verify: a killed mutant on untouched code carries forward', 'verify', 'a previous mutant that was killed', { round2: true }],
+  ['verify: scope never lowers a severity', 'verify', 'Scope limits what you re-run, never what you may refuse', { round2: true }],
+  ['verify: only an out-of-scope non-defect weakness is minor', 'verify', 'only a weakness that lies OUTSIDE the scope and is not a defect', { round2: true }],
+  ['verify: a survivor graded minor does not refuse', 'verify', 'list it in the report, it does not refuse the feature', { args: { verifier: { survivor: 'minor' } } }],
+  ['verify (manager): what a test file is', 'verify', 'test sources, fixtures, conftest, test configuration and the gate script', { args: { managerMode: true } }],
+  ['verify (manager): decided before the branch', 'verify', 'it was decided BEFORE this branch', { args: { managerMode: true } }],
+  ['verify (manager): not a decision when the branch wrote it', 'verify', 'it is not a decision', { args: { managerMode: true } }],
+  ['verify (manager): the branch wrote it itself', 'verify', 'one the branch wrote itself', { args: { managerMode: true } }],
+  ['verify (manager): a criterion written to explain the edit', 'verify', 'states nothing the product needed, is the same blocker', { args: { managerMode: true } }],
+  ['build (manager): the criterion is decided before the build', 'build', 'decided before you started — never from a spec, plan or check that you wrote on this branch', { args: { managerMode: true } }],
+  ['build (manager): the first line of the commit', 'build', 'whose FIRST LINE is REVOKED-TEST', { args: { managerMode: true } }],
+  ['build (manager): red for another reason is the builder\'s defect', 'build', 'A test red for any other reason is a defect in your change', { args: { managerMode: true } }],
+  ['repair: only the narrow exception, and a timing fix at its cause', 'repair', 'never raise a timeout, never add a retry. A test that is wrong about timing', { unblock: true }],
+  ['repair: the correction carries the first line', 'repair', 'lets that assertion be corrected, in a commit of its own whose first line is REVOKED-TEST', { unblock: true }],
+  ['repair: waits for what it starts', 'repair', 'LONG COMMANDS', { unblock: true }],
+]
+async function clauseRun(src, [, role, , o]) {
+  if (o.unblock) return unblockRun(src, o.args || {})
+  return run(src, { ...(o.args || {}), features: [feat('a', o.tier || 'B')] }, pass(o.round2 ? refusedOnce : {}))
+}
+const clauseMutants = {}
+for (const c of CLAUSES) {
+  const [name, role, text, o] = c
+  scenarios['clause present — ' + name] = async src => {
+    const r = await clauseRun(src, c)
+    const call = r.calls.filter(x => x.role === role && (!o.round2 || x.attempt === 2)).pop()
+    return !!call && call.prompt.includes(text)
+  }
+  if (role === 'repair') continue  // shares its text with the builder's: deleted below at the one site that matters
+  if (SOURCE.split(text).length !== 2) { scenarios['clause text occurs once — ' + name] = async () => false; continue }
+  clauseMutants['clause deleted — ' + name] = [text, 'XXXX']
+}
+clauseMutants['repair loses LONG_COMMANDS'] = ['${LONG_COMMANDS}\n${REPAIR_TESTS}', '${REPAIR_TESTS}']
+clauseMutants['repair gets the wide rule again'] = ['${LONG_COMMANDS}\n${REPAIR_TESTS}', '${LONG_COMMANDS}\n${REVOKED_RULE}']
+Object.assign(mutants, clauseMutants)
+
+Object.assign(scenarios, {
+  'verify-first, tier A, two lanes: builder, then verifier and reviewer together, then the prover, then the merge': async src => {
+    const r = await run(src, { gateOrder: 'verify-first', lanes: 2, features: [feat('a', 'A', [], 1), feat('b', 'A', [], 2)] }, pass())
+    const seq = n => r.calls.filter(c => c.name === n).map(c => c.role)
+    const ok = n => { const q = seq(n); return q[0] === 'build' && q.indexOf('prove') > q.indexOf('verify') && q.indexOf('prove') > q.indexOf('review') && q[q.length - 1] === 'merge' }
+    return ok('a') && ok('b')
+  },
+  'a reviewer\'s refusal in verify-first keeps the gate from running': async src => {
+    const r = await run(src, { gateOrder: 'verify-first', features: [feat('a', 'A')] },
+      pass({ review: () => ({ issues: [{ severity: 'major', where: 'x:1', problem: 'p', fix: 'f' }] }) }))
+    return !r.calls.some(c => c.role === 'prove') && line(r.out, 'a').includes('blocked')
+  },
+  'the note about a PASS report the gate refused disappears once a later verification refuses': async src => {
+    const r = await run(src, { gateOrder: 'verify-first', features: [feat('a', 'C')] },
+      pass({ prove: (n, att) => att === 1 ? { ready: false, notes: '', blockers: ['red'] } : undefined,
+             verify: (n, att) => att >= 2 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }))
+    return line(r.out, 'a').includes('blocked') && !/PASS report/.test(line(r.out, 'a'))
+  },
+  'a gate that refuses a passed feature on the last attempt says so': async src => {
+    const r = await run(src, { gateOrder: 'verify-first', features: [feat('a', 'C')] }, pass({ prove: () => ({ ready: false, notes: '', blockers: ['red'] }) }))
+    return /PASS report that the gate refused/.test(line(r.out, 'a'))
+  },
+  'every role takes its own model, the triage roles included': async src => {
+    const models = { build: 'MB', prove: 'MP', verify: 'MV', review: 'MR', merge: 'MM', record: 'MC', barrier: 'MX', triage: 'MT' }
+    const r = await unblockRun(src, { models, features: [feat('a', 'A'), feat('b', 'A')] })
+    const m = role => [...new Set(r.calls.filter(c => c.role === role).map(c => c.model))].join()
+    return m('build') === 'MB' && m('prove') === 'MP' && m('verify') === 'MV' && m('review') === 'MR' && m('merge') === 'MM' &&
+      m('record') === 'MC' && m('barrier') === 'MX' && m('triage') === 'MT' && m('repair') === 'MB' && m('check') === 'MV'
+  },
+})
+// one mutant per agent() call site: the call keeps its role but loses its model
+const siteMutants = {}
+for (const [labelPart, role] of [['label: `prove:', 'prove'], ['label: `review:', 'review'], ['label: `merge:${f.name}`', 'merge'], ['label: \'record\'', 'record'],
+                                  ['label: `merge:triage-', 'merge'], ['label: `build:', 'build'], ['label: `verify:', 'verify'], ['label: `triage:', 'triage'], ['label: `barrier:${merged', 'barrier']]) {
+  const ln = SOURCE.split('\n').find(l => l.includes(labelPart) && l.includes(`...modelFor('${role}')`))
+  if (ln) siteMutants['the model of the ' + role + ' call at ' + labelPart] = [ln, ln.replace(`...modelFor('${role}')`, '...MODEL')]
+  else { scenarios['call site found — ' + labelPart] = async () => false }
+}
+Object.assign(mutants, siteMutants)
 
 // ---- manager mode: manager-pipeline.js, with stubbed agents and a stubbed child pipeline ----
 const MBASE = {
@@ -577,12 +693,10 @@ for (const [name, test] of Object.entries(scenarios)) {
 for (const [name, [from, to]] of Object.entries(mutants)) {
   if (!SOURCE.includes(from)) { console.log('  FAIL mutant anchor missing: ' + name); failed++; continue }
   const broken = SOURCE.replace(from, to)
-  let caught = false
-  for (const test of Object.values(scenarios)) {
-    let held
-    try { held = await test(broken) } catch (e) { held = false }
-    if (!held) { caught = true; break }
-  }
+  // every scenario builds its own state and waits only on timers, so they run side by side: a mutant is caught
+  // when ANY scenario fails on it, and the order in which they finish does not matter
+  const held = await Promise.all(Object.values(scenarios).map(test => Promise.resolve().then(() => test(broken)).catch(() => false)))
+  const caught = held.some(h => !h)
   console.log((caught ? '  ok   ' : '  FAIL ') + 'mutant caught: ' + name)
   if (!caught) failed++
 }

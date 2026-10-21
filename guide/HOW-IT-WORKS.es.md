@@ -291,9 +291,9 @@ siguiente sección recibe su propio loop.
 
 **C — una ejecución en pipeline, solo Claude Code.** El mismo roadmap único, construido por un script
 de Workflow que la skill incluye: por feature un constructor, un probador nuevo que ejecuta tu gate
-completo una vez y escribe un recibo, el verificador de tu skill de build — que reutiliza ese recibo
-en vez de volver a ejecutar la suite —, un revisor para las features de nivel de riesgo A, y un
-integrador que ejecuta el gate sobre el árbol exacto antes de hacer el merge. Los intentos tienen un
+completo una vez y escribe un recibo, el verificador de tu skill de build — que por defecto reutiliza ese
+recibo en vez de volver a ejecutar la suite —, un revisor para las features de nivel de riesgo A, y un
+integrador que por defecto ejecuta el gate sobre el árbol exacto antes de hacer el merge. Los intentos tienen un
 tope según el nivel, y al tercero se le pide nombrar el invariante que sus predecesores seguían
 pasando por alto antes de escribir código. La skill te pide una sola vez el gate que toda feature debe
 pasar — tu gate entero, o, si tu proyecto deja la suite entera para una barrera del lote, el gate por
@@ -392,8 +392,9 @@ una disposición de la tabla de cobertura es honesta. Eso sigue siendo lectura.
 ## Medir lo que cuestan los agentes, y actualizar un proyecto
 
 Pide *"measure my agent cost"* y la skill lee las transcripciones de Claude Code de tu propio proyecto
-y muestra adónde fueron los tokens: por rol, por reintento, por el modelo y el esfuerzo con que corrió
-cada rol, y cuánto de cada conversación fue contexto acumulándose turno tras turno. No edita nada.
+y muestra adónde fueron los tokens y el tiempo: por rol, por reintento, por el modelo y el esfuerzo con que
+corrió cada rol, cuánto tiempo corrieron los agentes de cada rol, cuántos corrieron a la vez, y cuánto de cada
+conversación fue contexto acumulándose turno tras turno. No edita nada.
 Guarda una línea base antes de cambiar cómo corren los agentes y compara después; un ahorro que nadie
 midió es una suposición.
 

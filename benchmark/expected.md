@@ -315,7 +315,7 @@ down — option C's builder is never told the exception exists (`check-pipeline.
 Since 3.40.0 the exception also covers a test that a criterion of the feature's own spec contradicts, not
 only one an owner decision revokes. This fixture plants the owner-decision form only; the criterion form was
 exercised by blind agents on a small project, not by this scenario (see the 3.40.0 entry in
-`CHANGELOG.md`). What a correct run shows here does not change.
+`CHANGELOG.md`). What a correct run shows here does not change (by reading; the scenario was not re-run).
 
 ## `manager-unblock` — a red barrier repaired at level unblock
 
