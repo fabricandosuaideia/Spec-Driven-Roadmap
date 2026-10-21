@@ -29,7 +29,7 @@ export const meta = {
 //
 // args (from plan-pipeline.py): { project, skillDir, downstream, downstreamDir, statusPath, mainBranch,
 //   gate, barrierGate?, barrierEvery?, model?, waitChunk?, testHint, setup, push, lanes, worktreeRoot,
-//   checklist, effort, maxAttempts, models?: { <role>: model }, gateOrder?, mergeGate?, verifier?: { sensor?: { A, B, C }, survivor?, rounds? }, barrierPending?: { base, head },
+//   checklist, effort, maxAttempts, models?: { <role>: model }, gateOrder?, mergeGate?, postMerge?, verifier?: { sensor?: { A, B, C }, survivor?, rounds? }, barrierPending?: { base, head },
 //   features: [{ name, roadmap, tier, dependsOn[], lane, worktree?, startAttempt?, feedback? }] }
 // `gateOrder` is 'gate-first' (the default: build, prove, verify) or 'verify-first' (build, verify, and the
 // full gate only for a feature the verifier passed): see VERIFY_FIRST below.
@@ -105,11 +105,11 @@ const LAUNCHED = `LAUNCH REQUEST: the user request relayed to you above is the o
 // A gate can outlast one command (10 minutes), and a workflow agent is finished the moment it
 // replies, so a gate it does not wait for is read by nobody. `tail --pid` blocks without `sleep`,
 // which the harness refuses as a way of waiting.
-const RUN_GATE = (cmd, where) => `run it DETACHED and wait for it — a single command is cut off at 10 minutes, a gate can take longer, and you are finished the moment you reply:
+const RUN_GATE = (cmd, where, what = 'gate') => `run it DETACHED and wait for it — a single command is cut off at 10 minutes, a ${what} can take longer, and you are finished the moment you reply:
    a) D=$(mktemp -d); nohup bash -c 'cd "$1" && ( ${cmd.replace(/'/g, `'\\''`)} ); echo $? > "$0/exit"' "$D" "${where}" > "$D/log" 2>&1 & echo "$D $!"
    b) wait with: timeout ${CHUNK} tail --pid=<that PID> -f /dev/null — never sleep — and repeat it until $D/exit exists; exit code 124 only means keep waiting.
-   c) the gate's exit code is the content of $D/exit; read only the tail and the failures of $D/log.
-   NEVER reply while $D/exit does not exist: a reply sent while the gate still runs is not a result, and the pipeline reads it as a failure.`
+   c) the ${what}'s exit code is the content of $D/exit; read only the tail and the failures of $D/log.
+   NEVER reply while $D/exit does not exist: a reply sent while the ${what} still runs is not a result, and the pipeline reads it as a failure.`
 
 // 3.37.0, from the second real project (Infinity-Agent-Creator, Haiku): 8 of 56 builders never reached
 // the prover, and the three that ended with a job still running had loaded the Monitor tool, armed a
@@ -206,7 +206,14 @@ Look for: correctness and unhandled edge cases; non-atomic read-then-write on sh
 The builder's and the prover's notes are claims: spot-check the few most likely to be wrong instead of re-deriving everything.
 Report each issue with severity blocker | major | minor, where (file:line), problem and fix.`
 
-const MERGE_RECEIPT = f => `The gate receipt may stand in for the gate below. Run these checks in ${wt(f)}. Read .specs/features/${f.name}/gate-receipt.json: it proves this exact tree only if ALL of these hold — its gate is "pass"; its command is the same command as the gate named below, not a lighter one; it has a base, and the base equals the output of git -C ${wt(f)} rev-parse ${MAIN} (the prover recorded the commit of ${MAIN} its tree was built on, so a match means ${MAIN} has not moved since); git -C ${wt(f)} status --porcelain prints nothing; and its codeHash equals the hash this command prints: git -C ${wt(f)} diff ${MAIN}...HEAD -- . ':!.specs' ':!docs' | sha256sum | cut -d' ' -f1 . If they all hold, do NOT run the gate: write "gate skipped: receipt" in notes. If any one of them fails, or the file is missing or has no base, the receipt proves nothing: `
+const MERGE_RECEIPT = f => `The gate receipt may stand in for the gate below. Run these checks in ${wt(f)}. Read .specs/features/${f.name}/gate-receipt.json: it proves this exact tree only if ALL of these hold — its gate is "pass"; its command is the same command as the gate named in this step, not a lighter one; it has a base, and the base equals the output of git -C ${wt(f)} rev-parse ${MAIN} (the prover recorded the commit of ${MAIN} its tree was built on, so a match means ${MAIN} has not moved since); git -C ${wt(f)} status --porcelain prints nothing; and its codeHash equals the hash this command prints: git -C ${wt(f)} diff ${MAIN}...HEAD -- . ':!.specs' ':!docs' | sha256sum | cut -d' ' -f1 . If they all hold, do NOT run the gate: write "gate skipped: receipt" in notes. If any one of them fails, or the file is missing or has no base, the receipt proves nothing: `
+
+// 3.44.0, from the WordPress AI Agent Manager, whose local copy of this script ran a database migration after each
+// merge (`postMerge` in its pipeline.json) and would have lost it on a reinstall. The merge has happened by then:
+// the main branch moved, so a failure does not undo it; it stops what follows and the account says so.
+const POST_MERGE = A.postMerge ? `3b. Then, once, on ${MAIN} in ${P}, run the project's post-merge command: ${A.postMerge} (it applies what the merged code needs outside git, for example forward-only database migrations) — and ${RUN_GATE(A.postMerge, P, 'post-merge command')}
+   If it fails, the merge STAYS: never undo the fast-forward; reply ok=true with postMerge=false and the tail of its output in notes.
+` : ''
 
 const MERGE = f => `You are the MERGER for feature ${f.name} in the project at ${P}. Verification passed. Nothing reaches ${MAIN} without the gate below${BY_RECEIPT ? ', or a receipt that proves this exact tree' : ''}. Stop with ok=false at the first failure and change nothing further.
 ${LAUNCHED}
@@ -214,8 +221,8 @@ ${LAUNCHED}
 1. In ${wt(f)}: rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
 2. ${BY_RECEIPT ? MERGE_RECEIPT(f) : ''}Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
 3. Fast-forward ${MAIN} to feat/${f.name}${LANES > 1 ? ` (git -C ${P} checkout ${MAIN} && git -C ${P} merge --ff-only feat/${f.name})` : ` (git checkout ${MAIN} && git merge --ff-only feat/${f.name})`}.${A.push ? ` Then git push origin ${MAIN}.` : ' Do not push: pushing is the owner\'s call.'}
-4. ${LANES > 1 ? `git -C ${P} worktree remove ${wt(f)}; ` : ''}git branch -d feat/${f.name}.
-Reply with ok, before, the new ${MAIN} commit and notes.`
+${POST_MERGE}4. ${LANES > 1 ? `git -C ${P} worktree remove ${wt(f)}; ` : ''}git branch -d feat/${f.name}.
+Reply with ok, before, the new ${MAIN} commit and notes${A.postMerge ? ', and postMerge (true only if the post-merge command exited 0)' : ''}.`
 
 // ---- triage (level unblock only): classify by script, repair without loosening, check, merge ----
 const TRIAGE = (merged, failures, base, specs, cycle) => `You are the TRIAGE of a build pipeline for the project at ${P}, manager mode at level unblock, cycle ${cycle}. The batch barrier (${A.barrierGate}) failed after these features merged into ${MAIN}: ${merged.join(', ')}. You change nothing.
@@ -278,7 +285,7 @@ const BUILD_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' },
 const PROVE_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' }, notes: { type: 'string' }, blockers: { type: 'array', items: { type: 'string' } } }, required: ['ready', 'notes', 'blockers'] }
 const VERIFY_SCHEMA = { type: 'object', properties: { gateExit: { type: 'number' }, pass: { type: 'boolean' }, notMet: { type: 'array', items: { type: 'string' } }, issues: ISSUES }, required: ['gateExit', 'pass', 'notMet', 'issues'] }
 const REVIEW_SCHEMA = { type: 'object', properties: { issues: ISSUES }, required: ['issues'] }
-const MERGE_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, before: { type: 'string' }, commit: { type: 'string' }, notes: { type: 'string' } }, required: ['ok', 'before', 'commit', 'notes'] }
+const MERGE_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, before: { type: 'string' }, commit: { type: 'string' }, notes: { type: 'string' }, postMerge: { type: 'boolean' } }, required: ['ok', 'before', 'commit', 'notes'] }
 const TRIAGE_SCHEMA = { type: 'object', properties: { items: { type: 'array', items: { type: 'object', properties: { test: { type: 'string' }, command: { type: 'string' }, kind: { type: 'string', enum: ['regression', 'preexisting', 'not-reproduced'] }, feature: { type: 'string' }, evidence: { type: 'string' } }, required: ['test', 'command', 'kind', 'evidence'] } } }, required: ['items'] }
 const REPAIR_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' }, fixed: { type: 'array', items: { type: 'string' } }, blockers: { type: 'array', items: { type: 'string' } } }, required: ['ready', 'fixed', 'blockers'] }
 const CHECK_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, issues: ISSUES }, required: ['ok', 'issues'] }
@@ -318,6 +325,7 @@ const serious = list => (list || []).filter(i => i && i.severity !== 'minor')
 // base nobody has proved.
 let sinceBarrier = []
 let barrierRed = null
+let postMergeFailed = null  // the feature after whose merge the post-merge command did not exit 0
 const mergedAt = {}
 // A run paused inside its barrier leaves merges no green barrier proved; the next run owes it, and the
 // triage reads its base from the commit recorded as last proved.
@@ -358,7 +366,7 @@ const repair = async (merged, failures) => {
 }
 
 const runBarrier = async () => {
-  if (!A.barrierGate || !sinceBarrier.length) return
+  if (!A.barrierGate || !sinceBarrier.length || postMergeFailed) return  // main is not in step with its environment: a barrier now proves nothing
   const merged = sinceBarrier
   sinceBarrier = []
   const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:${merged[merged.length - 1]}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...modelFor('barrier') })
@@ -368,7 +376,10 @@ const runBarrier = async () => {
   if (!green && UNBLOCK) green = await repair(merged, b ? b.failures : [])
   if (!green) barrierRed = merged
 }
-const hold = f => { blocked.add(f.name); outcomes.push({ name: f.name, result: 'held', because: 'the barrier is red' }); log(`${f.name}: held (barrier red)`) }
+const hold = f => {
+  const why = barrierRed ? 'the barrier is red' : `the post-merge command failed after ${postMergeFailed}`
+  blocked.add(f.name); outcomes.push({ name: f.name, result: 'held', because: why }); log(`${f.name}: held (${why})`)
+}
 
 const runFeature = async f => {
   await Promise.all((f.dependsOn || []).filter(d => settled[d]).map(d => settled[d]))
@@ -379,7 +390,7 @@ const runFeature = async f => {
   let passedAt = 0
   let staleReport = false
   for (let attempt = f.startAttempt || 1; attempt <= MAX[tier] && !passedAt; attempt++) {
-    if (barrierRed) { hold(f); return }
+    if (barrierRed || postMergeFailed) { hold(f); return }
     const built = await agent(IMPLEMENT(f, attempt, feedback), { phase: 'Build', label: `build:${f.name}:${attempt}`, schema: BUILD_SCHEMA, effort: effortFor('implement', f), ...modelFor('build') })
     if (!built || !built.ready) {
       feedback = [{ severity: 'blocker', where: 'build', problem: 'the builder did not finish: ' + (built ? built.blockers.join('; ') : 'no result'), fix: 'finish the work on the existing branch' }]
@@ -419,14 +430,16 @@ const runFeature = async f => {
     return
   }
   const doMerge = async () => {
-    if (barrierRed) return { held: true }
+    if (barrierRed || postMergeFailed) return { held: true }
     const m = await agent(MERGE(f), { phase: 'Merge', label: `merge:${f.name}`, schema: MERGE_SCHEMA, effort: effortFor('merge', f), ...modelFor('merge') })
     if (m && m.ok) {
-      outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit, ...(/gate skipped/i.test(m.notes || '') ? { gateSkipped: true } : {}) })
+      const postFailed = !!A.postMerge && m.postMerge !== true  // anything but an explicit true is a failure: it is the safe reading
+      outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit, ...(/gate skipped/i.test(m.notes || '') ? { gateSkipped: true } : {}), ...(postFailed ? { postMergeFailed: true } : {}) })
       mergedAt[f.name] = { before: m.before, after: m.commit }
       log(`${f.name}: merged`)
       sinceBarrier.push(f.name)
-      if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()
+      if (postFailed) { postMergeFailed = f.name; log(`${f.name}: merged, but the post-merge command did not exit 0`) }
+      else if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()
     }
     return m
   }
@@ -452,4 +465,4 @@ return outcomes.map(o => o.name === 'barrier'
   ? `barrier: ${o.result} after ${o.after.join(', ')}${o.result === 'red' ? ' — ' + (o.failures || []).slice(0, 5).join('; ') : ''}`
   : o.name === 'triage'
   ? `triage: ${o.result} (cycle ${o.cycle})${o.items ? ' — ' + o.items.join('; ') : ''}${o.because ? ' — ' + o.because : ''}`
-  : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.gateSkipped ? ' [gate skipped: receipt]' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)
+  : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.gateSkipped ? ' [gate skipped: receipt]' : ''}${o.postMergeFailed ? ' [post-merge command failed]' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)

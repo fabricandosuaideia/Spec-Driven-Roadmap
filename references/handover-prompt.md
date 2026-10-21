@@ -690,6 +690,12 @@ them for an unattended run:
        and offer `"full"` to a user who prefers to re-verify everything each time at the cost of the
        loop.
 
+   Only if the project's own rules mention such a step, also ask what the merged code needs **outside git**
+   (`"postMerge"`): a command run once on the main branch after each fast-forward, such as a forward-only
+   database migration. The merge stays if it fails; the features after it are held, no barrier runs, and the
+   account says so. `plan-pipeline.py` refuses any key of `pipeline.json` that this version does not read, so a
+   setting that exists only in a locally patched copy of the skill is named instead of silently ignored.
+
    Write their answers and `"confirmed": true` into the file. If `plan-pipeline.py` then refuses
    with features the gate "cannot decide" — a report the gate refuses, or a pending feature a
    finished one depends on — read each report with the user and write their word into

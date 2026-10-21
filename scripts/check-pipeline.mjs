@@ -440,7 +440,7 @@ const MERGE_ARGS = { mergeGate: 'receipt', barrierGate: 'make all' }
 const CLAUSES = [
   ['merge: the receipt may stand in', 'merge', 'The gate receipt may stand in for the gate below', { args: MERGE_ARGS }],
   ['merge: the gate must be pass', 'merge', 'its gate is "pass"', { args: MERGE_ARGS }],
-  ['merge: the receipt\'s command must be the pipeline\'s gate', 'merge', 'its command is the same command as the gate named below, not a lighter one', { args: MERGE_ARGS }],
+  ['merge: the receipt\'s command must be the pipeline\'s gate', 'merge', 'its command is the same command as the gate named in this step, not a lighter one', { args: MERGE_ARGS }],
   ['merge: the base must exist and equal main', 'merge', 'it has a base, and the base equals the output of', { args: MERGE_ARGS }],
   ['merge: the tree must be clean and the hash equal', 'merge', 'prints nothing; and its codeHash equals the hash this command prints', { args: MERGE_ARGS }],
   ['merge: all must hold, then skip', 'merge', 'If they all hold, do NOT run the gate', { args: MERGE_ARGS }],
@@ -491,6 +491,52 @@ for (const c of CLAUSES) {
 clauseMutants['repair loses LONG_COMMANDS'] = ['${LONG_COMMANDS}\n${REPAIR_TESTS}', '${REPAIR_TESTS}']
 clauseMutants['repair gets the wide rule again'] = ['${LONG_COMMANDS}\n${REPAIR_TESTS}', '${LONG_COMMANDS}\n${REVOKED_RULE}']
 Object.assign(mutants, clauseMutants)
+
+// ---- 3.44.0: the command that applies what merged code needs outside git (a database migration) ----
+const PM = { postMerge: 'bash docs/process/migrate.sh' }
+const okMerge = (postMerge) => ({ merge: () => ({ ok: true, before: 'b0', commit: 'c', notes: '', ...(postMerge === undefined ? {} : { postMerge }) }) })
+Object.assign(scenarios, {
+  'without postMerge the merger is told nothing about a post-merge command': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    return !/post-merge/.test(r.calls.find(c => c.role === 'merge').prompt)
+  },
+  'with postMerge the merger runs it once after the fast-forward, detached, and never undoes the merge': async src => {
+    const r = await run(src, { ...PM, features: [feat('a')] }, pass(okMerge(true)))
+    const m = r.calls.find(c => c.role === 'merge').prompt
+    const at = k => m.indexOf(k)
+    return /bash docs\/process\/migrate\.sh/.test(m) && at('3b. Then, once') > at('3. Fast-forward') && at('3b. Then, once') < at('4. ') && /DETACHED/.test(m.slice(at('3b.'))) &&
+      /post-merge command can take longer/.test(m) && /the merge STAYS: never undo the fast-forward/.test(m)
+  },
+  'a post-merge command that exited 0 changes nothing': async src => {
+    const r = await run(src, { ...PM, features: [feat('a'), feat('b', 'B', ['a'])] }, pass(okMerge(true)))
+    return line(r.out, 'a').includes('merged') && !line(r.out, 'a').includes('post-merge') && line(r.out, 'b').includes('merged')
+  },
+  'a post-merge command that failed leaves the feature merged, says so, and holds what follows': async src => {
+    const r = await run(src, { ...PM, features: [feat('a'), feat('b', 'B', ['a']), feat('c', 'B', ['b'])] }, pass(okMerge(false)))
+    return line(r.out, 'a').includes('merged') && line(r.out, 'a').includes('[post-merge command failed]') && !r.calls.some(c => c.name === 'b' && c.role === 'build') &&
+      /held|skipped/.test(line(r.out, 'b')) && r.calls.filter(c => c.role === 'merge').length === 1
+  },
+  'a merger that does not answer postMerge is read as a failure': async src => {
+    const r = await run(src, { ...PM, features: [feat('a'), feat('b')] }, pass(okMerge(undefined)))
+    return line(r.out, 'a').includes('[post-merge command failed]') && line(r.out, 'b').includes('held') && line(r.out, 'b').includes('post-merge command failed after a')
+  },
+  'no barrier runs while the environment is out of step': async src => {
+    const r = await run(src, { ...PM, barrierGate: 'make all', barrierEvery: 1, features: [feat('a')] }, pass(okMerge(false)))
+    return !r.calls.some(c => c.role === 'barrier')
+  },
+  'the post-merge reply is asked for': async src => {
+    const r = await run(src, { ...PM, features: [feat('a')] }, pass(okMerge(true)))
+    return /and postMerge \(true only if the post-merge command exited 0\)/.test(r.calls.find(c => c.role === 'merge').prompt)
+  },
+})
+Object.assign(mutants, {
+  'a failed post-merge command is ignored': ["const postFailed = !!A.postMerge && m.postMerge !== true", "const postFailed = false"],
+  'only an explicit false counts as a failure': ["!!A.postMerge && m.postMerge !== true", "!!A.postMerge && m.postMerge === false"],
+  'features after a failed post-merge command are not held': ["if (barrierRed || postMergeFailed) { hold(f); return }", "if (barrierRed) { hold(f); return }"],
+  'the merger is not told the merge stays': ['the merge STAYS: never undo the fast-forward', 'the merge is undone'],
+  'the post-merge command is missing from the merger\'s prompt': ["${POST_MERGE}4. ", "4. "],
+  'a barrier runs while the environment is out of step': ["|| postMergeFailed) return  // main is not in step", ") return  // main is not in step"],
+})
 
 Object.assign(scenarios, {
   'verify-first, tier A, two lanes: builder, then verifier and reviewer together, then the prover, then the merge': async src => {

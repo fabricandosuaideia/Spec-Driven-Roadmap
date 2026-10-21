@@ -342,7 +342,7 @@ def plan(root, roadmap_rel, cfg):
     args = {
         "project": root, "skillDir": SKILL_DIR, "downstream": ds, "downstreamDir": ds_dir,
         "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main", "gate": cfg["gate"],
-        "barrierGate": (cfg.get("barrierGate") or "").strip() or None, "barrierEvery": int(cfg.get("barrierEvery") or 0),
+        "barrierGate": (cfg.get("barrierGate") or "").strip() or None, **({"postMerge": cfg["postMerge"].strip()} if isinstance(cfg.get("postMerge"), str) and cfg["postMerge"].strip() else {}), "barrierEvery": int(cfg.get("barrierEvery") or 0),
         "model": cfg.get("model") or None, "gateOrder": cfg.get("gateOrder") or "gate-first", "mergeGate": cfg.get("mergeGate") or "rerun",
         "verifier": verifier_policy(cfg),
         **({"models": models_policy(cfg)} if models_policy(cfg) else {}),
@@ -369,6 +369,14 @@ SURVIVOR_SEVERITIES = ("blocker", "major", "minor")
 ROUND_MODES = ("scoped", "full")
 TIERS = ("A", "B", "C")
 MODEL_ROLES = ("build", "prove", "verify", "review", "merge", "record", "triage", "barrier")
+EFFORT_ROLES = ("implement", "prove", "verify", "review", "merge", "record", "triage")
+EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
+# Every key of pipeline.json this version reads. A key outside the list used to be ignored, which is how a setting
+# that does nothing gets trusted: a project's `postMerge` lived only in a local patch of the skill and a reinstall
+# would have dropped it without a word.
+CONFIG_KEYS = ("confirmed", "gate", "barrierGate", "barrierEvery", "gateOrder", "mergeGate", "verifier", "model", "models",
+               "testHint", "setup", "postMerge", "push", "mainBranch", "lanes", "checklist", "effort", "maxAttempts",
+               "manager", "featureStatus", "waitChunk")
 VERIFIER_KEYS = ("sensor", "survivor", "rounds")
 # Keys of `manager` that mean something. A key outside this list was silently ignored before 3.41.0, which
 # is how a setting that does nothing gets trusted: "passes" was a local patch of one project, and is
@@ -386,6 +394,12 @@ def config_problems(cfg, ds=None):
     the key it is about. A value that is present but falsy (0, false, "", [], {}) is a problem, not an absence:
     only a missing key or null means "unset". `ds` is the downstream skill, when known."""
     out = []
+    if isinstance(cfg, dict):
+        stray = sorted(k for k in cfg if k not in CONFIG_KEYS)
+        if stray:
+            out.append("%s %s read by nothing in this version, so %s would be silently ignored; the keys are %s. If it was a local "
+                       "patch of an installed copy of this skill, that patch is not part of this version" % (
+                           "has no key" if len(stray) == 1 else "has no keys", ", ".join(stray), "it" if len(stray) == 1 else "they", ", ".join(CONFIG_KEYS)))
 
     def given(d, k):
         return isinstance(d, dict) and d.get(k) is not None
@@ -393,6 +407,27 @@ def config_problems(cfg, ds=None):
     def one_of(d, k, allowed, label):
         if given(d, k) and d[k] not in allowed:
             out.append("%s takes %s; not: %r" % (label, " or ".join(allowed), d[k]))
+    for key in ("gate", "barrierGate", "postMerge", "setup", "testHint", "checklist", "mainBranch", "model"):
+        if given(cfg, key) and not isinstance(cfg[key], str):
+            out.append("%s takes a string; not: %r" % (key, cfg[key]))
+    if isinstance(cfg.get("postMerge"), str) and not cfg["postMerge"].strip():
+        out.append("postMerge is only spaces: leave the key out, or give the command to run once on the main branch after each merge")
+    ef = cfg.get("effort")
+    if ef is not None and not isinstance(ef, dict):
+        out.append("effort takes an object by role; not: %r" % (ef,))
+    elif isinstance(ef, dict):
+        badr = sorted(k for k in ef if k not in EFFORT_ROLES)
+        if badr:
+            out.append("effort has no role %s; the roles are %s" % (", ".join(badr), ", ".join(EFFORT_ROLES)))
+        for role, lv in ef.items():
+            levels = lv.values() if isinstance(lv, dict) else [lv]
+            if isinstance(lv, dict) and sorted(lv) != sorted(set(lv) & set(TIERS)):
+                out.append("effort.%s names a tier that is not A, B or C" % role)
+            elif any(x not in EFFORT_LEVELS for x in levels):
+                out.append("effort.%s takes %s (or an object by tier A, B, C of them); not: %r" % (role, ", ".join(EFFORT_LEVELS), lv))
+    ma = cfg.get("maxAttempts")
+    if ma is not None and not (isinstance(ma, dict) and all(k in TIERS and _whole(v, 1) for k, v in ma.items())):
+        out.append("maxAttempts takes a whole number of at least 1 for A, B and C; not: %r" % (ma,))
     one_of(cfg, "gateOrder", GATE_ORDERS, "gateOrder")
     one_of(cfg, "mergeGate", MERGE_GATES, "mergeGate")
     for key in ("barrierEvery", "lanes"):
@@ -768,6 +803,20 @@ x
                 ("a manager.sectionsPerRun of -3", {"manager": {"sectionsPerRun": -3}}, "sectionsPerRun"),
                 ("a manager.stopAt that is a bare string", {"manager": {"stopAt": "live"}}, "stopAt")):
             refused_with(label, over, word)
+        for label, over, word in (
+                ("a key nothing reads", {"postMerg": "bash x"}, "postMerg"), ("a key that was a local patch", {"passes": 2}, "passes"),
+                ("a postMerge that is only spaces", {"postMerge": "  "}, "postMerge"), ("a postMerge that is a list", {"postMerge": ["a"]}, "postMerge"),
+                ("an effort for a role that does not exist", {"effort": {"implementer": "high"}}, "implementer"),
+                ("an effort level that does not exist", {"effort": {"prove": "ultra"}}, "effort.prove"),
+                ("an effort by a tier that does not exist", {"effort": {"verify": {"A": "high", "Z": "low"}}}, "effort.verify"),
+                ("maxAttempts as a bare number", {"maxAttempts": 5}, "maxAttempts"), ("maxAttempts with a tier D", {"maxAttempts": {"D": 3}}, "maxAttempts"),
+                ("a gate that is not a string", {"gate": ["make"]}, "gate")):
+            refused_with(label, over, word)
+        pm, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, postMerge="  bash docs/process/migrate.sh  "))
+        expect("a postMerge reaches the args, trimmed", pm["postMerge"] == "bash docs/process/migrate.sh")
+        expect("no postMerge, no key in the args", "postMerge" not in plan(root, os.path.join("docs", "ROADMAP.md"), cfg)[0])
+        expect("the maxAttempts and effort a project really uses are accepted",
+               not config_problems(dict(cfg, maxAttempts={"A": 6, "B": 6, "C": 5}, effort={"implement": {"A": "xhigh", "B": "high", "C": "medium"}, "prove": "medium", "record": "low"})))
         many = refused_with("three mistakes together", {"gateOrder": "x", "models": {"zzz": "m"}, "verifier": {"rounds": "partial"}}, "gateOrder")
         expect("every problem is reported in one go, not one per run", "models has no role zzz" in many and "verifier.rounds" in many)
         trimmed, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, models={"build": " sonnet "}))

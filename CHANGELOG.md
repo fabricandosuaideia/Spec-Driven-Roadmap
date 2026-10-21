@@ -9,6 +9,38 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.44.0 — 2026-10-21
+
+**`postMerge` enters the skill, and a key that nothing reads is refused** (found by the review of 3.43.1, which read the
+four real `pipeline.json` files). The WordPress AI Agent Manager runs `pnpm db:migrate` after every merge: a
+`postMerge` key that exists **only in a locally patched copy** of this skill (`roadmap-pipeline.js` and
+`plan-pipeline.py` of that project). Reinstalling the skill would have accepted the file, ignored the key, and
+stopped migrating the database, with no message anywhere. The same silent ignoring is how `manager.passes` of
+another project was found in 3.41.0.
+
+- **`"postMerge"`**: a command run once on the main branch after each fast-forward, detached and waited for like
+  the gate. What the local copy did not do: when it fails, the merge **has happened** (the main branch moved), so
+  the feature is recorded as merged with `[post-merge command failed]`, it counts toward the next barrier, the
+  features after it are **held** (`the post-merge command failed after <feature>`), and no barrier runs while the
+  environment is out of step with the code. The merger replies `ok=true, postMerge=false` and never undoes the
+  fast-forward; anything but an explicit `true` from the merger is read as a failure.
+- **`plan-pipeline.py` refuses any top-level key it does not read**, naming it and saying that a patch of an
+  installed copy is not part of this version; `effort` roles and levels, `maxAttempts` and the string-valued keys
+  are checked the same way. Checked against the four real files: only `manager.passes` of the Infinity project is
+  refused (3.41.0); the WordPress file, `postMerge` included, is accepted.
+- **`check-pipeline.mjs`:** 7 scenarios and 6 mutants for the post-merge command; `plan-pipeline.py --selftest` 13 new
+  assertions (100 to 113). The blind agents also found two wording defects, fixed before release ("run it run it";
+  "the gate named below" for a gate named in the same step; neither affected the outcome).
+
+**Executed, two blind Haiku mergers, each on its own copy, the post-merge script leaving a mark on disk:** the command
+that exits 0 ran once, detached, after the fast-forward (one mark), the receipt had skipped the gate (no gate mark),
+reply `postMerge=true`; the command that exits 1 ran once (one mark), the merge stayed, reply `ok=true,
+postMerge=false` with the error tail and a warning about the partial side effect. **Not executed:** a real Workflow
+run (so the `held` of the features after a failed post-merge command is shown by stubs only); lanes above 1; a
+post-merge command that takes longer than one wait. Fixtures not kept.
+
+---
+
 ## 3.43.1 — 2026-10-21
 
 **Corrections after an independent review of 3.37.0 to 3.43.0.** Four reviewers with fresh context, none given
