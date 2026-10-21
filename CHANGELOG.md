@@ -9,6 +9,38 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.41.0 — 2026-10-21
+
+**A model per role, and configuration keys that mean nothing are refused instead of ignored**
+(Infinity-Agent-Creator, skill 3.40.0, fifth step of the time review). The project ran everything on one
+model (`claude-haiku-5-5`), and its owner's local copy of the pipeline already carried a `models` key to
+give builders and verifiers a stronger one — a patch that a reinstall would have reverted, leaving the
+key in `pipeline.json` doing nothing.
+
+- **`models`** in `pipeline.json`: `{"build": ..., "verify": ..., ...}` over the roles `build`, `prove`,
+  `verify`, `review`, `merge`, `record`, `triage`, `barrier`; a role it does not name uses `model`, and
+  that one, when unset, the session's. The repairer is a builder, the triage checker a verifier, the
+  triage merger a merger. The key is the same one the project's local patch used, so its configuration
+  keeps working after a reinstall. `plan-pipeline.py` refuses a role it does not know, a model that is
+  not a name, and a value that is not an object.
+- **`manager` keys are checked.** A key outside `delegation`, `delegatedOn`, `autonomy`, `stopAt`,
+  `sectionsPerRun`, `decomposeModel`, `effort` is refused by name. This reaches that project's
+  `manager.passes: 2` — a local patch that gave an unfinished section another run before skipping the
+  sections after it. It is **not** adopted: nothing persists a feature's attempt count between passes
+  (`startAttempt` and `feedback` are read and never written), so a second pass restarts every
+  unfinished feature at attempt 1, which is a second full budget under another name; the refusal says
+  so and points at `maxAttempts`. Silent ignoring was worse — its owner would believe a second pass
+  happens.
+- **`check-pipeline.mjs`:** 3 scenarios and 2 mutants (the models, and the repairer taking the builder's
+  model); `plan-pipeline.py --selftest` 7 new assertions.
+
+**Executed:** the stubbed control flow, the planner's self-test, the release gate. **Not executed:** a real
+Workflow run (the `model` option per agent is the one a real run used in 3.31.0; the per-role lookup in
+front of it is exercised by stubs only). Whether a stronger builder or verifier cuts refused attempts is
+**not measured**: `measure-agents.py` splits cost by model and role, which is how to read it.
+
+---
+
 ## 3.40.0 — 2026-10-21
 
 **Rule change, manager mode only: an existing test is updated, not obeyed, when the feature's own spec

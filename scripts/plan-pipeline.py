@@ -345,6 +345,7 @@ def plan(root, roadmap_rel, cfg):
         "barrierGate": cfg.get("barrierGate") or None, "barrierEvery": int(cfg.get("barrierEvery") or 0),
         "model": cfg.get("model") or None, "gateOrder": cfg.get("gateOrder") or "gate-first",
         "verifier": verifier_policy(cfg, ds),
+        **({"models": models_policy(cfg)} if models_policy(cfg) else {}),
         "testHint": cfg.get("testHint") or "", "setup": cfg.get("setup") or "", "push": bool(cfg.get("push")),
         "lanes": lanes, "worktreeRoot": root.rstrip("/") + ".lanes", "checklist": cfg.get("checklist"),
         "effort": cfg.get("effort") or DEFAULT_CONFIG["effort"],
@@ -365,6 +366,27 @@ AUTONOMY = ("decide", "unblock")
 GATE_ORDERS = ("gate-first", "verify-first")
 SURVIVOR_SEVERITIES = ("blocker", "major", "minor")
 ROUND_MODES = ("scoped", "full")
+MODEL_ROLES = ("build", "prove", "verify", "review", "merge", "record", "triage", "barrier")
+# Keys of `manager` that mean something. A key outside this list was silently ignored before 3.41.0, which
+# is how a setting that does nothing gets trusted: "passes" was a local patch of one project, and is
+# refused by name because ignoring it would let its owner believe a second pass happens.
+MANAGER_KEYS = ("delegation", "delegatedOn", "autonomy", "stopAt", "sectionsPerRun", "decomposeModel", "effort")
+
+
+def models_policy(cfg):
+    """`models`: a model per role, validated. A role it does not name uses `model`."""
+    m = cfg.get("models")
+    if not m:
+        return None
+    if not isinstance(m, dict):
+        raise RuntimeError("%s models takes an object: {\"build\": \"<model>\", ...}" % CONFIG)
+    bad = sorted(k for k in m if k not in MODEL_ROLES)
+    if bad:
+        raise RuntimeError("%s models has no role %s; the roles are %s" % (CONFIG, ", ".join(bad), ", ".join(MODEL_ROLES)))
+    empty = sorted(k for k, v in m.items() if not (isinstance(v, str) and v.strip()))
+    if empty:
+        raise RuntimeError("%s models.%s must be a model name" % (CONFIG, ", models.".join(empty)))
+    return dict(m)
 
 
 def verifier_policy(cfg, ds):
@@ -455,6 +477,11 @@ def section_states(root, cfg=None):
 
 def manager_args(root, cfg):
     mgr = dict(DEFAULT_CONFIG["manager"], **(cfg.get("manager") or {}))
+    stray = sorted(k for k in mgr if k not in MANAGER_KEYS)
+    if stray:
+        note = (" \"passes\" was a local patch: a second pass would restart every unfinished feature at attempt 1, "
+                "which is only a second full budget — raise maxAttempts instead" if "passes" in stray else "")
+        raise RuntimeError("%s manager has no key %s; the keys are %s.%s" % (CONFIG, ", ".join(stray), ", ".join(MANAGER_KEYS), note))
     if not (mgr.get("delegation") or "").strip():
         raise RuntimeError("%s has no manager.delegation: manager mode decides what would otherwise be asked, "
                            "and only the owner can hand that over, in their own words" % CONFIG)
@@ -629,6 +656,17 @@ x
         except RuntimeError as e:
             ok_order = "gateOrder" in str(e)
         expect("gateOrder takes only gate-first or verify-first", ok_order)
+        expect("no per-role models unless the config sets them", "models" not in args)
+        m1, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, models={"build": "sonnet", "verify": "opus"}))
+        expect("models reach the args", m1["models"] == {"build": "sonnet", "verify": "opus"})
+        for label, bad in (("a role that does not exist", {"builder": "sonnet"}), ("an empty model name", {"build": ""}),
+                           ("a list instead of an object", ["sonnet"])):
+            try:
+                plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, models=bad))
+                refused = False
+            except RuntimeError as e:
+                refused = "models" in str(e)
+            expect("models: %s is refused" % label, refused)
         expect("no mutant cap and no survivor severity unless the config sets them",
                not (args["verifier"] or {}).get("sensor") and not (args["verifier"] or {}).get("survivor"))
         v1, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, verifier={"sensor": {"A": 5, "B": 3, "C": 1}, "survivor": "major"}))
@@ -805,6 +843,13 @@ x
         mw = dict(written, manager={"delegation": "decide", "delegatedOn": "2026-10-06"})
         expect("manager mode is told too, so it does not call the section already done",
                manager_args(root, mw).get("barrierPending") == {"base": h1, "head": h3})
+        for label, extra, word in (("passes", {"passes": 2}, "maxAttempts"), ("a misspelt key", {"sectionPerRun": 3}, "sectionPerRun")):
+            try:
+                manager_args(root, dict(written, manager=dict(mw["manager"], **extra)))
+                said = ""
+            except RuntimeError as e:
+                said = str(e)
+            expect("a manager key that means nothing is refused by name, not ignored (%s)" % label, word in said and "manager has no key" in said)
         record_barrier(root, "master", h3)
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             rc = main(["--root", root])

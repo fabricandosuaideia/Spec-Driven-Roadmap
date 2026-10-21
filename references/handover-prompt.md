@@ -602,6 +602,13 @@ them for an unattended run:
      <project-root> --sha <commit>`.
    - **The model** (`"model"`), for every agent the pipeline starts. Left `null`, they all inherit the
      session's model — say so, and say which one that is: a real run went out on a model nobody chose.
+     **A model per role** (`"models"`, optional): `{"build": "<model>", "verify": "<model>", ...}` over
+     the roles `build`, `prove`, `verify`, `review`, `merge`, `record`, `triage` and `barrier`; a role it
+     does not name uses `"model"`. The repairer is a builder, the triage checker a verifier, the triage
+     merger a merger. The roles do not need the same care: `prove`, `merge`, `record` and `barrier` only
+     run a command and report, while `build` and `verify` decide. Which split costs less without costing
+     quality is not measured — say that, and offer `measure-agents.py` to compare. `plan-pipeline.py`
+     refuses a role it does not know instead of ignoring it.
    - **Speed — four levers, each with its price, all the user's to choose:**
      - **Lanes** (`"lanes"`): how many features are proved at once, each in its own git worktree. It
        only helps features that do not depend on each other; a chain gains nothing. Before setting it

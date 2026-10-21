@@ -29,7 +29,7 @@ export const meta = {
 //
 // args (from plan-pipeline.py): { project, skillDir, downstream, downstreamDir, statusPath, mainBranch,
 //   gate, barrierGate?, barrierEvery?, model?, waitChunk?, testHint, setup, push, lanes, worktreeRoot,
-//   checklist, effort, maxAttempts, gateOrder?, verifier?: { sensor?: { A, B, C }, survivor?, rounds? }, barrierPending?: { base, head },
+//   checklist, effort, maxAttempts, models?: { <role>: model }, gateOrder?, verifier?: { sensor?: { A, B, C }, survivor?, rounds? }, barrierPending?: { base, head },
 //   features: [{ name, roadmap, tier, dependsOn[], lane, worktree?, startAttempt?, feedback? }] }
 // `gateOrder` is 'gate-first' (the default: build, prove, verify) or 'verify-first' (build, verify, and the
 // full gate only for a feature the verifier passed): see VERIFY_FIRST below.
@@ -55,6 +55,11 @@ const BARRIER_EVERY = Math.max(0, A.barrierEvery || 0)
 const CHUNK = Math.max(30, Math.min(540, A.waitChunk || 540))
 if (!P || !SKILL || !DS || !DSDIR || !A.gate) throw new Error('args incomplete: run plan-pipeline.py and pass its output as args')
 const MODEL = A.model ? { model: A.model } : {}
+// 3.41.0: one model for every agent made a cheap model do the work that needs a careful one, and the other
+// way round. `models` (pipeline.json) names a model for a role; a role it does not name uses `model`, and
+// that one, when unset, the session's. Roles: build, prove, verify, review, merge, record, triage, barrier.
+// The repairer is a builder, the triage checker a verifier, the triage merger a merger.
+const modelFor = role => (A.models && A.models[role]) ? { model: A.models[role] } : MODEL
 // 3.38.0, from a project whose gate took 24 minutes (Infinity-Agent-Creator): the full gate ran before the
 // verifier on every attempt, and 28 of the 37 attempts that reached the verifier were refused, so 28 gates
 // bought a refusal that did not need them. 11 of 48 provers did catch a real failure first (lint, a stale
@@ -319,17 +324,17 @@ const repair = async (merged, failures) => {
   const stop = (because, cycle) => { outcomes.push({ name: 'triage', result: 'stopped', cycle, because }); log(`triage: stopped — ${because}`); return false }
   if (!base) return stop('no base commit was recorded for these merges', 1)
   for (let cycle = 1; cycle <= 2; cycle++) {
-    const t = await agent(TRIAGE(merged, failures, base, specs, cycle), { phase: 'Barrier', label: `triage:${cycle}`, schema: TRIAGE_SCHEMA, effort: TRIAGE_EFFORT, ...MODEL })
+    const t = await agent(TRIAGE(merged, failures, base, specs, cycle), { phase: 'Barrier', label: `triage:${cycle}`, schema: TRIAGE_SCHEMA, effort: TRIAGE_EFFORT, ...modelFor('triage') })
     const items = (t && t.items) || []
     if (!items.length) return stop('nothing could be classified', cycle)
     if (items.some(i => i.kind === 'not-reproduced')) return stop('a failure did not reproduce on either tree: ' + items.filter(i => i.kind === 'not-reproduced').map(i => i.test).join(', '), cycle)
-    const fx = await agent(REPAIR(items, cycle), { phase: 'Barrier', label: `repair:${cycle}`, schema: REPAIR_SCHEMA, effort: effortFor('implement', { tier: 'A' }), ...MODEL })
+    const fx = await agent(REPAIR(items, cycle), { phase: 'Barrier', label: `repair:${cycle}`, schema: REPAIR_SCHEMA, effort: effortFor('implement', { tier: 'A' }), ...modelFor('build') })
     if (!fx || !fx.ready) return stop('the repair did not finish: ' + (fx ? fx.blockers.join('; ') : 'no result'), cycle)
-    const ck = await agent(CHECK(items, cycle), { phase: 'Barrier', label: `check:${cycle}`, schema: CHECK_SCHEMA, effort: TRIAGE_EFFORT, ...MODEL })
+    const ck = await agent(CHECK(items, cycle), { phase: 'Barrier', label: `check:${cycle}`, schema: CHECK_SCHEMA, effort: TRIAGE_EFFORT, ...modelFor('verify') })
     if (!ck || !ck.ok || serious(ck.issues).length) return stop('the checker refused the repair: ' + (ck ? serious(ck.issues).map(i => i.problem).join('; ') : 'no result'), cycle)
-    const m = await agent(TRIAGE_MERGE(cycle), { phase: 'Barrier', label: `merge:triage-${cycle}`, schema: MERGE_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...MODEL })
+    const m = await agent(TRIAGE_MERGE(cycle), { phase: 'Barrier', label: `merge:triage-${cycle}`, schema: MERGE_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...modelFor('merge') })
     if (!m || !m.ok) return stop('the repair did not merge: ' + (m ? m.notes : 'no result'), cycle)
-    const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:after-triage-${cycle}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...MODEL })
+    const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:after-triage-${cycle}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...modelFor('barrier') })
     const green = !!(b && b.ok && b.exitCode === 0)
     outcomes.push({ name: 'triage', result: green ? 'repaired' : 'not enough', cycle, items: items.map(i => `${i.kind}${i.feature ? ' in ' + i.feature : ''}: ${i.test}`) })
     outcomes.push({ name: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
@@ -344,7 +349,7 @@ const runBarrier = async () => {
   if (!A.barrierGate || !sinceBarrier.length) return
   const merged = sinceBarrier
   sinceBarrier = []
-  const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:${merged[merged.length - 1]}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...MODEL })
+  const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:${merged[merged.length - 1]}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...modelFor('barrier') })
   let green = !!(b && b.ok && b.exitCode === 0)
   outcomes.push({ name: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
   log(`barrier after ${merged.join(', ')}: ${green ? 'green' : 'red'}`)
@@ -363,22 +368,22 @@ const runFeature = async f => {
   let staleReport = false
   for (let attempt = f.startAttempt || 1; attempt <= MAX[tier] && !passedAt; attempt++) {
     if (barrierRed) { hold(f); return }
-    const built = await agent(IMPLEMENT(f, attempt, feedback), { phase: 'Build', label: `build:${f.name}:${attempt}`, schema: BUILD_SCHEMA, effort: effortFor('implement', f), ...MODEL })
+    const built = await agent(IMPLEMENT(f, attempt, feedback), { phase: 'Build', label: `build:${f.name}:${attempt}`, schema: BUILD_SCHEMA, effort: effortFor('implement', f), ...modelFor('build') })
     if (!built || !built.ready) {
       feedback = [{ severity: 'blocker', where: 'build', problem: 'the builder did not finish: ' + (built ? built.blockers.join('; ') : 'no result'), fix: 'finish the work on the existing branch' }]
       continue
     }
     let gateRefused = false
     const proveStep = async () => {
-      const proved = await agent(PROVE(f), { phase: 'Build', label: `prove:${f.name}:${attempt}`, schema: PROVE_SCHEMA, effort: effortFor('prove', f), ...MODEL })
+      const proved = await agent(PROVE(f), { phase: 'Build', label: `prove:${f.name}:${attempt}`, schema: PROVE_SCHEMA, effort: effortFor('prove', f), ...modelFor('prove') })
       if (proved && proved.ready) return true
       feedback = ((proved && proved.blockers.length) ? proved.blockers : ['the prover did not finish, or the gate failed'])
         .map(b => ({ severity: 'blocker', where: 'prove', problem: b, fix: 'make the gate pass on the rebased tree' }))
       return false
     }
     if (!VERIFY_FIRST && !(await proveStep())) continue
-    const thunks = [() => agent(VERIFY(f, attempt), { phase: 'Verify', label: `verify:${f.name}:${attempt}`, schema: VERIFY_SCHEMA, effort: effortFor('verify', f), ...MODEL })]
-    if (tier === 'A') thunks.push(() => agent(REVIEW(f), { phase: 'Verify', label: `review:${f.name}:${attempt}`, schema: REVIEW_SCHEMA, effort: effortFor('review', f), ...MODEL }))
+    const thunks = [() => agent(VERIFY(f, attempt), { phase: 'Verify', label: `verify:${f.name}:${attempt}`, schema: VERIFY_SCHEMA, effort: effortFor('verify', f), ...modelFor('verify') })]
+    if (tier === 'A') thunks.push(() => agent(REVIEW(f), { phase: 'Verify', label: `review:${f.name}:${attempt}`, schema: REVIEW_SCHEMA, effort: effortFor('review', f), ...modelFor('review') }))
     const [ver, rev] = await parallel(thunks)
     let pass = !!(ver && ver.pass && ver.gateExit === 0 && serious(ver.issues).length === 0 &&
       (tier !== 'A' || (rev && serious(rev.issues).length === 0)))
@@ -403,7 +408,7 @@ const runFeature = async f => {
   }
   const doMerge = async () => {
     if (barrierRed) return { held: true }
-    const m = await agent(MERGE(f), { phase: 'Merge', label: `merge:${f.name}`, schema: MERGE_SCHEMA, effort: effortFor('merge', f), ...MODEL })
+    const m = await agent(MERGE(f), { phase: 'Merge', label: `merge:${f.name}`, schema: MERGE_SCHEMA, effort: effortFor('merge', f), ...modelFor('merge') })
     if (m && m.ok) {
       outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit })
       mergedAt[f.name] = { before: m.before, after: m.commit }
@@ -430,7 +435,7 @@ await parallel(Object.values(queues).map(q => async () => {
 await withMergeLock(runBarrier)
 
 phase('Record')
-await agent(RECORD(outcomes), { phase: 'Record', label: 'record', schema: RECORD_SCHEMA, effort: effortFor('record', { tier: 'B' }), ...MODEL })
+await agent(RECORD(outcomes), { phase: 'Record', label: 'record', schema: RECORD_SCHEMA, effort: effortFor('record', { tier: 'B' }), ...modelFor('record') })
 return outcomes.map(o => o.name === 'barrier'
   ? `barrier: ${o.result} after ${o.after.join(', ')}${o.result === 'red' ? ' — ' + (o.failures || []).slice(0, 5).join('; ') : ''}`
   : o.name === 'triage'

@@ -129,6 +129,26 @@ const scenarios = {
     return ['prove', 'merge', 'barrier', 'verify'].every(role => r.calls.filter(c => c.role === role).every(waits)) &&
       r.calls.some(c => c.role === 'barrier')
   },
+  // 3.41.0: a model per role.
+  'models name a model per role, and a role they do not name uses the one model': async src => {
+    const r = await run(src, { model: 'opus', models: { build: 'haiku', verify: 'sonnet', merge: 'sonnet' }, barrierGate: 'make all', features: [feat('a', 'A')] }, pass())
+    const m = role => r.calls.filter(c => c.role === role).map(c => c.model).join()
+    return m('build') === 'haiku' && m('verify') === 'sonnet' && m('merge') === 'sonnet' && m('review') === 'opus' &&
+      m('prove') === 'opus' && m('barrier') === 'opus' && m('record') === 'opus'
+  },
+  'the triage roles take the model of the role they play': async src => {
+    let n = 0
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', models: { triage: 'T', build: 'B', verify: 'V', merge: 'M', barrier: 'R' }, barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
+      pass({ barrier: () => (n++ === 0 ? { ok: false, exitCode: 1, failures: ['tests/test_x.py::test_y'] } : undefined),
+             triage: () => ({ items: [{ test: 'tests/test_x.py::test_y', command: 'pytest x', kind: 'preexisting', evidence: '{}' }] }),
+             repair: () => ({ ready: true, fixed: ['t'], blockers: [] }), check: () => ({ ok: true, issues: [] }) }))
+    const m = role => [...new Set(r.calls.filter(c => c.role === role).map(c => c.model))].join()
+    return m('triage') === 'T' && m('repair') === 'B' && m('check') === 'V' && m('barrier') === 'R'
+  },
+  'with no models the session model is inherited by every role': async src => {
+    const r = await run(src, { features: [feat('a', 'A')] }, pass())
+    return r.calls.every(c => c.model === undefined)
+  },
   // 3.39.0: the verifier's policy and its scoped rounds.
   'with no verifier policy the verifier is told nothing about mutants': async src => {
     const r = await run(src, { features: [feat('a')] }, pass())
@@ -355,6 +375,8 @@ const mutants = {
   'red barrier ignored': ['if (!green) barrierRed = merged', 'if (false) barrierRed = merged'],
   'launch request not scoped': ['never ask.\n${LAUNCHED}', 'never ask.'],
   'gate not waited for': ['tail --pid=<that PID>', 'cat <that PID>'],
+  'models ignored': ["const modelFor = role => (A.models && A.models[role]) ? { model: A.models[role] } : MODEL", 'const modelFor = role => MODEL'],
+  'the repairer not given the builder model': ["label: `repair:${cycle}`, schema: REPAIR_SCHEMA, effort: effortFor('implement', { tier: 'A' }), ...modelFor('build')", "label: `repair:${cycle}`, schema: REPAIR_SCHEMA, effort: effortFor('implement', { tier: 'A' }), ...MODEL"],
   'rounds full ignored': ["VP.rounds === 'full' ? '' : attempt > 1", 'attempt > 1'],
   'verifier policy dropped': ['${ROUND(f, attempt)}${SENSOR_POLICY(f)}', '${ROUND(f, attempt)}'],
   'a later round not scoped': ['? `ROUND ${attempt}: a verifier already refused this feature; ${SCOPE(f)}\\n`', '? `ROUND ${attempt}: verify everything\\n`'],
