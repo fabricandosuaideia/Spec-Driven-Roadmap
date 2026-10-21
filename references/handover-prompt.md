@@ -612,8 +612,22 @@ them for an unattended run:
      section's pipeline only: manager mode's decomposer, planner and recorder take
      `manager.decomposeModel` or `"model"`. The roles do not need the same care: `prove`, `merge`, `record` and `barrier` only
      run a command and report, while `build` and `verify` decide. Which split costs less without costing
-     quality is not measured — say that, and offer `measure-agents.py` to compare. `plan-pipeline.py`
+     quality is not established (the one comparison there is, below, cannot separate the model) — say that,
+     and offer `measure-agents.py` to compare. `plan-pipeline.py`
      refuses a role it does not know instead of ignoring it.
+     **A cheaper model is cheaper only if it does not cost attempts**, because every attempt pays the gate
+     and a fresh context; that follows from how an attempt is priced, not from the comparison. The one
+     comparison measured, on Infinity-Agent-Creator, ran the pipeline with `claude-haiku-5-5` in every role
+     (9 features integrated, 3.2 agent-hours each) and then, after its owner patched a local copy of the skill,
+     with `claude-sonnet-5-5` for `build`, `verify` and `review` and Haiku for the rest (13 integrated, 0.65
+     each, the run still going when measured; 1.4 if the three features the first runs left unfinished are
+     charged to the second). Of the 2.6 hours saved per feature, 1.9 (72%) were in `prove` and `merge`, which
+     wait for the suite and which the builder's model does not touch: the project made its own suite several
+     times faster and its merger skipped its gate on a receipt. The other 0.7 changed with the model, the
+     verifier's depth, the test rule, the attempt ceilings and the features themselves at once, and the builder
+     ending without finishing (8 of 56 attempts, then 1 of 31) is not a model signal either: three of the eight
+     were the old test rule working as designed, two waited on a background command and three needed an owner
+     decision or a permission. Say that, and say it was one project.
    - **Speed — five levers, each with its price, all the user's to choose:**
      - **Lanes** (`"lanes"`): how many features are proved at once, each in its own git worktree. It
        only helps features that do not depend on each other; a chain gains nothing. Before setting it
@@ -709,7 +723,14 @@ them for an unattended run:
    written and, when it is `a && b && c`, with its parts at once, alternating the order, recording the
    machine's load and refusing to compare a run that failed. By default the gate runs twice per feature
    (the prover and the merger), so its duration is paid on every feature; the script changes nothing —
-   adopting a faster form is theirs.
+   adopting a faster form is theirs. **No lever above shortens the gate itself**, and when the gate is
+   long beside a verification that is where the time is: on the one project measured (a 24-minute gate)
+   `prove` and `merge` were about 60% of the agent time, and after the project made its own suite parallel (one
+   database per worker, the tests that measure real time kept serial) the prover's median fell from 23.8
+   to 4.5 minutes and 56% of the time saved per feature was in the prover (another 17% in the merger, which is
+   the `mergeGate` lever above). That work is the project's, not the
+   pipeline's, and which form fits is theirs to find; say it once when `bench-gate.py` shows a long gate,
+   and do not promise the same figure to a project that has not measured its own.
 2. If the session can spawn sub-agents at all, nothing else is needed; the pipeline sets each role's
    effort itself (`effort` in `pipeline.json`, per role and tier) and does not use the agent files.
 

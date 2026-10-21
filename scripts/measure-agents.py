@@ -24,8 +24,10 @@ and prints, never message content, only counts:
   - TIME, because tokens are not the only price: per workflow role, the wall-clock its
     agents spent (first to last turn) and its share of all workflow-agent time; the
     wall-clock of the workflow runs themselves (from each run's journal) against the
-    agents' own, which is how many agents ran at once; and how many verifications passed
-    and how many were refused. On one project the prover and the merger, which run the gate, were about 60%
+    agents' own, which is how many agents ran at once; how many verifications passed
+    and how many were refused; and which stage the other refusals came from (a builder that
+    did not finish, a prover that refused, a reviewer's blocker or major, a merge that
+    failed), each as what the agent itself returned. On one project the prover and the merger, which run the gate, were about 60%
     of the agent time and about 13% of the relative cost, so a run can be cheap and still slow.
 
     python3 measure-agents.py                       # project = current directory
@@ -45,6 +47,8 @@ transcripts, or none in the window) — an empty measurement is not a result.
 
 import argparse
 import collections
+import contextlib
+import io
 import json
 import datetime
 import os
@@ -130,6 +134,16 @@ def classify(path, root):
 
 # --------------------------------------------------------------------------- scan
 
+# What a role's own reply says about its attempt, for the roles whose reply is not a verdict. A reply of another
+# shape (a key missing, the wrong type) is not an outcome of that role and is left out of the count.
+STAGE_REFUSALS = {
+    "build": ("the builder did not finish", lambda o: o["ready"] is False if isinstance(o.get("ready"), bool) else None),
+    "prove": ("the prover refused (a red gate or a rebase it could not do)", lambda o: o["ready"] is False if isinstance(o.get("ready"), bool) else None),
+    "review": ("the reviewer found a blocker or a major", lambda o: any(isinstance(i, dict) and i.get("severity") in ("blocker", "major") for i in o["issues"]) if isinstance(o.get("issues"), list) else None),
+    "merge": ("the merge failed", lambda o: o["ok"] is False if isinstance(o.get("ok"), bool) else None),
+}
+
+
 def scan(path, since, until):
     """Per-turn context sizes and token totals for one transcript.
 
@@ -143,6 +157,7 @@ def scan(path, since, until):
     mix = collections.Counter()
     stamps = []
     verdict = None
+    final = None
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             if NOTIFICATION_MARK in line and '"type":"user"' in line.replace(" ", ""):
@@ -168,7 +183,10 @@ def scan(path, since, until):
                 stamps.append(t)
             for block in (msg.get("content") or []) if isinstance(msg.get("content"), list) else []:
                 if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "StructuredOutput":
-                    passed = (block.get("input") or {}).get("pass")
+                    reply = block.get("input")
+                    if isinstance(reply, dict):
+                        final = reply
+                    passed = (reply or {}).get("pass") if isinstance(reply, dict) else None
                     if isinstance(passed, bool):
                         verdict = passed
             key = msg.get("id") or d.get("requestId") or d.get("uuid")
@@ -185,7 +203,7 @@ def scan(path, since, until):
     stamps.sort()
     span = (stamps[-1] - stamps[0]) if stamps else 0.0
     pause = max((b - a for a, b in zip(stamps, stamps[1:])), default=0.0)
-    return ctx, totals, notifications, mix, (span, pause, stamps[0] if stamps else None, stamps[-1] if stamps else None), verdict
+    return ctx, totals, notifications, mix, (span, pause, stamps[0] if stamps else None, stamps[-1] if stamps else None), verdict, final
 
 
 def epoch(ts):
@@ -231,6 +249,7 @@ def measure(dirs, since, until, weights):
         "kind": None, "agents": 0, "turns": [], "first_ctx": [], "ctx_sum": 0,
         "growth_sum": 0, "totals": collections.Counter(), "mix": collections.Counter(), "secs": [], "pause": 0.0})
     verdicts = collections.Counter()
+    stages = collections.defaultdict(lambda: [0, 0])  # role -> [agents with an outcome, of them refused]
     by_run = collections.defaultdict(list)  # workflow run id -> [(first, last)] of its agents
     attempts = collections.Counter()
     features = collections.defaultdict(lambda: {"cost": 0.0, "max_attempt": 0})
@@ -244,7 +263,7 @@ def measure(dirs, since, until, weights):
                     continue
                 path = os.path.join(dp, f)
                 kind, role, feature, attempt = classify(path, root)
-                ctx, totals, notes, mix, (span, pause, t0, t1), verdict = scan(path, since, until)
+                ctx, totals, notes, mix, (span, pause, t0, t1), verdict, final = scan(path, since, until)
                 if kind == "main-session":
                     notifications += notes
                 if not ctx:
@@ -263,6 +282,11 @@ def measure(dirs, since, until, weights):
                 r["pause"] = max(r["pause"], pause)
                 if kind == "workflow-agent" and role == "verify" and verdict is not None:
                     verdicts["said pass" if verdict else "said refuse"] += 1
+                if kind == "workflow-agent" and role in STAGE_REFUSALS and final is not None:
+                    refused = STAGE_REFUSALS[role][1](final)
+                    if refused is not None:
+                        stages[role][0] += 1
+                        stages[role][1] += 1 if refused else 0
                 if kind == "workflow-agent" and t0 is not None:
                     run_id = os.path.basename(os.path.dirname(path))
                     if run_id.startswith("wf_"):
@@ -276,7 +300,8 @@ def measure(dirs, since, until, weights):
                     features[feature]["max_attempt"] = max(features[feature]["max_attempt"], attempt or 0)
     return {"roles": roles, "attempts": attempts, "features": features,
             "classes": classes, "notifications": notifications, "files": files,
-            "verdicts": verdicts, "workflows": workflow_runs(dirs, since, until), "by_run": by_run}
+            "verdicts": verdicts, "stages": {k: tuple(v) for k, v in stages.items()},
+            "workflows": workflow_runs(dirs, since, until), "by_run": by_run}
 
 
 def workflow_runs(dirs, since, until):
@@ -362,6 +387,7 @@ def summarise(m, weights):
     out["parallelism_runs"] = paired_runs
     out["agents_outside_journals"] = max(0, sum(len(v) for v in (m.get("by_run") or {}).values()) - paired_agents)
     out["verified"] = dict(m.get("verdicts") or {})
+    out["stages"] = {r: {"agents": n, "refused": k} for r, (n, k) in (m.get("stages") or {}).items()}
     decided = collections.Counter()
     for run in runs:
         decided.update(run["decided"])
@@ -438,6 +464,10 @@ def report(s, top, base=None):
         n = sum(v.values())
         print("verifier verdicts (what each verifier itself returned): %d said pass, %d said refuse (%s)" % (
             v.get("said pass", 0), v.get("said refuse", 0), pct(v.get("said refuse", 0) / n).strip()))
+    st = s.get("stages") or {}
+    if st:
+        print("other stages (what each agent itself returned): " + "; ".join(
+            "%s %d of %d" % (STAGE_REFUSALS[r][0], st[r]["refused"], st[r]["agents"]) for r in STAGE_REFUSALS if r in st))
     d = s.get("pipeline_decisions") or {}
     if d:
         n = sum(d.values())
@@ -473,12 +503,14 @@ def _write(path, lines):
             fh.write(json.dumps(d) + "\n")
 
 
-def _turn(mid, ts, inp, cw, cr, out, model="claude-sonnet-5-5", effort="high", verdict=None):
+def _turn(mid, ts, inp, cw, cr, out, model="claude-sonnet-5-5", effort="high", verdict=None, reply=None):
     d = {"type": "assistant", "timestamp": ts, "effort": effort, "message": {"id": mid, "model": model, "usage": {
         "input_tokens": inp, "cache_creation_input_tokens": cw,
         "cache_read_input_tokens": cr, "output_tokens": out}}}
     if verdict is not None:
         d["message"]["content"] = [{"type": "tool_use", "name": "StructuredOutput", "input": {"pass": verdict, "issues": []}}]
+    if reply is not None:
+        d["message"]["content"] = [{"type": "tool_use", "name": "StructuredOutput", "input": reply}]
     return d
 
 
@@ -588,6 +620,41 @@ def selftest():
                and epoch("not a time") is None)
         expect("the project path is encoded the way Claude Code stores it",
                encode_project("/root/.claude/x_y") == "-root--claude-x-y")
+        # What the other roles themselves returned: a builder and a prover with ready=false, a reviewer with a major
+        # among minors (and one with only minors, and one with none), a merger with ok=false, a verifier (no stage),
+        # a builder that never replied and a reviewer whose reply has another shape (neither is an outcome).
+        root2 = os.path.join(tmp, "proj2")
+        wf2 = os.path.join(root2, "s2", "subagents", "workflows", "wf_2")
+        n = [0]
+
+        def agent2(desc, reply):
+            n[0] += 1
+            name = "agent-%d" % n[0]
+            _write(os.path.join(wf2, name + ".jsonl"), [_turn("x%d" % n[0], "2026-09-10T14:00:00Z", 0, 100, 0, 1, reply=reply)])
+            json.dump({"agentType": "workflow-subagent", "description": desc}, open(os.path.join(wf2, name + ".meta.json"), "w"))
+        agent2("build:f:1", {"ready": False, "summary": "", "blockers": ["x"]})
+        agent2("build:f:2", {"ready": True, "summary": "", "blockers": []})
+        agent2("build:f:3", None)
+        agent2("prove:f:1", {"ready": False, "notes": "", "blockers": []})
+        agent2("prove:f:2", {"ready": True, "notes": "", "blockers": []})
+        agent2("review:f:1", {"issues": [{"severity": "minor"}, {"severity": "major"}]})
+        agent2("review:f:2", {"issues": [{"severity": "minor"}]})
+        agent2("review:f:3", {"issues": []})
+        agent2("review:f:4", {"verdict": "other shape"})
+        agent2("merge:f", {"ok": True, "before": "a", "commit": "b", "notes": ""})
+        agent2("merge:g", {"ok": False, "before": "a", "commit": "", "notes": ""})
+        agent2("verify:f:1", {"gateExit": 0, "pass": False, "notMet": [], "issues": []})
+        s2 = summarise(measure([root2], None, None, w), w)
+        expect("each role's own reply is counted as its outcome, a reply of another shape and no reply are not",
+               s2["stages"] == {"build": {"agents": 2, "refused": 1}, "prove": {"agents": 2, "refused": 1},
+                                "review": {"agents": 3, "refused": 1}, "merge": {"agents": 2, "refused": 1}})
+        expect("the verifier keeps its own line and is no stage", s2["verified"] == {"said refuse": 1} and "verify" not in s2["stages"])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            report(s2, 12)
+        expect("the report names each stage with its own count",
+               "the builder did not finish 1 of 2" in buf.getvalue() and "the prover refused" in buf.getvalue()
+               and "the reviewer found a blocker or a major 1 of 3" in buf.getvalue() and "the merge failed 1 of 2" in buf.getvalue())
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("\n%d failed" % len(failures))

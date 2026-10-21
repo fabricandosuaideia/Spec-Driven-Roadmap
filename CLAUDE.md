@@ -34,7 +34,7 @@ Before the lessons, the mechanics. Everything below is a command; none of it is 
 | `scripts/check-conversion-guards.py` | Every path on which the conversion must refuse. Builds and deletes its own trees. Called by the release gate, and by the hook when the conversion or its fixture changes. |
 | `scripts/run-benchmark.py` | Sets up an isolated run and scores it. See [`benchmark/`](benchmark/). |
 | `scripts/convert-to-multi.py` | Shipped to users. The single→multi conversion. |
-| `scripts/measure-agents.py` | Shipped to users. Reads a project's Claude Code transcripts and decomposes token cost by class, role, retry, model/effort and orchestrator, and wall-clock time by workflow role, with the run's parallelism and the verifications passed or refused. Read-only. |
+| `scripts/measure-agents.py` | Shipped to users. Reads a project's Claude Code transcripts and decomposes token cost by class, role, retry, model/effort and orchestrator, and wall-clock time by workflow role, with the run's parallelism, the verifications passed or refused and the stage each other refusal came from. Read-only. |
 | `scripts/feature-brief.py` | Shipped to users. Prints one feature's slice of the roadmap for its builder (entry, questions, contracts, ledger, risk tier). Read-only. |
 | `scripts/status-block.py` | Shipped to users. The only writer of `## Status` and of the seed's `## Handoff` (`--handoff`); archives every body it replaces, and every old copy of the Handoff, to `docs/roadmap-history.md`. |
 | `scripts/write-agents.py` | Shipped to users. Writes `.claude/agents/roadmap-*.md` (option B); never overwrites a changed file. |
@@ -337,6 +337,13 @@ Recorded so it is not attempted again:
   drifts — this repository's two declarative tables rotted within weeks.
 - **A release gate resting on LLM judgement**, with no determinism. No CI, no hook, and a cost per
   release: it becomes theatre, producing an artifact that *resembles* verification.
+- **Clauses for the reviewer, tested on fixtures** (3.46.0): a severity scale, "grep who else reads what the diff writes", "list every major in one
+  pass". Fourteen blind Sonnet reviewers, on a five-file repo and on a 55-file repo with three readers outside the diff: every one found every planted
+  defect with and without the clauses, so fixtures of that size cannot show a gain in recall, and the clauses only moved severity — down by 1.75 majors on
+  the small repo, up by 1 on the large one. What loops tier A is a large diff the reviewer does not exhaust in one pass; build that fixture before
+  writing the clause again. The change that did pay was the one whose failure is a plain omission (the builder's first attempt never rebased an existing
+  branch: 0 of 3 finished controls did, 10 of 10 with the sentence), because there the control shows the defect. And count a `git merge` as what it is: an
+  ancestor test cannot tell it from a rebase.
 - **Splitting a file by size.** Splitting worked only where there was a real seam — two triggers and
   two readers in one file. Cutting by line count is the kind of surgery that introduced defects three
   times.

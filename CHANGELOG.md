@@ -9,6 +9,88 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.46.0 — 2026-10-21
+
+**A second round of the same project, measured, and what it adds to 3.37.0–3.45.0: one sentence in the builder's prompt, one line in the
+measurer, a paragraph on what the gate and the model cost — and a list of what was tried and not shipped.** The project
+(Infinity-Agent-Creator, `tlc-spec-driven`, manager mode) ran again after its owner patched a local copy of the skill (a model per role, a second
+pass per section, a merge that skips the gate on a receipt, a lighter verifier, a wider rule for old tests — the ideas behind 3.40.0–3.43.0, except the
+second pass, which 3.41.0 refuses), made its own test suite parallel, and put Sonnet in `build`, `verify` and `review`. Read from its transcripts with
+`measure-agents.py` and small scripts over the same files, in copies, writing nothing there.
+
+**What the second round shows** (the earlier two runs: 176 agents, 9 features integrated, 39.1 agent-hours; the new one: 112 agents, 13 integrated,
+8.4 agent-hours, **still going when measured**). Three features the earlier runs spent 9.9 of their hours on were finished only by the new one, so the figure
+per integrated feature depends on whom those hours are charged to: **3.2 hours against 0.65 (5×) counting each round's hours on the features it integrated,
+3.2 against 1.4 (2.3×) charging the three to the new round as well.** On the first count the saving is 2.6 hours per feature:
+
+| agent-hours per integrated feature | earlier runs | new run |
+|---|---|---|
+| build | 0.74 | 0.38 |
+| prove | 1.60 | 0.16 |
+| merge | 0.44 | 0.004 |
+| verify | 0.43 | 0.06 |
+| review | 0.04 | 0.02 |
+| barrier | — | 0.02 |
+
+`prove` and `merge`, which wait for the suite, are **1.9 of the 2.6 hours (72%)** — 56% in the prover and 17% in the merger — and the builder's model does
+not touch them: the prover's median went from 23.8 to 4.5 minutes (the project's suite, now parallel) and the merger's from 23.8 to 0.2 (its patch lets the
+merger skip the gate on a receipt, which is the `mergeGate` lever of 3.43.0). The other 0.7 hours changed with the model, the verifier's depth, the test rule, the
+attempt ceilings and the features themselves **at once**, so the data cannot say what the model did alone. The builder ended without finishing in 8 of 56
+attempts and in 1 of 31, and that is not a model signal either: three of the eight were `stop-file-outcomes` stuck on the old narrow test rule ("stays red"), two
+waited on a command left running (what 3.37.0 fixed) and three needed an owner decision or a permission. 7 of the 13 integrated features needed one attempt
+(none of the 12 the earlier runs touched merged in one). Verifier findings: 63 `notMet`, 42 major and 4 blocker over 37 verifications before (by the verifiers'
+own text the blockers were an error text returned to the user, a hand-written receipt twice, and an existing test edited), none of the three over 19 after,
+and 51 minors against 126 (2.7 per verification against 3.4). That is as consistent with a verifier that lost its bite as with builders that got better: in the
+same round the reviewers refused 6 of 8 and the provers 11 of 30. What still loops is tier A: `stop-derived-versions` took 9 attempts and
+`intake-upload-resumable` 6, **15 of the 32 builder attempts**; in the first, 3 of the first 6 were refused by the prover for reasons that are not code
+defects (a rebase conflict in `.specs/STATE.md`, twice a guard of the project's own docs), and the reviewer's majors changed from round to round (the same
+finding was a major in the first run and a minor in the second).
+
+- **A builder's first attempt on a branch that already exists rebases it onto the main branch itself.** The prompt said so only from the second attempt;
+  the prover rebases again and fixes nothing. In this project's transcripts it cost **one attempt in 112 agents** (the first prover of
+  `stop-derived-versions`, a conflict in `.specs/STATE.md`); in the earlier runs the provers resolved their own conflicts. The case for the sentence is the
+  test, not the frequency. Executed by blind agents, each in its own copy of a fixture whose feature branch is behind a main that changed the same lines of
+  `.specs/STATE.md`: **with the previous text none of the 3 Haiku controls that finished rebased** (one wrote "I did not rebase, because the instruction
+  does not say to", another "The instruction does not say to merge or rebase, so I left it", the third reported the branch as behind main and not rebased), and of
+  3 Sonnet controls stopped mid-run one had merged main into the branch and two had done neither; **with the new text 10 of 10 rebased** (7 finished, 3 stopped
+  after rebasing), 6 with the first wording and 4 with the final one (two sentences), with no conflict marker left and no rebase left open. Six Sonnet agents
+  were stopped by me while still running, five of them timing a 10,000-item case (the machine was loaded and other projects share it); the counts are of the
+  branches as they stood, and stopping early can only understate the controls (one might have rebased later), so the figure to read is the 0 of 3 that finished. Mutation-checked in `check-pipeline.mjs` (clause present, clause deleted).
+- **`measure-agents.py` prints which stage the refusals came from**, as what each agent returned itself: builder not finished, prover refused (a red
+  gate or a rebase), reviewer with a blocker or major, merge failed. On the two runs: 8 of 56, 11 of 48, 8 of 14, 0 of 9 before; 1 of 31, 11 of 30, 6 of 8, 0 of 13
+  after. It is what showed the tier A loop above. `--selftest` 26 to 29.
+- **Step 10 (`handover-prompt.md`)** says what the model comparison does and does not show, and that no lever shortens the gate itself; when the gate is long,
+  that is where the time is, and it is the project's work. It promises no figure to a project that has not measured its own.
+
+**Of the other project's suggestions** the skill already had: a model per role (3.41.0), the wider rule for old tests with `REVOKED-TEST` (3.40.0), the
+verifier that does not converge (3.39.0: a cap on mutants and the survivor as a minor, both opt-in; scoped rounds by default), the merge that skips a
+gate a receipt proved (3.43.0, opt-in because it needs a barrier), waiting for the gate (`RUN_GATE` for the prover since 3.31.0, the builder's
+`LONG_COMMANDS` in 3.37.0). **Not adopted, with the reason:**
+
+- `manager.passes`. The one section it closed took 3 more attempts of the same feature after a first pass of 6, and `maxAttempts` expresses that;
+  3.41.0 stands. The project's own `maxAttempts` for tier A was already 6.
+- Contract-level dependencies between sections: still the 1 skipped section freed out of 8 measured in the 3.37.0 work (not measured again).
+- Decomposer rules for a test that is red on purpose, and for the work that speeds the suite coming first: one project's analysis; nothing in this
+  round's transcripts shows either. Not measured, not written.
+- The ~47k tokens of context every agent starts with: 46–48k at the first turn in every role in both runs, from the project's
+  own rules, tools and skills list; the pipeline has no option that changes it.
+- **Three clauses for the reviewer** (define blocker/major/minor by what happens in use; grep who else reads what the diff starts to write; list every
+  blocker and major in one pass), executed and **removed again**. Eight Sonnet reviewers on a five-file fixture with three planted defects (control 4,
+  with the three clauses 4): **all eight found all three**, and the mean of blockers plus majors moved 8.0 → 6.25, because a missing timeout went from
+  major in 3 of 4 to minor in 4 of 4 and a quadratic cost that completes from major in 3 of 4 to major in 2 of 4. Six on a 55-file repo with three readers of a
+  new value outside the diff (history, retention, search), with the second and third clauses only: 9 of 9 found without them and 9 of 9 with them, and
+  there the mean **rose** 7.0 → 8.0 (a badge for a new kind, which nothing in the roadmap mentions, went from minor in 3 of 3 to major in 3 of 3). So the
+  clauses moved severity in both directions and found nothing more. Reviewers already read what the diff does not touch; what loops tier A is not what a
+  fixture of that size can show. A large diff would be the test, and it was not run.
+
+**Not executed:** a real Workflow run with this text; the test above reproduces the situation, not the pipeline.
+
+**Found by an independent review of this entry before it shipped** (all corrected above): the headline "per integrated feature" mixed 9.9 hours of three
+features the new run finished; the builder non-finishes were presented as a model signal; a control that had *merged* main was counted as having rebased
+(0 of 6 rebased, not 1); "seen in both runs" for a conflict that cost one attempt once; "the verifier still sees gaps and no longer stops on them" for a
+change the data cannot attribute; the 67% credited to the parallel suite when 17 points of it are the receipt; and a summary that left out the 55-file
+result that went the other way. Every printed figure matched a recomputation from the transcripts.
+
 ## 3.45.0 — 2026-10-21
 
 **The upgrade route knows what 3.37.0 to 3.44.0 changed, and refuses to replace a project's own patch of the skill without

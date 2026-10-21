@@ -4,7 +4,7 @@ description: Generates a dependency-ordered feature backlog (a ROADMAP.md plus a
 license: MIT
 metadata:
   author: Fabricando Sua Ideia - github.com/fabricandosuaideia
-  version: "3.45.0"
+  version: "3.46.0"
 ---
 
 # Spec-Driven Roadmap
@@ -105,8 +105,9 @@ python3 <skill-dir>/scripts/measure-agents.py --project <project-root> [--since 
 It reads the project's own Claude Code transcripts and prints shares — token classes, cost by role
 (from each agent's label), context at the first turn and how much of it is growth, retries, and how
 many notifications the orchestrator processed — and **time**: the wall-clock each workflow role took
-and its share, how many agents ran at once on the run's own clock, and how many verifications passed or
-were refused. Tokens and time are different prices (on one project the prover and the merger, which run the gate, were
+and its share, how many agents ran at once on the run's own clock, how many verifications passed or
+were refused, and which stage the other refusals came from (a builder that did not finish, a prover
+that refused, a reviewer's blocker or major, a failed merge). Tokens and time are different prices (on one project the prover and the merger, which run the gate, were
 about 60% of the agent time and about 13% of the relative cost), so look at both before choosing a lever. **You run it; report what it points at, in the
 user's language, and never read its unit as money or quota** — the script says why. Save a baseline
 with `--save-baseline` before a change to how agents run and compare with `--baseline` after it: a

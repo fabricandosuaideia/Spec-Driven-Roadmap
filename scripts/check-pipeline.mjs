@@ -450,6 +450,7 @@ const CLAUSES = [
   ['prove: verify-first does not verify again', 'prove', 'do not verify again', { args: { gateOrder: 'verify-first' } }],
   ['prove: verify-first leaves a note for the next builder', 'prove', 'gate-failure.md (the failing tests and the command', { args: { gateOrder: 'verify-first' } }],
   ['build: an earlier gate-failure note is read', 'build', 'or a gate-failure.md note) is committed', {}],
+  ['build: an existing branch is rebased by the builder, not left to the prover', 'build', 'the prover rebases it again and fixes nothing, so a conflict left for it costs a whole attempt', {}],
   ['verify: no report means verify everything and ignore the scope', 'verify', 'this is a FIRST verification: ignore the rest of this paragraph and verify everything', {}],
   ['verify: a first verification demotes nothing', 'verify', 'a clause of a criterion that no test exercises is not proven', {}],
   ['verify: inside the scope and in a first verification nothing is demoted', 'verify', 'Inside the scope, and in a first verification, nothing is demoted', { round2: true }],
