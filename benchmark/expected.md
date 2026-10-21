@@ -312,6 +312,11 @@ What a correct run shows:
 Outside manager mode the same feature must stay blocked with the test red and the reason written
 down — option C's builder is never told the exception exists (`check-pipeline.mjs` holds that).
 
+Since 3.40.0 the exception also covers a test that a criterion of the feature's own spec contradicts, not
+only one an owner decision revokes. This fixture plants the owner-decision form only; the criterion form was
+exercised by blind agents on a small project, not by this scenario (see the 3.40.0 entry in
+`CHANGELOG.md`). What a correct run shows here does not change.
+
 ## `manager-unblock` — a red barrier repaired at level unblock
 
 `benchmark/unblock-fixture/`: a single-section project, one feature (`calc-add`), and a defect older

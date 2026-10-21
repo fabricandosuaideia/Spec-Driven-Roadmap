@@ -217,8 +217,9 @@ const scenarios = {
   'in manager mode a revoked assertion may be corrected, and the verifier checks every test change': async src => {
     const r = await run(src, { managerMode: true, features: [feat('a', 'C')] }, pass())
     const b = r.calls.find(c => c.role === 'build'), v = r.calls.find(c => c.role === 'verify')
-    return /REVOKED-TEST <file>:<line>/.test(b.prompt) && /same strength/.test(b.prompt) && !/never edit, weaken/.test(b.prompt) &&
-      /REVOKED TESTS \(manager mode\)/.test(v.prompt) && /is a blocker issue/.test(v.prompt)
+    return /REVOKED-TEST <file>:<test name>/.test(b.prompt) && /fix the code, not the test/.test(b.prompt) && /same strength/.test(b.prompt) && !/never edit, weaken/.test(b.prompt) &&
+      /REVOKED TESTS \(manager mode\)/.test(v.prompt) && /is a blocker issue/.test(v.prompt) &&
+      /states a behaviour the OLD assertion contradicts/.test(v.prompt)
   },
   // 3.35.0 — level unblock: a red barrier is triaged by script, repaired, checked, merged, re-run.
   'at level decide a red barrier is never triaged': async src => {
@@ -363,6 +364,7 @@ const mutants = {
   'verify-first runs the gate before the verdict anyway': ['if (!VERIFY_FIRST && !(await proveStep())) continue', 'if (!(await proveStep())) continue'],
   'builder not told to wait for a long command': ['${LONG_COMMANDS}\n${A.checklist ?', '${A.checklist ?'],
   'verifier not told to check test changes in manager mode': ["${MANAGED ? REVOKED_CHECK(f) + '\\n' : ''}", ''],
+  'verifier not told the criterion must contradict the old assertion': ['states a behaviour the OLD assertion contradicts', 'exists'],
   'barrier only at the end': ['if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()', ''],
   'unblock outside manager mode': ["const UNBLOCK = MANAGED && A.autonomy === 'unblock'", "const UNBLOCK = A.autonomy === 'unblock'"],
   'repair merged without the checker': ["if (!ck || !ck.ok || serious(ck.issues).length) return stop(", "if (false) return stop("],

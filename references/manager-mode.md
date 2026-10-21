@@ -18,7 +18,7 @@ Like running an agent with narrower or wider permissions, the owner picks how fa
 without them (`manager.autonomy` in `pipeline.json`):
 
 - **`decide` — level 1, the default.** It answers the open questions itself (marked as its own), and
-  in its builds it may correct a test asserting what the owner revoked. When something breaks — a red
+  in its builds it may update an existing test that asserts what the feature's spec changes. When something breaks — a red
   batch barrier, a feature the downstream gate cannot decide, a chain blocked behind a failed feature
   — it **stops** and waits for the owner.
 - **`unblock` — level 2, more permission.** Everything level 1 does, and it also **repairs what
@@ -60,14 +60,26 @@ and barrier.
 
 **One test rule changes, and only here.** Everywhere else a builder never edits an existing test to
 reach a pass: a test that is wrong stays red for a person to authorise. Nobody is there in manager
-mode, and on a real project two features in two days each spent all their attempts, and stopped the
-chain behind them, on tests asserting behaviour the owner had revoked — the owner authorised the same
-correction by hand both times. So in manager mode the builder may correct **that assertion and only
-it**, when an owner decision recorded in the roadmap (an answered question, a settled Cross-Cutting
-Decision) revokes exactly the behaviour it states: in a commit of its own quoting the decision, the new
-assertion as strong as the old. The independent verifier checks every change to an existing test on
-the branch and refuses the feature for any that is not such a correction — an undeclared edit, a
-decision that does not revoke it, a weaker assertion, a skip or a deletion.
+mode, and on real projects features spent all their attempts, and stopped the chain behind them, on
+tests asserting behaviour that the feature's own spec had changed (one project's own diagnosis counts 8 of
+53 refusals; a keyword count of its verifier reports finds fewer, 2 of 26 — not the same measure) — the
+owner authorised the same correction by hand each time. So in manager mode an existing test is
+**updated, not obeyed** when its assertion states a behaviour that this feature's spec changes — an
+acceptance criterion, an answered question or a settled Cross-Cutting Decision states the new
+behaviour and the old assertion contradicts it. The builder corrects **that assertion and only it**:
+in a commit of its own quoting the criterion or decision and where it is recorded, the new assertion
+as strong as the old, and declared as `REVOKED-TEST <file>:<test name>`. A test red for any other reason
+is a defect in the builder's change: it fixes the code, not the test. The independent verifier checks
+every change to an existing test on the branch, reads the criterion or decision cited, and refuses the
+feature for any change that is not such a correction — an undeclared edit, a criterion that the old
+assertion does not contradict, a weaker assertion, a skip or a deletion.
+
+This is wider than the first version of the exception (3.33.0), which asked that an owner decision
+revoke exactly the assertion. In manager mode the manager writes the feature's criteria and answers its
+questions under the owner's delegation, so the wider rule lets it correct a test against its own
+criterion; that is why each correction is declared, sits in its own commit and is checked by a verifier
+that did not write it. **Review the `REVOKED-TEST` lines after a run** (they are in the builders' notes
+and the commit log): a correction the owner would not have made is a change request, not a wording fix.
 
 **Why a script and not a prompt.** A manager that is a conversation grows with every section: on a
 measured multi-agent build the coordinator went from 41k to 88k tokens of context in 25 turns, and a

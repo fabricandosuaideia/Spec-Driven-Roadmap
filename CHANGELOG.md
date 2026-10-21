@@ -9,6 +9,50 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.40.0 — 2026-10-21
+
+**Rule change, manager mode only: an existing test is updated, not obeyed, when the feature's own spec
+changes what it asserts** (Infinity-Agent-Creator, skill 3.39.0, fourth step of the time review; widened
+at the owner's explicit confirmation of 2026-10-20). It widens the exception 3.33.0 gave a builder in
+manager mode, which required that *an owner decision* revoke exactly the assertion. The owner of that
+project had already made the wider rule their own (their `AGENTS.md`, "Teste antigo que contradiz a spec é
+atualizado, não obedecido"), and kept it in a local copy of the pipeline that a reinstall would have
+reverted.
+
+- **What changed.** A test whose assertion a criterion, an answered question or a settled
+  Cross-Cutting Decision of the feature's spec contradicts is corrected — that assertion and only it, as
+  strong as before, in a commit of its own that quotes the criterion and where it is recorded, declared
+  as `REVOKED-TEST <file>:<test name>` (a name, not a line: a line moves). **A test red for any other
+  reason is a defect in the builder's change**: it fixes the code, not the test, instead of stopping
+  with the test red as 3.33.0 said.
+- **Why it is not simply looser.** In manager mode the manager writes the criteria and answers the
+  questions under the owner's delegation, so the wider rule lets it correct a test against its own
+  criterion. What holds it: each correction is declared and in its own commit, and the verifier, which
+  did not write it, reads the criterion cited and refuses a change unless the criterion states a
+  behaviour the *old assertion contradicts* and the new assertion is as strong; a criterion written only
+  to explain the edit is the same blocker. The owner's local version had weakened that check to "a
+  criterion explains it"; it is kept strict here.
+- **Left out on purpose.** The local version also allowed updating a test that asserts "behaviour of a
+  version of the product the roadmap replaced". That clause is not in the project's own rule and has no
+  boundary an unattended agent could apply; a stale test the spec does not contradict stays red.
+- **Where it is said:** `manager-mode.md` ("One test rule changes"), the builder's and the verifier's
+  prompts, `benchmark/expected.md` (a note: the `manager-revoke` fixture plants the owner-decision form
+  only, and its answer is unchanged). `check-pipeline.mjs`: the scenario now checks the new wording and a
+  mutant that drops the "must contradict the old assertion" check, caught.
+
+**Executed, on a small fixture (three functions, two new criteria, five old tests of which one is
+contradicted, one is a trap — a test the spec does not touch that a careless implementation turns red —
+and three are plain), blind Sonnet agents each in its own copy:** 2 builders, 2/2 changed only the
+contradicted test, in a commit of its own, quoting the criterion, in the declared format; left the other
+four byte for byte; fixed the code and not the trap test. 1 verifier on a branch with three planted
+defects (a declared but weaker assertion, an undeclared `skip`, an undeclared loosened assertion): all
+three refused as `blocker`. **Not executed:** a real Workflow run, so the `manager-revoke` scenario was not
+re-run; a builder tempted to cite a criterion that does not contradict the test (the verifier clause for
+it is read by a stub only); the unblock repairer, which shares the text. **Review the `REVOKED-TEST` lines
+after a run** — a correction the owner would not have made is a change request, not a wording fix.
+
+---
+
 ## 3.39.0 — 2026-10-21
 
 **The verifier's sensor can be capped and its survivors graded, and a refusal fixed in one round is
