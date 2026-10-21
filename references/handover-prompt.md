@@ -609,7 +609,7 @@ them for an unattended run:
      run a command and report, while `build` and `verify` decide. Which split costs less without costing
      quality is not measured — say that, and offer `measure-agents.py` to compare. `plan-pipeline.py`
      refuses a role it does not know instead of ignoring it.
-   - **Speed — four levers, each with its price, all the user's to choose:**
+   - **Speed — five levers, each with its price, all the user's to choose:**
      - **Lanes** (`"lanes"`): how many features are proved at once, each in its own git worktree. It
        only helps features that do not depend on each other; a chain gains nothing. Before setting it
        above 1, run `python3 <this-skill-dir>/scripts/bench-gate.py --root <project-root> --lanes 2`:
@@ -644,6 +644,16 @@ them for an unattended run:
        Recommend verify-first only when the gate is long beside a verification, and say it was
        measured on one project. The price: a feature the verifier passed and the gate then refuses
        leaves a PASS report on its branch that the gate did not back — the run's account says so.
+     - **Whether the merge runs the gate again** (`"mergeGate"`: `"rerun"`, the default, or `"receipt"`).
+       The merger rebases the branch and runs the whole gate on the exact tree before it fast-forwards
+       the main branch; the prover already ran it on the same tree a moment earlier. With `"receipt"`
+       the merger skips it when the prover's receipt proves that tree: gate `pass`, the same code hash,
+       and the main branch exactly where the prover rebased onto it (so the rebase replayed nothing).
+       On one measured project the merges were 9 runs of ~24 minutes, 10% of the time. The price: a
+       receipt is written by an agent, and one branch of a real project carried a receipt written by
+       hand. So `plan-pipeline.py` refuses `"receipt"` without a `barrierGate`, the run of the project's
+       checks on the merged main branch that no one's word stands in for — say that, and say the
+       barrier then carries the guarantee the second gate used to give.
      - **How hard the verifier's sensor pushes** (`"verifier"`: `"sensor"`, a cap of mutants per tier
        `{"A": n, "B": n, "C": n}`, and `"survivor"`, the severity of a mutant that survives). Both are
        unset by default, and then the verifier follows the downstream skill's own depth. On one

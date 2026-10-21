@@ -70,6 +70,7 @@ DEFAULT_CONFIG = {
     "barrierGate": None,
     "barrierEvery": 0,
     "gateOrder": "gate-first",
+    "mergeGate": "rerun",
     "verifier": {"sensor": None, "survivor": None, "rounds": "scoped"},
     "model": None,
     "testHint": "",
@@ -296,6 +297,11 @@ def plan(root, roadmap_rel, cfg):
         else os.path.join("docs", "ROADMAP.md")
     if (cfg.get("gateOrder") or "gate-first") not in GATE_ORDERS:
         raise RuntimeError("%s gateOrder takes %s; not: %s" % (CONFIG, " or ".join(GATE_ORDERS), cfg.get("gateOrder")))
+    if (cfg.get("mergeGate") or "rerun") not in MERGE_GATES:
+        raise RuntimeError("%s mergeGate takes %s; not: %s" % (CONFIG, " or ".join(MERGE_GATES), cfg.get("mergeGate")))
+    if cfg.get("mergeGate") == "receipt" and not cfg.get("barrierGate"):
+        raise RuntimeError("%s mergeGate \"receipt\" needs a barrierGate: the receipt is written by an agent, and the barrier is "
+                           "the one run of the project's checks that nobody's word stands in for" % CONFIG)
     done, pending, discharged, doubtful = classify(root, ds, ds_dir, entries, order, cfg, roadmap_rel)
     if doubtful:
         raise RuntimeError(doubtful_message(doubtful))
@@ -343,7 +349,7 @@ def plan(root, roadmap_rel, cfg):
         "project": root, "skillDir": SKILL_DIR, "downstream": ds, "downstreamDir": ds_dir,
         "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main", "gate": cfg["gate"],
         "barrierGate": cfg.get("barrierGate") or None, "barrierEvery": int(cfg.get("barrierEvery") or 0),
-        "model": cfg.get("model") or None, "gateOrder": cfg.get("gateOrder") or "gate-first",
+        "model": cfg.get("model") or None, "gateOrder": cfg.get("gateOrder") or "gate-first", "mergeGate": cfg.get("mergeGate") or "rerun",
         "verifier": verifier_policy(cfg, ds),
         **({"models": models_policy(cfg)} if models_policy(cfg) else {}),
         "testHint": cfg.get("testHint") or "", "setup": cfg.get("setup") or "", "push": bool(cfg.get("push")),
@@ -364,6 +370,7 @@ SLUG_RE = re.compile(r"`?docs/ROADMAP-([A-Za-z0-9][\w-]*)\.md`?")
 
 AUTONOMY = ("decide", "unblock")
 GATE_ORDERS = ("gate-first", "verify-first")
+MERGE_GATES = ("rerun", "receipt")
 SURVIVOR_SEVERITIES = ("blocker", "major", "minor")
 ROUND_MODES = ("scoped", "full")
 MODEL_ROLES = ("build", "prove", "verify", "review", "merge", "record", "triage", "barrier")
@@ -650,6 +657,16 @@ x
         expect("the gate runs first unless the config says otherwise", args["gateOrder"] == "gate-first")
         args3, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, gateOrder="verify-first"))
         expect("gateOrder verify-first reaches the args", args3["gateOrder"] == "verify-first")
+        expect("the merge reruns the gate unless the config says otherwise", args["mergeGate"] == "rerun")
+        mg, _ = plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, mergeGate="receipt", barrierGate="make all"))
+        expect("mergeGate receipt reaches the args when a barrier exists", mg["mergeGate"] == "receipt")
+        for label, bad in (("receipt without a barrierGate", dict(mergeGate="receipt")), ("an unknown mergeGate", dict(mergeGate="trust"))):
+            try:
+                plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, **bad))
+                refused = False
+            except RuntimeError as e:
+                refused = "mergeGate" in str(e)
+            expect("%s is refused" % label, refused)
         try:
             plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, gateOrder="gate-last"))
             ok_order = False

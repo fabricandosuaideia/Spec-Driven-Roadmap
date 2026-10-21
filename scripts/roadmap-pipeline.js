@@ -29,7 +29,7 @@ export const meta = {
 //
 // args (from plan-pipeline.py): { project, skillDir, downstream, downstreamDir, statusPath, mainBranch,
 //   gate, barrierGate?, barrierEvery?, model?, waitChunk?, testHint, setup, push, lanes, worktreeRoot,
-//   checklist, effort, maxAttempts, models?: { <role>: model }, gateOrder?, verifier?: { sensor?: { A, B, C }, survivor?, rounds? }, barrierPending?: { base, head },
+//   checklist, effort, maxAttempts, models?: { <role>: model }, gateOrder?, mergeGate?, verifier?: { sensor?: { A, B, C }, survivor?, rounds? }, barrierPending?: { base, head },
 //   features: [{ name, roadmap, tier, dependsOn[], lane, worktree?, startAttempt?, feedback? }] }
 // `gateOrder` is 'gate-first' (the default: build, prove, verify) or 'verify-first' (build, verify, and the
 // full gate only for a feature the verifier passed): see VERIFY_FIRST below.
@@ -67,6 +67,11 @@ const modelFor = role => (A.models && A.models[role]) ? { model: A.models[role] 
 // run on those 11 and saves a gate on every attempt the verifier refuses. It pays when the gate is long
 // beside a verification (bench-gate.py times it); a short gate loses by it.
 const VERIFY_FIRST = A.gateOrder === 'verify-first'
+// 3.43.0: the merge ran the whole gate again on a tree the prover had just proved, 9 times in 24 minutes on the
+// project that measured it (10% of its time). `mergeGate: 'receipt'` lets the receipt stand in when it proves
+// the exact tree: same code hash, and the main branch where the prover rebased onto it. A receipt is written by
+// an agent, so plan-pipeline.py refuses this without a barrierGate, the one gate nobody's word stands in for.
+const BY_RECEIPT = A.mergeGate === 'receipt'
 // Set by manager-pipeline.js only. In manager mode nobody is there to authorise a test correction,
 // and on a real project two features in two days each spent five attempts and stopped the chain on
 // tests asserting behaviour the owner had revoked; the owner authorised the same correction by hand
@@ -150,7 +155,7 @@ ROLE: PROVER, on a fresh context. A builder already committed this feature on fe
 1. Rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
 2. Run the GATE once on this exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
    A failure is a defect, never "environmental": reply ready=false naming the failing test or file, and fix nothing.
-3. Write .specs/features/${f.name}/gate-receipt.json as {"codeHash":"<output of: ${HASH}>","gate":"pass","command":<the gate command>} and commit it.
+3. Write .specs/features/${f.name}/gate-receipt.json as {"codeHash":"<output of: ${HASH}>","base":"<output of: git rev-parse ${MAIN}>","gate":"pass","command":<the gate command>} and commit it.
 Reply ready=true only when the rebase is clean, the gate finished and passed, and the receipt is committed.`
 
 const VERIFY_RECEIPT = f => `GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, run the gate yourself (${A.gate}) — ${RUN_GATE(A.gate, wt(f))}
@@ -196,11 +201,13 @@ Look for: correctness and unhandled edge cases; non-atomic read-then-write on sh
 The builder's and the prover's notes are claims: spot-check the few most likely to be wrong instead of re-deriving everything.
 Report each issue with severity blocker | major | minor, where (file:line), problem and fix.`
 
+const MERGE_RECEIPT = f => `The gate receipt may stand in for it. Read .specs/features/${f.name}/gate-receipt.json. Only if ALL of these hold does it prove this exact tree: its gate is "pass"; its base equals the output of git -C ${P} rev-parse ${MAIN} (so the rebase in step 1 replayed nothing); its codeHash equals the output of: ${HASH}; and git status --porcelain prints nothing. Then do NOT run the gate: write "gate skipped: receipt" in notes. If any one of them fails, or the file is missing, the receipt proves nothing: `
+
 const MERGE = f => `You are the MERGER for feature ${f.name} in the project at ${P}. Verification passed. Nothing reaches ${MAIN} without the gate below. Stop with ok=false at the first failure and change nothing further.
 ${LAUNCHED}
 0. Note the commit ${MAIN} points at now (git -C ${P} rev-parse ${MAIN}): that is \`before\`.
 1. In ${wt(f)}: rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
-2. Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
+2. ${BY_RECEIPT ? MERGE_RECEIPT(f) : ''}Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
 3. Fast-forward ${MAIN} to feat/${f.name}${LANES > 1 ? ` (git -C ${P} checkout ${MAIN} && git -C ${P} merge --ff-only feat/${f.name})` : ` (git checkout ${MAIN} && git merge --ff-only feat/${f.name})`}.${A.push ? ` Then git push origin ${MAIN}.` : ' Do not push: pushing is the owner\'s call.'}
 4. ${LANES > 1 ? `git -C ${P} worktree remove ${wt(f)}; ` : ''}git branch -d feat/${f.name}.
 Reply with ok, before, the new ${MAIN} commit and notes.`

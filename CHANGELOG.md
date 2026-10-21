@@ -9,6 +9,39 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.43.0 — 2026-10-21
+
+**The merge can take the prover's receipt for the gate, when it proves the exact tree** (Infinity-Agent-Creator,
+skill 3.42.0, seventh step of the time review). The merger rebased the branch and ran the whole gate again on
+the tree the prover had just proved: 9 runs of ~24 minutes, 10% of that project's agent time. An option, not
+the default — the receipt is written by an agent.
+
+- **`"mergeGate"`**: `"rerun"` (default, unchanged) or `"receipt"`. With `"receipt"` the merger skips the gate
+  only if ALL hold: the receipt's gate is `pass`; its `base` equals the main branch now (so the rebase
+  replayed nothing); its `codeHash` equals the hash recomputed on the tree; and `git status --porcelain` is
+  empty. Anything else, or no file: it runs the gate, detached and waited for as before. The prover's
+  receipt now records `base` (`git rev-parse <main>`) beside `codeHash`.
+- **It needs a `barrierGate`**: `plan-pipeline.py` refuses `"receipt"` without one. A receipt proves what its
+  writer says it proves, a branch of a real project carried a receipt written by hand, and the barrier is the
+  one run of the project's checks on the merged main branch that no one's word stands in for. What this
+  option cannot catch is a prover that never ran the gate and wrote a coherent receipt; the barrier, every
+  N merges, is what catches that late.
+- **`check-pipeline.mjs`:** 2 scenarios and 2 mutants (the option ignored; the base not recorded);
+  `plan-pipeline.py --selftest` 4 new assertions. A mutant of an older scenario ("the barrier runs on a dirty
+  tree") replaced the first `status --porcelain` in the file and began replacing the new text instead; its
+  anchor is now the barrier's own sentence.
+
+**Executed, three blind Haiku mergers (the model that runs the role), each on its own copy of a small
+repository whose gate leaves a mark in a file when it runs, so what happened is read from the disk and not
+from the report:** a valid receipt → gate skipped (no mark), merged; `main` moved after the receipt → the
+rebase replayed the commits, `base` differed, gate ran (one mark), merged; a receipt with a zeroed
+`codeHash` → gate ran (one mark), merged, and the agent flagged the bad receipt now on `main`. 3/3. A
+wording seam in my first text ("you run it — Run the GATE…") was read before the run and fixed.
+**Not executed:** a real Workflow run; a receipt that is wrong in `gate` or in a dirty tree (stubs only);
+whether the barrier catches a lying prover in practice.
+
+---
+
 ## 3.42.0 — 2026-10-21
 
 **`measure-agents.py` measures time, not only tokens** (Infinity-Agent-Creator, skill 3.41.0, sixth step of

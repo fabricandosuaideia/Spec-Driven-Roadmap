@@ -129,6 +129,17 @@ const scenarios = {
     return ['prove', 'merge', 'barrier', 'verify'].every(role => r.calls.filter(c => c.role === role).every(waits)) &&
       r.calls.some(c => c.role === 'barrier')
   },
+  // 3.43.0: the merge may take the receipt for the gate, when it proves the exact tree.
+  'by default the merger runs the gate and is told nothing about a receipt': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    return !/gate receipt may stand in/.test(r.calls.find(c => c.role === 'merge').prompt)
+  },
+  'with mergeGate receipt the merger is told when the receipt stands in, and otherwise to run the gate': async src => {
+    const r = await run(src, { mergeGate: 'receipt', barrierGate: 'make all', waitChunk: 60, features: [feat('a')] }, pass())
+    const m = r.calls.find(c => c.role === 'merge').prompt, p = r.calls.find(c => c.role === 'prove').prompt
+    return /gate receipt may stand in/.test(m) && /rev-parse main/.test(m) && /codeHash equals/.test(m) && /If any one of them fails, or the file is missing, the receipt proves nothing/.test(m) &&
+      /DETACHED/.test(m) && /"base":"<output of: git rev-parse main>"/.test(p)
+  },
   // 3.41.0: a model per role.
   'models name a model per role, and a role they do not name uses the one model': async src => {
     const r = await run(src, { model: 'opus', models: { build: 'haiku', verify: 'sonnet', merge: 'sonnet' }, barrierGate: 'make all', features: [feat('a', 'A')] }, pass())
@@ -375,6 +386,8 @@ const mutants = {
   'red barrier ignored': ['if (!green) barrierRed = merged', 'if (false) barrierRed = merged'],
   'launch request not scoped': ['never ask.\n${LAUNCHED}', 'never ask.'],
   'gate not waited for': ['tail --pid=<that PID>', 'cat <that PID>'],
+  'receipt merge ignored': ["const BY_RECEIPT = A.mergeGate === 'receipt'", 'const BY_RECEIPT = false'],
+  'receipt does not record the base': ['\"base\":\"<output of: git rev-parse ${MAIN}>\",', ''],
   'models ignored': ["const modelFor = role => (A.models && A.models[role]) ? { model: A.models[role] } : MODEL", 'const modelFor = role => MODEL'],
   'the repairer not given the builder model': ["label: `repair:${cycle}`, schema: REPAIR_SCHEMA, effort: effortFor('implement', { tier: 'A' }), ...modelFor('build')", "label: `repair:${cycle}`, schema: REPAIR_SCHEMA, effort: effortFor('implement', { tier: 'A' }), ...MODEL"],
   'rounds full ignored': ["VP.rounds === 'full' ? '' : attempt > 1", 'attempt > 1'],
@@ -397,7 +410,7 @@ const mutants = {
   'an owed barrier ignored without the guard': ['if (A.barrierGate && A.barrierPending && A.barrierPending.base) {', 'if (false) {'],
   'an owed barrier never run': ['await withMergeLock(runBarrier)\n\nawait parallel', 'await parallel'],
   'the barrier does not record itself': ['record-barrier.py --root ${P} --sha <that commit>', 'true'],
-  'the barrier runs on a dirty tree': ['status --porcelain', 'status --short'],
+  'the barrier runs on a dirty tree': ['if \\`git -C ${P} status --porcelain\\`', 'if \\`git -C ${P} status --short\\`'],
   'checker told nothing about a command that finds no test': ['No tests found', 'Something else'],
   'triage allowed a line selector': ['never a file:line', 'any selector'],
   'a not-reproduced failure repaired anyway': ["if (items.some(i => i.kind === 'not-reproduced')) return stop(", "if (false) return stop("],
