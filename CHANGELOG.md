@@ -9,6 +9,41 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.37.0 — 2026-10-20
+
+**A builder no longer ends its attempt with a job still running** (Infinity-Agent-Creator, skill 3.36.0,
+Haiku). First step of a time review of that project's two last manager runs (176 agents, 38.7 agent-hours,
+read only). Wall-clock there is not where the build kit assumed: prove 51%, build 24%, verify 13%, merge
+10% — the gate is 61% of the time and about 2% of the tokens, so the "builders take two thirds of the
+time" premise of the effort lever (measured on WordPress) does not hold on every project. The rest of the
+review is planned as the next releases; this one is the defect with a certain cause.
+
+- **Cause, measured.** 8 of 56 builders never reached the prover. Three of them (`stop-async-runner`,
+  `stop-yaml-gate`, `ver-golden-llm`, all attempt 1, 107–138 turns, 150–220k tokens of context) had loaded
+  the Monitor tool through ToolSearch, armed a watcher on a background test batch or a lock
+  regeneration, and answered `ready=false` "waiting for the monitor". A workflow agent is finished the
+  moment it replies, so the result was read by nobody and the attempt was spent. The prover has had
+  `RUN_GATE` since 3.31.0; the builder had nothing. (The other five stopped on tests asserting revoked
+  behaviour — a later step.)
+- **`LONG_COMMANDS`** in the builder's and the repairer's prompts: never `run_in_background`, never
+  load or arm Monitor, never `ready=false` because something is still running; a command that surely ends
+  within 2 minutes (the Bash tool's own limit) runs in the foreground, anything longer or of unknown
+  length runs detached and is waited for with `timeout N tail --pid`, with the Bash call's `timeout`
+  parameter set above the wait.
+- **The timeout clause comes from a blind run.** Real provers set it unprompted in 159 of 162 waits
+  (`timeout=560000`); the first blind builder run showed the wait moved to the background without it.
+- **`check-pipeline.mjs`:** 1 scenario and 1 mutant (the rule removed from the builder), caught.
+
+**Executed:** 4 blind Haiku agents, two rounds, each in its own copy, a command that takes 150 s: 4/4
+detached, waited in the same turn and returned the right line and exit code; none armed a Monitor.
+Round 1 (2/2) found the missing tool-timeout clause and the unclear 2-minute-to-5-minute range; round 2
+(2/2) ran with the clause. **Not executed:** the last edit (the foreground limit from "about 5 minutes" to
+2 minutes — it only sends more commands down the path the four runs exercised), and a real Workflow run
+with a real builder; whether builders now finish is to be read from the next run's journals with
+`measure-agents.py`.
+
+---
+
 ## 3.36.0 — 2026-10-06
 
 **Manager mode at level `unblock`, with two lanes, stopped twice on defects of the pipeline itself,

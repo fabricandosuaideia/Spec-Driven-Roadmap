@@ -129,6 +129,14 @@ const scenarios = {
     return ['prove', 'merge', 'barrier', 'verify'].every(role => r.calls.filter(c => c.role === role).every(waits)) &&
       r.calls.some(c => c.role === 'barrier')
   },
+  // 3.37.0: three builders ended with a job running ("waiting for the monitor"), which spends the attempt.
+  'a builder is told to wait for what it starts, never to watch it and reply': async src => {
+    const r = await run(src, { waitChunk: 60, features: [feat('a')] }, pass())
+    const b = r.calls.find(c => c.role === 'build')
+    return !!b && /LONG COMMANDS/.test(b.prompt) && /never load or arm Monitor/.test(b.prompt) &&
+      /never reply ready=false because something is still running/.test(b.prompt) && /timeout 60 tail --pid=/.test(b.prompt) &&
+      /timeout parameter of 80000 milliseconds/.test(b.prompt)
+  },
   'with a barrierGate, the barrier runs once, after the last merge, on its own command': async src => {
     const r = await run(src, { barrierGate: 'make all', features: [feat('a'), feat('b', 'B', ['a'])] }, pass())
     const roles = r.calls.map(c => c.role)
@@ -296,6 +304,7 @@ const mutants = {
   'red barrier ignored': ['if (!green) barrierRed = merged', 'if (false) barrierRed = merged'],
   'launch request not scoped': ['never ask.\n${LAUNCHED}', 'never ask.'],
   'gate not waited for': ['tail --pid=<that PID>', 'cat <that PID>'],
+  'builder not told to wait for a long command': ['${LONG_COMMANDS}\n${A.checklist ?', '${A.checklist ?'],
   'verifier not told to check test changes in manager mode': ["${MANAGED ? REVOKED_CHECK(f) + '\\n' : ''}", ''],
   'barrier only at the end': ['if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()', ''],
   'unblock outside manager mode': ["const UNBLOCK = MANAGED && A.autonomy === 'unblock'", "const UNBLOCK = A.autonomy === 'unblock'"],

@@ -89,6 +89,16 @@ const RUN_GATE = (cmd, where) => `run it DETACHED and wait for it — a single c
    c) the gate's exit code is the content of $D/exit; read only the tail and the failures of $D/log.
    NEVER reply while $D/exit does not exist: a reply sent while the gate still runs is not a result, and the pipeline reads it as a failure.`
 
+// 3.37.0, from the second real project (Infinity-Agent-Creator, Haiku): 8 of 56 builders never reached
+// the prover, and the three that ended with a job still running had loaded the Monitor tool, armed a
+// watcher on a background test run or a lock regeneration, and answered ready=false "waiting for the
+// monitor". A workflow agent is finished the moment it replies, so the job's result was read by nobody
+// and the attempt was spent. The prover has had RUN_GATE since 3.31.0; the builder had nothing.
+const LONG_COMMANDS = `LONG COMMANDS: you are finished the moment you reply or call StructuredOutput, and nothing wakes you later — a background job, a Monitor or a watcher is read by nobody. Never run_in_background, never load or arm Monitor, never reply ready=false because something is still running. Wait for it in this same turn: a command you are sure ends within 2 minutes (the tool's own limit) runs in the foreground; anything that may take longer, or whose length you cannot tell (a test batch, a lock regeneration, a build), runs detached and is waited for:
+   a) D=$(mktemp -d); nohup bash -c 'cd "$1" && ( <the command> ); echo $? > "$0/exit"' "$D" "<your working tree>" > "$D/log" 2>&1 & echo "$D $!"
+   b) timeout ${CHUNK} tail --pid=<that PID> -f /dev/null — never sleep — repeated until $D/exit exists (exit code 124 only means keep waiting). Give that Bash call a timeout parameter of ${(CHUNK + 20) * 1000} milliseconds: the tool's default is 120 seconds, and a wait that outlasts it is moved to the background, which is the thing to avoid.
+   c) the exit code is the content of $D/exit; read only the tail and the failures of $D/log.`
+
 const COMMON = f => `You are one agent of a build pipeline for the project at ${P}. Nobody is available to answer: decide, record the decision where ${DS} keeps assumptions, never ask.
 ${LAUNCHED}
 FEATURE: ${f.name}, risk tier ${tierOf(f)}. Its spec source is the output of: python3 ${SKILL}/scripts/feature-brief.py ${f.name} --root ${P} — the entry, the questions naming it, the contracts it consumes, the settled Cross-Cutting Decisions, and what tier ${tierOf(f)} sets for ${DS}. Never open a docs/ROADMAP*.md file whole.
@@ -113,6 +123,7 @@ const IMPLEMENT = (f, attempt, feedback) => `${COMMON(f)}
 ROLE: BUILDER, attempt ${attempt} of ${MAX[tierOf(f)]}. ${ANGLES[Math.min(attempt, ANGLES.length) - 1]}
 ${attempt > 1 ? `First rebase feat/${f.name} onto ${MAIN}. Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
 While you work, run only the tests related to what you touched${A.testHint ? ` (${A.testHint})` : ''}. Do NOT run the full gate and do NOT write ${REPORT}: a fresh prover and an independent verifier come after you.
+${LONG_COMMANDS}
 ${A.checklist ? `Before you finish, check your diff against every item of ${A.checklist} (the problems reviewers kept finding in this project) and fix what fails.\n` : ''}DEFERRED SCOPE: an issue that is the declared scope of a LATER feature in the build order is not yours: name that feature in your notes and move on.
 Reply ready=true once every change is committed, even though the full gate has not run; otherwise ready=false with blockers.`
 
@@ -169,6 +180,7 @@ ${JSON.stringify(items, null, 1)}
 - PREEXISTING: the test failed before these merges too — broken, or flaky. Find the cause and fix it at the root: in the test when the test is wrong about timing, ordering or shared state (an unordered result compared as ordered, a wait on the wrong event, state leaking between tests), in the code when the code is wrong. Never raise a timeout, never loosen, narrow or delete an assertion, never skip it or mark it expected to fail, never add a retry.
 Identify a test by its name, never a file:line, when you write a command or a note about it: a line moves when you add one above it. Your fix keeps the test's name, so a command that selects by name still finds the test.
 Prove each fix: run its test 10 times in a row with no retries; all 10 must pass. Commit each fix on its own, message "TRIAGE <kind> <test>: <cause>".
+${LONG_COMMANDS}
 ${REVOKED_RULE}
 Reply ready (true only when every item is fixed and proved), fixed (one line each: test, cause, change, proof) and blockers.`
 
