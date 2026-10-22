@@ -58,6 +58,7 @@ skill_version() {
     # version string and make every comparison differ.
     while IFS= read -r line || [[ -n "$line" ]]; do
         line="${line%$'\r'}"
+        line="${line#$'\xef\xbb\xbf'}"  # a byte-order mark (a Windows editor adds one) would hide the opening ---
         if [[ "$line" == "---" ]]; then
             if [[ "$in_frontmatter" == "true" ]]; then break; fi
             in_frontmatter="true"

@@ -100,6 +100,29 @@ def installed_copy(proj, old_tree, version=None, patch=False):
     return dest
 
 
+def plant_edge_cases(dest):
+    """Local changes the first release of --check never saw (review of 3.49.0, run through both installers): a dotfile the
+    project added, a modified file emptied to nothing, and a case-only edit."""
+    open(os.path.join(dest, ".hidden-note"), "w", encoding="utf-8").write("mine\n")
+    open(os.path.join(dest, "scripts", "plan-pipeline.py"), "w", encoding="utf-8").close()
+    path = os.path.join(dest, "scripts", "status-block.py")
+    body = open(path, encoding="utf-8").read()
+    open(path, "w", encoding="utf-8", newline="").write(body.replace("def ", "DEF ", 1))
+
+
+def with_bom(dest):
+    path = os.path.join(dest, "SKILL.md")
+    body = open(path, "rb").read()  # read first: opening for writing truncates
+    open(path, "wb").write(b"\xef\xbb\xbf" + body)
+
+
+def edge_expectations(label, r, diff_marker):
+    expect("%s: a dotfile the project added is listed" % label, re.search(r"added\s+\.hidden-note", r.stdout), r.stdout + r.stderr)
+    expect("%s: a file emptied to nothing is listed and its diff does not crash the check" % label,
+           re.search(r"modified scripts/plan-pipeline\.py", r.stdout) and r.returncode == 0 and "nothing was changed" in r.stdout, r.stdout + r.stderr)
+    expect("%s: a case-only edit shows in the diff" % label, diff_marker in r.stdout, r.stdout + r.stderr)
+
+
 def run(cmd, cwd, base, **kw):
     env = dict(os.environ, SDR_ARCHIVE_BASE="file://" + base)
     return subprocess.run(cmd, cwd=cwd, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True,
@@ -174,6 +197,18 @@ def main():
         expect("a fresh install needs no check and no --force",
                r.returncode == 0 and "differ" not in r.stdout and "v%s installed" % new_v in r.stdout and os.path.isfile(os.path.join(proj, ".claude", "skills", "spec-driven-roadmap", "SKILL.md")), r.stdout + r.stderr)
 
+        proj = os.path.join(tmp, "p6"); os.makedirs(proj)
+        dest = installed_copy(proj, old_tree)
+        plant_edge_cases(dest)
+        r = run(sh + ["--check", "--diff"], proj, base)
+        edge_expectations("install.sh", r, "+DEF ")
+        proj = os.path.join(tmp, "p7"); os.makedirs(proj)
+        dest = installed_copy(proj, old_tree)
+        with_bom(dest)
+        r = run(sh + ["--check"], proj, base)
+        expect("install.sh: a SKILL.md that starts with a byte-order mark still gives its version, and is listed as modified",
+               "could not check" not in r.stdout and "installed %s" % OLD in r.stdout.replace("installed: ", "installed ") and re.search(r"modified SKILL\.md", r.stdout), r.stdout + r.stderr)
+
         print("\ninstall.ps1")
         pwsh = shutil.which("pwsh") or shutil.which("powershell")
         if not pwsh:
@@ -198,6 +233,18 @@ def main():
             expect("the patch and its extra file are gone",
                    not os.path.exists(os.path.join(dest, "scripts", "extra-local.py")) and
                    filecmp.cmp(os.path.join(dest, "scripts", "plan-pipeline.py"), os.path.join(new_tree, "scripts", "plan-pipeline.py"), shallow=False))
+
+            proj = os.path.join(tmp, "q6"); os.makedirs(proj)
+            dest = installed_copy(proj, old_tree)
+            plant_edge_cases(dest)
+            r = run(ps + ["-Check", "-Diff"], proj, base)
+            edge_expectations("install.ps1", r, "+ DEF ")
+            proj = os.path.join(tmp, "q7"); os.makedirs(proj)
+            dest = installed_copy(proj, old_tree)
+            with_bom(dest)
+            r = run(ps + ["-Check"], proj, base)
+            expect("install.ps1: a SKILL.md that starts with a byte-order mark gives its version, and is listed as modified",
+                   "could not check" not in r.stdout and re.search(r"modified SKILL\.md", r.stdout), r.stdout + r.stderr)
             proj = os.path.join(tmp, "q2"); os.makedirs(proj)
             installed_copy(proj, old_tree)
             r = run(ps + ["-Check"], proj, base)

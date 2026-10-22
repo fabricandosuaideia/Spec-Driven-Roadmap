@@ -34,6 +34,8 @@ const P = A.project
 const SKILL = A.skillDir
 const SECTIONS = A.sections || []
 const STOP_AT = new Set(A.stopAt || [])
+// A slug that matches no section reserves nothing: the section the owner meant to keep would be built unattended (review of 3.49.0).
+for (const slug of STOP_AT) if (!SECTIONS.some(s => s.slug === slug)) throw new Error(`stopAt names ${slug}, which is not a section slug (${SECTIONS.map(s => s.slug).join(', ')}): refusing to build anything`)
 const PER_RUN = Math.max(1, A.sectionsPerRun || 4)
 const EFFORT = A.effort || {}
 if (!P || !SKILL || !A.downstream || !A.pipelineScript || !(A.delegation || '').trim()) {
@@ -153,11 +155,14 @@ for (const s of SECTIONS) {
   }
 
   built++
-  let out
+  let out, raw, ran = true
   // managerMode lets a builder correct a test asserting behaviour the owner revoked, and makes the
   // verifier check every test change; option C, run by a person, never gets it.
-  try { out = await workflow({ scriptPath: A.pipelineScript }, { ...pargs, managerMode: true, autonomy: AUTONOMY }) } catch (e) { out = null; lines.push(`${s.slug}: blocked — the pipeline did not run: ${e.message}`) }
-  out = Array.isArray(out) ? out : []
+  try { raw = await workflow({ scriptPath: A.pipelineScript }, { ...pargs, managerMode: true, autonomy: AUTONOMY }) } catch (e) { ran = false; lines.push(`${s.slug}: blocked — the pipeline did not run: ${(e && e.message) || e}`) }
+  // The child returns one text line per outcome. Anything else is read as no account at all, and said so: a result the manager
+  // cannot read must not block its section silently (a line that is not text used to crash the run before its final record).
+  out = Array.isArray(raw) && raw.every(l => typeof l === 'string') ? raw : []
+  if (ran && !out.length) lines.push(`${s.slug}: blocked — the pipeline returned ${Array.isArray(raw) ? (raw.length ? 'lines that are not text' : 'no lines') : raw == null ? 'nothing' : 'a ' + typeof raw}, so what it merged is unknown: read git log on ${A.mainBranch}`)
   // The run's own lines are read by their exact shape: a feature called `barrier` writes `barrier: merged (attempt 1)`.
   const isBarrier = l => /^barrier: (green|red) after /.test(l)
   if (out.some(isBarrier)) barrierOwed = false
@@ -175,6 +180,9 @@ for (const s of SECTIONS) {
   for (const t of triaged) lines.push(`  ${s.slug} ${t}`)
   // what a builder stashed and a push that failed are the owner's to know; the child says them, the manager passes them on
   for (const l of out.filter(l => l.startsWith('stashed: before ') || /^[^\s:]+: merged\b.*\[push failed\]/.test(l))) lines.push(`  ${s.slug} ${l}`)
+  // and a record that was not written takes its blocked features' last issues with it: the child lists them under its line
+  const rec = out.findIndex(l => l.startsWith('record: not written'))
+  if (rec >= 0) for (const l of [out[rec], ...out.slice(rec + 1).filter(l => l.startsWith('  '))]) lines.push(`  ${s.slug} ${l.trim()}`)
   if (!out.length || unfinished.length) blockedSections.add(s.slug)
   if (stillRed) { stopped = `the barrier is red after ${s.slug}`; break }
   // The child held what followed a failed post-merge command and ran no barrier; the next section would be built on an

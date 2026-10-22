@@ -30,7 +30,9 @@ without them (`manager.autonomy` in `pipeline.json`):
     agent's view. A fresh repairer fixes each at the root — a regression in the feature's code, never
     in its test; a preexisting failure at its cause, never by raising a timeout, loosening an assertion,
     skipping or retrying — and proves it ten runs in a row; an independent checker refuses any
-    repair that loosens anything; the repair merges through the gate and the barrier runs again. At
+    repair that loosens anything; the repair merges through the gate (and the project's `postMerge` command, if it has one: a
+   repair that merged without it would meet the barrier with the environment behind the code, so a failure there stops the
+   repair before the barrier) and the barrier runs again. At
     most two cycles; anything not reproduced stops the run, as level 1 would. A failing test is
     always named, never located by `file:line` — a repair that adds a line above it moves it, and the
     command would then find no test (the probe refuses such a command).
@@ -77,7 +79,9 @@ script), reads the criterion or decision cited, checks with `git log` that the b
 and refuses the feature for any change that is not such a correction — an undeclared edit, a criterion
 that the old assertion does not contradict or that the branch itself wrote, a weaker assertion, a skip
 or an expected-failure mark, a deletion. A deletion is always refused, so a spec that removes a
-behaviour stops the feature for the owner to settle: that is the safe direction, and a known limit.
+behaviour stops the feature for the owner to settle: that is the safe direction, and a known limit. So does a correction
+that conflicts with a change the main branch made to the same test: the builder's stop on a test conflict (3.47.0) applies to it too,
+every attempt up to the tier's ceiling, and the owner settles it (checked on blind agents in 3.50.0: 4 of 4 stopped, none settled it).
 
 The unblock repairer keeps the **narrow** form (an owner decision recorded in the roadmap revokes exactly
 that assertion), because a regression belongs to a feature whose own spec did not change; it may also
@@ -114,7 +118,10 @@ section against the code as the previous ones left it.
    `plan-pipeline.py --manager` refuses to run without it, and the decomposer quotes it verbatim.
 3. **Where to stop.** Ask which sections need the owner whatever happens — live validation with real
    users, a vendor or paid-service choice, anything irreversible or outward-facing — and write their
-   slugs into `manager.stopAt`. The manager stops before the first of them.
+   slugs into `manager.stopAt`. The manager stops before the first of them. Each must be a section's slug exactly
+   (`money`, not `Money` or `docs/ROADMAP-money.md`): `plan-pipeline.py --manager` refuses one that matches no section, because the
+   section it was meant to reserve would otherwise be built unattended. A section left in `stopAt` after it was finished still
+   stops every later run until the owner removes it.
 4. **How much per run.** `manager.sectionsPerRun` (default 4): a Workflow run caps its agents at 1000,
    and a section of ten tier-A features can use up to about two hundred (five attempts of four agents each). The manager stops at the cap and says so;
    launching again continues.

@@ -608,6 +608,12 @@ def manager_args(root, cfg):
     if mgr.get("autonomy", "decide") not in AUTONOMY:
         raise RuntimeError("%s manager.autonomy takes \"decide\" or \"unblock\"" % CONFIG)
     secs, ds, ds_dir = section_states(root, cfg)
+    # A slug that matches no section reserves nothing, and the manager then builds the section the owner meant to keep
+    # (`mony`, `Money`, a file name): refused here, as a gate must refuse what it cannot judge (review of 3.49.0).
+    unknown = [x for x in (mgr.get("stopAt") or []) if x not in {s["slug"] for s in secs}]
+    if unknown:
+        raise RuntimeError("%s manager.stopAt names %s, which is not a section slug of this project (%s): the manager would "
+                           "build the section you meant to reserve" % (CONFIG, ", ".join(unknown), ", ".join(s["slug"] for s in secs)))
     owed = barrier_pending(root, cfg)
     status = os.path.join("docs", "ROADMAP-INDEX.md")
     if not os.path.isfile(os.path.join(root, status)):
@@ -996,6 +1002,16 @@ x
             rc = main(["--root", root, "--manager"])
         expect("an autonomy level that does not exist is refused", rc == 1)
         written["manager"]["autonomy"] = "decide"
+        json.dump(written, open(os.path.join(root, CONFIG), "w"))
+        for typo in (["lat"], ["Late"], ["docs/ROADMAP-late.md"], ["core", " late"]):
+            written["manager"]["stopAt"] = typo
+            json.dump(written, open(os.path.join(root, CONFIG), "w"))
+            err = io.StringIO()
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+                rc = main(["--root", root, "--manager"])
+            expect("a stopAt naming no section (%s) is refused, naming it and the real slugs" % typo[-1],
+                   rc == 1 and typo[-1] in err.getvalue() and "core" in err.getvalue() and "late" in err.getvalue())
+        written["manager"]["stopAt"] = []
         json.dump(written, open(os.path.join(root, CONFIG), "w"))
         os.remove(os.path.join(root, "docs", "ROADMAP-INDEX.md"))
         os.rename(os.path.join(root, "docs", "ROADMAP-core.md"), os.path.join(root, "docs", "ROADMAP.md"))

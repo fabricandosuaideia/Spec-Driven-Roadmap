@@ -71,7 +71,8 @@ previous run wrote to, and never score a run whose directory you did not create 
 scratch space: sub-agents inherit the launcher's scratchpad, so tell each to keep its scratch files
 inside its own copy. And the shell: a sub-agent's starts every call in the launcher's working directory —
 this repository — so tell each to begin every command with `cd <its copy> &&` (3.48.0: one that did not ran
-a `git checkout -b` here). Use
+a `git checkout -b` here). And whatever scores a run — the hashes it will be judged by — lives outside the copies, never beside
+`proj/`: 3.50.0's harness kept a `facts.json` next to it and two agents read it (they used nothing from it, and said so). Use
 `scripts/run-benchmark.py setup --agents N`, which builds N isolated copies and refuses to reuse a
 path; hand-rolling the setup is where this goes wrong every time.
 

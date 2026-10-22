@@ -114,6 +114,9 @@ directory, which is this repository. In 3.48.0's test a blind agent told only to
 maintainer's uncommitted work. It was one checkout, undone from the reflog; but a copy isolates
 nothing while the real tree is one forgotten `cd` away. `setup` prints this reminder too.
 
+**And keep whatever scores a run outside the copies.** A hash file, an expected value, a map of which agent had which text: beside `proj/` it is an answer
+key next to what it grades. 3.50.0's harness kept one there and two agents read it (they used nothing from it, and said so).
+
 ## Reading a result
 
 Two numbers, and they answer different questions.

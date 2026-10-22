@@ -159,7 +159,7 @@ function Get-ReleaseTree {
 function Get-LocalChanges {
     param([string]$Installed, [string]$Release)
     $base = (Resolve-Path -LiteralPath $Installed).Path
-    foreach ($f in (Get-ChildItem -LiteralPath $base -Recurse -File | Sort-Object FullName)) {
+    foreach ($f in (Get-ChildItem -LiteralPath $base -Recurse -File -Force | Sort-Object FullName)) {  # -Force: a dotfile the project added is a local change too
         $rel = $f.FullName.Substring($base.Length).TrimStart('\', '/')
         if ($rel -match '\.pyc$' -or $rel -match '__pycache__' -or $rel -eq '.skill-meta.json') { continue }
         $orig = Join-Path $Release $rel
@@ -245,8 +245,11 @@ try {
                     foreach ($c in ($changes | Where-Object { $_ -like 'modified *' })) {
                         $rel = ($c -replace '^modified\s+', '')
                         Write-Host ''; Write-Host "--- $rel (release v$oldVersion -> installed copy)"
-                        $a = Get-Content -LiteralPath (Join-Path $relTree $rel); $b = Get-Content -LiteralPath (Join-Path $Dest $rel)
-                        Compare-Object $a $b | Select-Object -First 80 | ForEach-Object { ($(if ($_.SideIndicator -eq '=>') { '+ ' } else { '- ' }) + $_.InputObject) } | ForEach-Object { Write-Host $_ }
+                        # @(...): an empty file is $null to Get-Content, and Compare-Object refuses $null. -CaseSensitive: a case-only edit is a change.
+                        $a = @(Get-Content -LiteralPath (Join-Path $relTree $rel)); $b = @(Get-Content -LiteralPath (Join-Path $Dest $rel))
+                        $d = @(Compare-Object $a $b -CaseSensitive)
+                        if ($d.Count -eq 0) { Write-Host '  (no line differs: the file differs in line endings, line order, a final newline or an encoding mark)' }
+                        else { $d | Select-Object -First 80 | ForEach-Object { ($(if ($_.SideIndicator -eq '=>') { '+ ' } else { '- ' }) + $_.InputObject) } | ForEach-Object { Write-Host $_ } }
                     }
                 }
                 Write-Host '  If a setting of the project depended on a local patch, it stops working after this install.'

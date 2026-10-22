@@ -254,6 +254,7 @@ def cmd_setup(args):
     print("And tell it to start EVERY shell command with `cd <that path> &&`: a sub-agent's")
     print("shell does not keep its directory between calls and starts in the launcher's")
     print("working directory — this repository.")
+    print("Keep whatever scores the run (hashes, expected values) outside every copy, never beside proj/.")
     return 0
 
 

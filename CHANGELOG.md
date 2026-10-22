@@ -9,6 +9,66 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.50.0 — 2026-10-22
+
+**The suspicions 3.49.0 left unlisted, checked one by one; what was real is fixed, what was not is recorded as not.** Eleven independent agents,
+read-only, each given **one** suspicion and told to try to refute it (a suspicion handed over to be confirmed comes back confirmed): 4 confirmed and
+fixed, 3 confirmed but narrower than I had written (also fixed), 4 left alone — not reproduced, harmless or by design. Then 31 blind agents in their own copies, 3.49.0's text against the new one,
+for the three prompt changes. Results below are read from each copy's git state, except where it says the agent's reply.
+
+**Fixed, with a defect planted for each in `check-pipeline.mjs`** (eight bullets: seven of the eleven agents led to a fix, and the barrier's agent found two; the "never empty" clause and the gate-launch `&&` below are not from the eleven):
+- **A `manager.stopAt` that names no section reserved nothing.** `mony`, `Money` or `docs/ROADMAP-money.md` was accepted, the planner's summary even
+  printed `stops at mony`, and the section the owner meant to keep was decomposed and built unattended. `plan-pipeline.py --manager` now refuses it, naming the
+  slug and the real ones, and the manager script refuses it too (args that did not come from the planner). **A `pipeline.json` with such a slug is refused by `plan-pipeline.py --manager` now** — not by `--check-config` or the plain planner, which do not read the sections.
+- **A child result the manager cannot read blocked its section in silence, and one that is not text crashed the run.** An array with a `null` or an object in it
+  threw `startsWith is not a function` before the final record; a string, `undefined` or `[]` gave no line about the section. Now the section is blocked
+  with a line saying what came back and that `git log` on the main branch is where to look; a thrown value that is not an `Error` is read too. Nothing
+  built on the unreadable section either way (checked: that part was already safe), and an owed barrier was never wrongly cleared.
+- **The barrier's clean-tree check counted the pipeline's own files as work.** A project that installs its skills per project and has not committed
+  `pipeline.json` or the roadmap had every barrier refused (`?? .claude/`, `?? docs/process/`), and the refusal held every later feature. It now leaves
+  those **untracked** files out (`.claude`, `docs`, `.specs`, the way the builder's stash does since 3.48.0), and still refuses an edit to any **tracked** file, under
+  those paths too (a first version excluded the paths wholesale and would have missed a tracked `docs/` edit; the review caught it). **Second round: 3 of 3 ran and recorded with only untracked pipeline files; 3 of 3 refused with a tracked `docs/` edit.** **Control 0 of 3 ran the barrier, new 3 of 3 ran and
+  recorded it.**
+- **With more than one lane the barrier was not told to check out the main branch.** The reviewer reproduced one executor running the gate on another branch
+  and recording the main branch's sha as proved (a false green); the prompt now says to, in every mode, and that the checkout is the one change it may make.
+  **In my own run 3 of 3 controls checked it out unaided, so this is an omission fix with no measured gain**; it costs nothing and fails in the dangerous direction.
+- **A barrier repair merged without the project's `postMerge` command.** The triage merger (3.35.0) predates `postMerge` (3.44.0) and nothing covered the two
+  together: the barrier then ran with the environment behind the code (a migration the repair added, unapplied), judged the repair "not enough" or, worse,
+  went green on code ahead of its environment. The triage merger now runs it as the feature merger does, and a repair whose command failed stops the cycle before the
+  barrier. **Control 0 of 3 ran it (the old prompt does not mention it); new 3 of 3 did, and the repair was on main in all six.**
+- **The builder deferred a criterion of its own entry to a later feature and said `ready=true`.** On real projects this looped for hours: in 3 features
+  of 2 projects the verifier refused a criterion of the feature's own spec, the builder answered "deferred to the later feature, moved on" and changed
+  nothing, and the feature spent the tier's ceiling of full gates (about 15 h in one). The verifier was right each time; the verifier's wording is not
+  touched (a rule that waves through "belongs to a later feature" would have waved through a criterion of this feature, and lets the builder write the exemption
+  itself). The builder's DEFERRED SCOPE clause now exempts a criterion or check of **its own entry**: it replies `ready=false` naming both features and the
+  criterion, which skips the gate and the verifier. The builder's attempt-4 line ("if one criterion is truly impossible as written … meet all the others") read against
+  that rule as a way out, so it now says a criterion only a later feature makes possible is not that case. **At attempt 4, controls (the new clause, the old line) and new were
+  both 3 of 3 `ready=false`: the contradiction the review found did not show, so this is a consistency edit with no measured gain.** **Control 4 of 4 replied `ready=true` (3 of 4 wrote `curate` to call a module that does not exist, leaving a
+  green-on-main test red); new 4 of 4 replied `ready=false`, 1 of 4 still left the same red test.** `ready=false` repeats on each attempt, but each costs a builder, not a gate and a verifier.
+- **A failed `RECORD` was invisible, and the reviewer's findings were the first cut.** The pipeline discarded RECORD's reply, so a run that could not write
+  `docs/roadmap-history.md` left its blocked features' last issues nowhere (the returned lines carry none). It now ends with `record: not written …` and the issues
+  under it, and the manager passes both to the owner. The 5 kept issues now start with the reviewer's, which are in no committed file (the verifier's are in its report), and a merge that failed keeps its reason there too. The
+  3.48.0 line "its findings are the issues above" pointed at nothing in the returned line; it says `lastIssues in docs/roadmap-history.md` now.
+- **`install.ps1` and `install.sh` disagreed about what a project changed.** Run both, with `pwsh` 7.6 on Linux: a **dotfile** the project added was invisible to
+  `install.ps1` (no `-Force`), so it said "nothing local to lose" and the install deleted it after one prompt; a modified file **emptied to nothing** crashed `-Diff`
+  (and aborted `-Force -Diff`); a **case-only** edit printed an empty diff; a **BOM** in `SKILL.md` made `install.sh` lose the version ("could not check", no list, no second prompt).
+  All four fixed; `check-installers.py` plants each, and deleting each fix fails one of its assertions. **Not run:** Windows PowerShell 5.1 (Hidden-attribute files, CRLF checkouts).
+
+**Checked and not changed (the reason is the point):**
+- **Merger standing in a removed worktree:** the git behaviour exists, but 73 of 73 real step-4 commands started in the project root (the shell resets each call), and the effect, a branch left undeleted after the merge, is a note with `ok=true`.
+- **A `triage/N` branch left by an earlier run:** `git checkout -b` fails and the prompt is silent, **but 4 of 4 agents renamed the stale branch and recreated it**, noting the stale commit loosened an assertion. The worse paths (building on it, merging it) did not occur; a wording fix could not show a gain over 4 of 4.
+- **Round numbering:** the attempt number and the number of verifications diverge, but the scope comes from `git log` and nothing reads the number (the vendored validator accepted every variation; a real project's report numbers go 1, 2, 3, 5, 6, 7, 7).
+- **Test conflict against a `REVOKED-TEST` correction:** the stop is the documented outcome (the feature ends blocked, the owner settles it); 4 of 4 agents stopped, 0 settled the conflict by the side that passes, and the verifier does not flag a test that came in from the main branch through a merge. Loosening it would loosen the protected clause; the limit is written in `manager-mode.md` now.
+- **"Never empty" failures list for a red barrier:** I added a clause and removed it again — 2 of 2 controls already named the error; no gain, more tokens in every barrier.
+- **The gate-launch `&&` (3.49.0's measurement)** stands.
+
+**Mine, and worth saying.** (1) My test harness kept a `facts.json` of git hashes **next to `proj/` in each copy** — an answer key beside what it grades, the lesson-9 pattern again.
+Two agents read it and said they did not use it; none of the scoring depends on a reply it could have shaped, but the file is outside the copies now and `CLAUDE.md` says so. (2) The
+first 3.49.0 remedy for the `barrier`-named feature was a planner refusal; the reviewer showed it also stopped option C projects (see 3.49.0).
+
+`check-pipeline.mjs`: 321 passing checks at 3.49.0 with 150 planted defects caught; 356 now with 168; 0 failed. Blind agents this release: 31 in the prompt tests
+plus 12 for the changes the review asked for, plus 11 verifiers, Haiku and Sonnet. **Not executed:** a real Workflow run with this text; the manager-revoke benchmark; the builder's second-attempt prompt.
+
 ## 3.49.0 — 2026-10-22
 
 **Two of the four items 3.48.0 left open, and a measurement that closes a third without a change.** No agent was needed for the fixes: both are

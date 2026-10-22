@@ -141,7 +141,7 @@ const ANGLES = [
   'Build the feature exactly as its spec source states.',
   'The previous attempt was refused. Resolve every listed issue precisely; do not widen scope and do not undo what already passes.',
   'Two attempts have been refused. BEFORE writing code, write in one sentence the invariant the refusals share (the single rule that, enforced in one place, prevents all of them), record it with your notes, then satisfy it with the smallest change — a different place or shape if needed, reusing what already works.',
-  'Three attempts have been refused. Restate the invariant if the last one was wrong or incomplete, then make the smallest change that enforces it and meets every criterion. If one criterion is truly impossible as written, say exactly why and meet all the others.',
+  'Three attempts have been refused. Restate the invariant if the last one was wrong or incomplete, then make the smallest change that enforces it and meets every criterion. If one criterion is truly impossible as written, say exactly why and meet all the others — a criterion that only a LATER feature makes possible is not that case: DEFERRED SCOPE below applies, and you reply ready=false.',
   'Several attempts have been refused, each time on a narrower variant of the same cause. Fix ONLY the blocker and major issues below, at the root (state the invariant, enforce it in one place), leave minor ones alone, do not refactor.',
 ]
 
@@ -165,7 +165,7 @@ ROLE: BUILDER, attempt ${attempt} of ${MAX[tierOf(f)]}. ${ANGLES[Math.min(attemp
 ${LANES > 1 ? '' : `Before anything else, in this shared tree: if a rebase or merge is in progress, abort it (git rebase --abort or git merge --abort) — nothing else works while one is; then, if git status --porcelain ${OWN_FILES_OUT} prints anything, an earlier agent left it here: run git stash push -u -m "left before feat/${f.name}" ${OWN_FILES_OUT}, say so in your notes and reply stashed=true — never carry it into this branch. (That pathspec leaves the pipeline's own files in the tree even when uncommitted: the installed skills under .claude, the roadmap and pipeline.json under docs, the specs under .specs.)\n`}${attempt > 1 ? `First ${BRING_MAIN(f)}, and resolve any conflict yourself, keeping what both sides intended. ${TEST_CONFLICT} Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}${attempt === 1 ? `If feat/${f.name} already exists, an earlier run built on it: first ${BRING_MAIN(f)}, and resolve any conflict yourself, keeping what both sides intended — the prover brings ${MAIN} in again and fixes nothing, so a conflict left for it costs a whole attempt. ${TEST_CONFLICT}\nIf feat/${f.name} already exists and a refused ${REPORT} (or a gate-failure.md note) is committed in .specs/features/${f.name}/, an earlier run refused this feature: read that report or note first and resolve every gap it lists before anything else, as an attempt after a refusal does.\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
 While you work, run only the tests related to what you touched${A.testHint ? ` (${A.testHint})` : ''}. Do NOT run the full gate and do NOT write ${REPORT}: a fresh prover and an independent verifier come after you.
 ${LONG_COMMANDS}
-${A.checklist ? `Before you finish, check your diff against every item of ${A.checklist} (the problems reviewers kept finding in this project) and fix what fails.\n` : ''}DEFERRED SCOPE: an issue that is the declared scope of a LATER feature in the build order is not yours: name that feature in your notes and move on.
+${A.checklist ? `Before you finish, check your diff against every item of ${A.checklist} (the problems reviewers kept finding in this project) and fix what fails.\n` : ''}DEFERRED SCOPE: an issue that is the declared scope of a LATER feature in the build order is not yours: name that feature in your notes and move on — unless it is an acceptance criterion or check of THIS feature's own entry (feature-brief.py): that one stays yours, and if it cannot be met before the later feature exists, reply ready=false naming both features and the criterion, not ready=true with it unmet.
 Reply ready=true once every change is committed, even though the full gate has not run; otherwise ready=false with blockers — and commit what you keep before either reply: an uncommitted change is left for the next agent to trip on.`
 
 const PROVE = f => `${COMMON(f, true)}
@@ -272,15 +272,15 @@ ${LAUNCHED}
 1. In ${P}: rebase triage/${cycle} onto ${MAIN}. If that stops on a conflict, run \`git rebase --abort\` and reply ok=false naming the conflicting files.
 2. Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, P)}
 3. Fast-forward ${MAIN} to triage/${cycle} (git checkout ${MAIN} && git merge --ff-only triage/${cycle}).${A.push ? ` Then git push origin ${MAIN}.` : ' Do not push.'}
-4. git branch -d triage/${cycle}.
-Reply with ok, before, the new ${MAIN} commit and notes${A.push ? ', and pushed (true only if the push succeeded)' : ''}.`
+${POST_MERGE}4. git branch -d triage/${cycle}.
+Reply with ok, before, the new ${MAIN} commit and notes${A.postMerge ? ', and postMerge (true only if the post-merge command exited 0)' : ''}${A.push ? ', and pushed (true only if the push succeeded)' : ''}.`
 
 const EARLIER = 'earlier-run'
 const sinceText = merged => merged.map(n => n === EARLIER ? `an earlier run's merges (${A.barrierPending.base.slice(0, 9)}..${A.barrierPending.head.slice(0, 9)}), which no green barrier ever proved` : n).join(', ')
 const BARRIER = merged => `You are the BARRIER of a build pipeline for the project at ${P}. These have been merged into ${MAIN} since the last green barrier: ${sinceText(merged)}. Nothing more merges until you report.
 ${LAUNCHED}
-You change no code and fix nothing. On ${MAIN}, in ${P}${LANES > 1 ? '' : ` (git checkout ${MAIN} first)`}, note the commit ${MAIN} points at (git -C ${P} rev-parse ${MAIN}), then run the project's barrier — ${A.barrierGate} — and ${RUN_GATE(A.barrierGate || '', P)}
-The tree must be clean on ${MAIN} before the barrier runs: if \`git -C ${P} status --porcelain\` prints anything, change nothing, run no barrier and reply ok=false with exitCode -1 and that output as the failure — a barrier that ran on uncommitted work proves nothing.
+You change no code and fix nothing; the only change you may make to the project's files is checking out ${MAIN}. On ${MAIN}, in ${P} (git checkout ${MAIN} first: the project root may be on another branch, and a barrier that ran there proves nothing about ${MAIN}), note the commit ${MAIN} points at (git -C ${P} rev-parse ${MAIN}), then run the project's barrier — ${A.barrierGate} — and ${RUN_GATE(A.barrierGate || '', P)}
+The tree must be clean on ${MAIN} before the barrier runs: if the checkout was refused, or \`git -C ${P} status --porcelain --untracked-files=no\` (an edit to any tracked file) or \`git -C ${P} status --porcelain ${OWN_FILES_OUT}\` (everything else) prints anything, change nothing further, run no barrier and reply ok=false with exitCode -1 and that output as the failure — a barrier that ran on uncommitted work proves nothing. (The pipeline's own files — the installed skills under .claude, the roadmap and pipeline.json under docs, the specs under .specs — may be untracked: that is not work. An edit to one that is tracked is.)
 Recording the proof is part of your task: only if the barrier exited 0, run python3 ${SKILL}/scripts/record-barrier.py --root ${P} --sha <that commit>. Never for a red or unfinished barrier: the next run reads that record to know what is proved.
 Reply with ok (true only if the barrier finished and exited 0), exitCode, and failures: the failing tests or files, as the log names them.`
 
@@ -356,7 +356,7 @@ const TRIAGE_EFFORT = EFFORT.triage || 'high'
 const repair = async (merged, failures) => {
   const base = mergedAt[merged[0]] && mergedAt[merged[0]].before
   const specs = merged.filter(n => mergedAt[n]).map(n => `${n}:${mergedAt[n].before}:${mergedAt[n].after}`)
-  const stop = (because, cycle) => { outcomes.push({ name: 'triage', kind: 'triage', result: 'stopped', cycle, because }); log(`triage: stopped — ${because}`); return false }
+  const stop = (because, cycle, extra = {}) => { outcomes.push({ name: 'triage', kind: 'triage', result: 'stopped', cycle, because, ...extra }); log(`triage: stopped — ${because}`); return false }
   if (!base) return stop('no base commit was recorded for these merges', 1)
   for (let cycle = 1; cycle <= 2; cycle++) {
     const t = await agent(TRIAGE(merged, failures, base, specs, cycle), { phase: 'Barrier', label: `triage:${cycle}`, schema: TRIAGE_SCHEMA, effort: TRIAGE_EFFORT, ...modelFor('triage') })
@@ -369,6 +369,8 @@ const repair = async (merged, failures) => {
     if (!ck || !ck.ok || serious(ck.issues).length) return stop('the checker refused the repair: ' + (ck ? serious(ck.issues).map(i => i.problem).join('; ') : 'no result'), cycle)
     const m = await agent(TRIAGE_MERGE(cycle), { phase: 'Barrier', label: `merge:triage-${cycle}`, schema: MERGE_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...modelFor('merge') })
     if (!m || !m.ok) return stop('the repair did not merge: ' + (m ? m.notes : 'no result'), cycle)
+    // The repair is on the main branch, and what the code needs outside git (a migration) has not been applied if the command failed: a barrier now proves nothing.
+    if (A.postMerge && m.postMerge !== true) return stop('the repair merged, but the post-merge command did not exit 0: the environment is out of step with the code, so no barrier ran', cycle, A.push && m.pushed !== true ? { pushFailed: true } : {})
     const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:after-triage-${cycle}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...modelFor('barrier') })
     const green = !!(b && b.ok && b.exitCode === 0)
     outcomes.push({ name: 'triage', kind: 'triage', result: green ? 'repaired' : 'not enough', cycle, items: items.map(i => `${i.kind}${i.feature ? ' in ' + i.feature : ''}: ${i.test}`), ...(A.push && m.pushed !== true ? { pushFailed: true } : {}) })
@@ -404,9 +406,11 @@ const runFeature = async f => {
   let feedback = f.feedback || null
   let passedAt = 0
   let staleReport = false
+  let reviewerIssues = []  // the last attempt's serious reviewer findings: in no committed file, so they head the recorded copy
   let reviewRefusedAt = 0  // the attempt whose PASS report the tier A reviewer refused, while the branch still carries it
   for (let attempt = f.startAttempt || 1; attempt <= MAX[tier] && !passedAt; attempt++) {
     if (barrierRed || postMergeFailed) { hold(f); return }
+    reviewerIssues = []
     const built = await agent(IMPLEMENT(f, attempt, feedback), { phase: 'Build', label: `build:${f.name}:${attempt}`, schema: BUILD_SCHEMA, effort: effortFor('implement', f), ...modelFor('build') })
     if (built && built.stashed && !stashedBefore.includes(f.name)) stashedBefore.push(f.name)
     if (!built || !built.ready) {
@@ -440,6 +444,7 @@ const runFeature = async f => {
     if (gateRefused) continue
     feedback = [...serious(ver && ver.issues), ...serious(rev && rev.issues),
       ...((ver && ver.notMet) || []).map(n => ({ severity: 'blocker', where: 'criterion', problem: 'not met: ' + n, fix: 'meet it' }))]
+    reviewerIssues = serious(rev && rev.issues)
     if (ver && ver.gateExit !== 0 && !feedback.length) feedback.push({ severity: 'blocker', where: 'gate', problem: `${GATE_SCRIPT} exited ${ver.gateExit}`, fix: 'read the report the verifier wrote' })
     if (!ver) feedback.push({ severity: 'blocker', where: 'verify', problem: 'the verifier returned nothing', fix: 're-run verification' })
     if (tier === 'A' && !rev) feedback.push({ severity: 'blocker', where: 'review', problem: 'the reviewer returned nothing', fix: 'nothing to change for it: the next attempt reviews again' })
@@ -448,9 +453,9 @@ const runFeature = async f => {
   }
   if (!passedAt) {
     blocked.add(f.name)
-    outcomes.push({ name: f.name, result: 'blocked', lastIssues: (feedback || []).slice(0, 5),
+    outcomes.push({ name: f.name, result: 'blocked', lastIssues: [...reviewerIssues, ...(feedback || []).filter(i => !reviewerIssues.includes(i))].slice(0, 5),
       ...(staleReport ? { because: `branch feat/${f.name} carries a PASS report that the gate refused` }
-        : reviewRefusedAt ? { because: `branch feat/${f.name} carries a PASS report the tier A reviewer refused in attempt ${reviewRefusedAt}${reviewRefusedAt === MAX[tier] ? ' (its findings are the issues above)' : ''}` } : {}) })
+        : reviewRefusedAt ? { because: `branch feat/${f.name} carries a PASS report the tier A reviewer refused in attempt ${reviewRefusedAt}${reviewRefusedAt === MAX[tier] ? ' (its findings are lastIssues in docs/roadmap-history.md)' : ''}` } : {}) })
     log(`${f.name}: blocked after ${MAX[tier]} attempts`)
     return
   }
@@ -491,11 +496,20 @@ await withMergeLock(runBarrier)
 if (stashedBefore.length) outcomes.push({ name: 'stashed', stash: stashedBefore })  // told apart by `stash`, never by a name a feature can have
 
 phase('Record')
-await agent(RECORD(outcomes), { phase: 'Record', label: 'record', schema: RECORD_SCHEMA, effort: effortFor('record', { tier: 'B' }), ...modelFor('record') })
-return outcomes.map(o => o.stash
+const rec = await agent(RECORD(outcomes), { phase: 'Record', label: 'record', schema: RECORD_SCHEMA, effort: effortFor('record', { tier: 'B' }), ...modelFor('record') })
+const account = outcomes.map(o => o.stash
   ? `stashed: before ${o.stash.join(', ')} — uncommitted changes found in the shared tree are in git stash list ("left before feat/<name>"); none was carried into a branch`
   : o.kind === 'barrier'
   ? `barrier: ${o.result} after ${o.after.join(', ')}${o.result === 'red' ? ' — ' + (o.failures || []).slice(0, 5).join('; ') : ''}`
   : o.kind === 'triage'
   ? `triage: ${o.result} (cycle ${o.cycle})${o.pushFailed ? ' [push failed]' : ''}${o.items ? ' — ' + o.items.join('; ') : ''}${o.because ? ' — ' + o.because : ''}`
   : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.gateSkipped ? ' [gate skipped: receipt]' : ''}${o.postMergeFailed ? ' [post-merge command failed]' : ''}${o.pushFailed ? ' [push failed]' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)
+// RECORD's reply was discarded, so a record that did not happen (main not checked out, an uncommitted change in the way) left the account
+// in nowhere: the returned lines carry no findings. Said, with what the owner would otherwise lose (review of 3.49.0).
+if (!(rec && rec.recorded)) {
+  account.push('record: not written — docs/roadmap-history.md and ## Status were not updated by this run; what follows is the only copy of what is blocked or failed to merge')
+  for (const o of outcomes.filter(o => o.result === 'blocked' && o.lastIssues))
+    for (const i of o.lastIssues) account.push(`  ${o.name}: ${i.severity} ${i.where} — ${i.problem}`)
+  for (const o of outcomes.filter(o => o.result === 'merge-failed')) account.push(`  ${o.name}: merge-failed — ${o.notes}`)
+}
+return account

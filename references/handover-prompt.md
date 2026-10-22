@@ -705,7 +705,7 @@ them for an unattended run:
        loop.
 
    Only if the project's own rules mention such a step, also ask what the merged code needs **outside git**
-   (`"postMerge"`): a command run once on the main branch after each fast-forward, such as a forward-only
+   (`"postMerge"`): a command run once on the main branch after each fast-forward (a feature's, and in manager mode at level `unblock` a barrier repair's), such as a forward-only
    database migration. The merge stays if it fails; the features after it are held, no barrier runs, the
    account says so, and manager mode stops there instead of starting the next section. `plan-pipeline.py` refuses any key of `pipeline.json` that this version does not read, so a
    setting that exists only in a locally patched copy of the skill is named instead of silently ignored.

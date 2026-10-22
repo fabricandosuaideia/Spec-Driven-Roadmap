@@ -418,7 +418,12 @@ const mutants = {
   'an owed barrier ignored without the guard': ['if (A.barrierGate && A.barrierPending && A.barrierPending.base) {', 'if (false) {'],
   'an owed barrier never run': ['await withMergeLock(runBarrier)\n\nawait parallel', 'await parallel'],
   'the barrier does not record itself': ['record-barrier.py --root ${P} --sha <that commit>', 'true'],
-  'the barrier runs on a dirty tree': ['if \\`git -C ${P} status --porcelain\\`', 'if \\`git -C ${P} status --short\\`'],
+  'the barrier runs on a dirty tree': ['if the checkout was refused, or \\`git -C ${P} status --porcelain --untracked-files=no\\`', 'if the checkout was refused, or \\`git -C ${P} status --short --untracked-files=no\\`'],
+  'the barrier is blind to an edit of a tracked file under the pipeline\'s own paths': ['\\`git -C ${P} status --porcelain --untracked-files=no\\` (an edit to any tracked file) or ', ''],
+  'the barrier counts the pipeline\'s own files as work': ['status --porcelain ${OWN_FILES_OUT}\\` (everything else) prints anything', 'status --porcelain\\` (everything else) prints anything'],
+  'a multi-lane barrier is not told to check out the main branch': ["(git checkout ${MAIN} first: the project root may be on another branch", "(the project root may be on another branch"],
+  'a triage repair is merged without the post-merge command': ['${POST_MERGE}4. git branch -d triage/${cycle}.', '4. git branch -d triage/${cycle}.'],
+  'a triage repair whose post-merge command failed goes on to the barrier': ["if (A.postMerge && m.postMerge !== true) return stop(", "if (false) return stop("],
   'checker told nothing about a command that finds no test': ['No tests found', 'Something else'],
   'triage allowed a line selector': ['never a file:line', 'any selector'],
   'a not-reproduced failure repaired anyway': ["if (items.some(i => i.kind === 'not-reproduced')) return stop(", "if (false) return stop("],
@@ -471,6 +476,9 @@ const CLAUSES = [
   ['review: the reviewer changes no test and no code, in manager mode too', 'review', 'TESTS: you edit no test and no code of the branch: what you find is reported, never fixed.', { tier: 'A', args: { managerMode: true } }],
   ['prove: a gate-failure note the gate no longer backs is deleted', 'prove', 'delete it in that commit (the gate it described now passes)', {}],
   ['merge: after the fast-forward the merge has happened', 'merge', 'from then on the merge has happened', {}],
+  ['barrier: the main branch is checked out whatever the lanes', 'barrier', 'first: the project root may be on another branch', { args: { lanes: 2, barrierGate: 'make all', barrierEvery: 1 } }],
+  ['barrier: the pipeline\'s own files are not work', 'barrier', 'may be untracked: that is not work. An edit to one that is tracked is.', { args: { barrierGate: 'make all', barrierEvery: 1 } }],
+  ['build: a criterion of this feature\'s own entry is not deferred', 'build', 'unless it is an acceptance criterion or check of THIS feature', {}],
   ['merge: the feature branch is checked out, after an abort', 'merge', 'is not the branch checked out there, check it out', {}],
   ['build: a shared tree left dirty is stashed, never carried', 'build', 'an earlier agent left it here: run git stash push', {}],
   ['build: in a shared tree an open rebase or merge is aborted before the stash', 'build', 'abort it (git rebase --abort or git merge --abort) — nothing else works while one is', {}],
@@ -536,13 +544,13 @@ Object.assign(scenarios, {
   },
   'a PASS report the tier A reviewer refused is said in the account': async src => {
     const r = await run(src, { features: [feat('a', 'A')] }, pass({ review: () => ({ issues: [{ severity: 'major', where: 'x', problem: 'p', fix: 'f' }] }) }))
-    return /a: blocked.*carries a PASS report the tier A reviewer refused in attempt 5 \(its findings are the issues above\)/.test(line(r.out, 'a'))
+    return /a: blocked.*carries a PASS report the tier A reviewer refused in attempt 5 \(its findings are lastIssues in docs\/roadmap-history\.md\)/.test(line(r.out, 'a'))
   },
   'a last attempt whose builder did not finish is not blamed on an earlier reviewer': async src => {
     const r = await run(src, { features: [feat('a', 'A')] }, pass({
       review: () => ({ issues: [{ severity: 'major', where: 'x', problem: 'p', fix: 'f' }] }),
       build: (n, att) => att === 5 ? { ready: false, summary: '', blockers: ['ran out'] } : undefined }))
-    return line(r.out, 'a').includes('blocked') && /the tier A reviewer refused in attempt 4/.test(line(r.out, 'a')) && !/its findings are the issues above/.test(line(r.out, 'a'))
+    return line(r.out, 'a').includes('blocked') && /the tier A reviewer refused in attempt 4/.test(line(r.out, 'a')) && !/its findings are lastIssues/.test(line(r.out, 'a'))
   },
   'a FAIL report after the reviewer refused a PASS one clears the refusal from the account': async src => {
     const r = await run(src, { features: [feat('a', 'A')] }, pass({
@@ -580,6 +588,68 @@ Object.assign(scenarios, {
     const s = r.out.filter(l => l.startsWith('stashed: '))
     return s.length === 1 && /^stashed: before a — .*git stash list/.test(s[0]) && line(r.out, 'a').includes('merged')
   },
+  'a tier A reviewer\'s findings head the recorded copy, ahead of the verifier\'s that are in the committed report': async src => {
+    const mk = (n, w) => Array.from({ length: n }, (_, i) => ({ severity: 'major', where: `${w}:${i}`, problem: w, fix: 'f' }))
+    const r = await run(src, { features: [feat('a', 'A')] }, pass({ verify: () => ({ gateExit: 0, pass: false, notMet: [], issues: mk(5, 'verifier') }), review: () => ({ issues: mk(2, 'reviewer') }) }))
+    const rec = r.calls.find(c => c.role === 'record')
+    const m = rec && rec.prompt.match(/"lastIssues": \[([\s\S]*?)\n  \]/)
+    return !!m && (m[1].match(/"problem": "reviewer"/g) || []).length === 2 && (m[1].match(/"problem": "verifier"/g) || []).length === 3
+  },
+  'a record that was not written is said, with the blocked features\' last issues': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass({ verify: () => ({ gateExit: 1, pass: false, notMet: ['C1'], issues: [] }), record: () => ({ recorded: false }) }))
+    return r.out.some(l => /^record: not written/.test(l)) && r.out.some(l => /^  a: blocker criterion — not met: C1/.test(l)) && line(r.out, 'a').includes('blocked')
+  },
+  'a record that was written adds no line': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    return !r.out.some(l => /^record:/.test(l))
+  },
+  'the barrier\'s clean-tree check leaves the pipeline\'s own files out, as the builder\'s stash does': async src => {
+    const r = await run(src, { barrierGate: 'make all', barrierEvery: 1, features: [feat('a')] }, pass())
+    const b = r.calls.find(c => c.role === 'barrier')
+    return !!b && b.prompt.includes("status --porcelain -- . ':(exclude).claude' ':(exclude)docs' ':(exclude).specs'") &&
+      b.prompt.includes('status --porcelain --untracked-files=no` (an edit to any tracked file)')  // a tracked edit under those paths still counts
+  },
+  'the triage merger runs the post-merge command, and a repair whose command failed stops before the barrier': async src => {
+    const go = async post => {
+      let n = 0
+      return run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, postMerge: 'bash migrate.sh', features: [feat('a')] },
+        pass({ barrier: () => (n++ === 0 ? { ok: false, exitCode: 1, failures: ['t::x'] } : undefined),
+               triage: () => ({ items: [{ test: 't::x', command: 'pytest x', kind: 'preexisting', evidence: '{}' }] }),
+               repair: () => ({ ready: true, fixed: ['t'], blockers: [] }), check: () => ({ ok: true, issues: [] }),
+               merge: name => name === 'triage-1' ? { ok: true, before: 'b', commit: 'c', notes: '', postMerge: post } : { ok: true, before: 'b', commit: 'c', notes: '', postMerge: true } }))
+    }
+    const bad = await go(false), good = await go(true)
+    const tm = bad.calls.find(c => c.role === 'merge' && c.name === 'triage-1')
+    const barriers = r => r.calls.filter(c => c.role === 'barrier').length
+    return !!tm && tm.prompt.includes('bash migrate.sh') && /and postMerge \(true only if/.test(tm.prompt) &&
+      bad.out.some(l => /^triage: stopped \(cycle 1\) — the repair merged, but the post-merge command did not exit 0/.test(l)) && barriers(bad) === 1 &&
+      good.out.some(l => /^triage: repaired \(cycle 1\)/.test(l)) && barriers(good) === 2
+  },
+  'without a post-merge command the triage merger and its flow are what they were': async src => {
+    const r = await unblockRun(src, {})
+    const tm = r.calls.find(c => c.role === 'merge' && c.name === 'triage-1')
+    return !!tm && !/post-merge/.test(tm.prompt) && (r.out || []).some(l => /^triage: repaired \(cycle 1\)/.test(l))
+  },
+  'a later attempt that fails early does not keep the earlier reviewer\'s findings in the recorded copy': async src => {
+    const r = await run(src, { features: [feat('a', 'A')] }, pass({
+      review: () => ({ issues: [{ severity: 'major', where: 'rev.py:1', problem: 'REVIEWER-FINDING', fix: 'f' }] }),
+      build: (n, att) => att === 5 ? { ready: false, summary: '', blockers: ['ran out'] } : undefined }))
+    const rec = r.calls.find(c => c.role === 'record')
+    return !!rec && !/REVIEWER-FINDING/.test(rec.prompt.slice(rec.prompt.indexOf('"lastIssues"'))) && /the builder did not finish: ran out/.test(rec.prompt)
+  },
+  'a merge that failed is kept with its reason when the record was not written': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass({ merge: () => ({ ok: false, before: 'b', commit: '', notes: 'ff refused: main moved' }), record: () => ({ recorded: false }) }))
+    return r.out.some(l => /^record: not written/.test(l)) && r.out.some(l => /^  a: merge-failed — ff refused: main moved/.test(l))
+  },
+  'a push that failed on the repair\'s post-merge stop is still marked': async src => {
+    let n = 0
+    const r = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, postMerge: 'bash migrate.sh', push: true, features: [feat('a')] },
+      pass({ barrier: () => (n++ === 0 ? { ok: false, exitCode: 1, failures: ['t::x'] } : undefined),
+             triage: () => ({ items: [{ test: 't::x', command: 'pytest x', kind: 'preexisting', evidence: '{}' }] }),
+             repair: () => ({ ready: true, fixed: ['t'], blockers: [] }), check: () => ({ ok: true, issues: [] }),
+             merge: name => name === 'triage-1' ? { ok: true, before: 'b', commit: 'c', notes: '', postMerge: false, pushed: false } : { ok: true, before: 'b', commit: 'c', notes: '', postMerge: true, pushed: true } }))
+    return r.out.some(l => /^triage: stopped \(cycle 1\) \[push failed\] — the repair merged, but the post-merge command/.test(l))
+  },
   'a failed push is in the account, and the merge stays': async src => {
     const r = await run(src, { push: true, features: [feat('a')] }, pass({ merge: () => ({ ok: true, before: 'b0', commit: 'c1', notes: 'push rejected', pushed: false }) }))
     const m = r.calls.find(c => c.role === 'merge')
@@ -592,15 +662,20 @@ Object.assign(mutants, {
   'a reviewer that returned nothing is not said': ["if (tier === 'A' && !rev) feedback.push(", 'if (false) feedback.push('],
   'a refusal with nothing to act on is left empty': ['if (!feedback.length) feedback.push({ severity: \'blocker\', where: \'verify\', problem: `the verifier refused', 'if (false) feedback.push({ severity: \'blocker\', where: \'verify\', problem: `the verifier refused'],
   'a PASS report the reviewer refused is not said': [': reviewRefusedAt ? {', ': false ? {'],
-  'an earlier reviewer\'s findings are claimed for a later attempt': ["${reviewRefusedAt === MAX[tier] ? ' (its findings are the issues above)' : ''}", ' (its findings are the issues above)'],
+  'an earlier reviewer\'s findings are claimed for a later attempt': ["${reviewRefusedAt === MAX[tier] ? ' (its findings are lastIssues in docs/roadmap-history.md)' : ''}", ' (its findings are lastIssues in docs/roadmap-history.md)'],
   'a FAIL report does not clear the reviewer\'s refusal': ['? attempt : 0  // a new report replaces the old', '? attempt : reviewRefusedAt'],
   'the triage merger reports a failure after the move as ok=false': ["from then on the repair is merged, and a failure after it", 'XXXX'],
   'a failed triage push vanishes': ["${o.pushFailed ? ' [push failed]' : ''}${o.items", '${o.items'],
   'the barrier line is told apart by name again': ["  : o.kind === 'barrier'\n", "  : o.name === 'barrier'\n"],
   'the triage line is told apart by name again': ["  : o.kind === 'triage'\n", "  : o.name === 'triage'\n"],
-  'the stash line is told apart by name': ['return outcomes.map(o => o.stash\n', "return outcomes.map(o => o.name === 'stashed'\n"],
+  'the stash line is told apart by name': ['const account = outcomes.map(o => o.stash\n', "const account = outcomes.map(o => o.name === 'stashed'\n"],
   'the verifier is handed the builder\'s rule for correcting a test again': ['const VERIFY = (f, attempt) => `${COMMON(f, true)}', 'const VERIFY = (f, attempt) => `${COMMON(f)}'],
   'the reviewer is handed the builder\'s rule for correcting a test again': ['const REVIEW = (f, notes) => `${COMMON(f, true)}', 'const REVIEW = (f, notes) => `${COMMON(f)}'],
+  'the reviewer\'s findings are cut by the verifier\'s again': ['lastIssues: [...reviewerIssues, ...(feedback || []).filter(i => !reviewerIssues.includes(i))].slice(0, 5)', 'lastIssues: (feedback || []).slice(0, 5)'],
+  'a record that was not written is not said': ["if (!(rec && rec.recorded)) {", "if (false) {"],
+  'a stale reviewer finding is kept across attempts': ['    reviewerIssues = []\n    const built', '    const built'],
+  'a merge failure is lost with an unwritten record': ["account.push(`  ${o.name}: merge-failed — ${o.notes}`)", "account.push('')"],
+  'the push mark is lost on the post-merge stop': ["A.push && m.pushed !== true ? { pushFailed: true } : {})", "{})"],
   'a failed push vanishes from the account': ["${o.pushFailed ? ' [push failed]' : ''}", ''],
   'a stash is never said': ["if (stashedBefore.length) outcomes.push(", 'if (false) outcomes.push('],
   'the verify-first reviewer is sent to notes no prover wrote yet': ["...(VERIFY_FIRST ? {} : { prover: proverNotes })", 'prover: proverNotes'],
@@ -873,6 +948,32 @@ const managerScenarios = {
     return r.out.some(l => /^a: 2 merged, 1 not finished \(triage\) — barrier: red/.test(l)) && r.out.filter(l => /^  a triage: stopped/.test(l)).length === 1 && !r.out.some(l => /^  a triage: blocked/.test(l)) &&
       !r.out.some(l => /^  a stashed:/.test(l)) && r.out.some(l => /stopped: the barrier is red after a/.test(l))
   },
+  'manager: a record that was not written is passed on to the owner with its issues': async src => {
+    const r = await runManager(src, { sections: [sec('a')] },
+      () => ['a-a: blocked', 'record: not written — docs/roadmap-history.md and ## Status were not updated by this run; what follows is the only copy of what is blocked', '  a-a: blocker criterion — not met: C1', 'barrier: green after x'])
+    return r.out.some(l => /^  a record: not written/.test(l)) && r.out.some(l => /^  a a-a: blocker criterion/.test(l)) && r.out.some(l => /^a: 0 merged, 1 not finished \(a-a\)/.test(l))
+  },
+  'manager: a stopAt that matches no section builds nothing and says so': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('b'), sec('c')], stopAt: ['bb'] })
+    return /stopAt names bb/.test(r.error || '') && r.calls.length === 0 && r.children.length === 0
+  },
+  'manager: a stopAt that names a section still stops there': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('b'), sec('c')], stopAt: ['b'] })
+    return !r.error && r.children.map(c => c.slug).join() === 'a' && r.out.some(l => /stopped: b needs the owner/.test(l))
+  },
+  'manager: a child result the manager cannot read blocks its section in words, and nothing past it is built on it': async src => {
+    const shapes = [undefined, null, 'a-a: merged (attempt 1)', { lines: ['a-a: merged'] }, [], ['a-a: merged (attempt 1)', null], [{ name: 'a-a' }]]
+    for (const shape of shapes) {
+      const r = await runManager(src, { sections: [sec('a'), sec('b', { dependsOn: ['a'] }), sec('c')] }, slug => slug === 'a' ? shape : ['x: merged (attempt 1)', 'barrier: green after x'])
+      if (r.error || r.children.map(c => c.slug).join() !== 'a,c' || !r.out.some(l => /^a: blocked — the pipeline returned /.test(l)) ||
+          !r.out.some(l => /^b: skipped — depends on a/.test(l)) || !r.calls.some(c => c.role === 'final')) return false
+    }
+    return true
+  },
+  'manager: a child that throws something that is not an Error is blocked, not a crash': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('c')] }, slug => { if (slug === 'a') throw null; return ['x: merged (attempt 1)', 'barrier: green after x'] })
+    return !r.error && r.out.some(l => /^a: blocked — the pipeline did not run/.test(l)) && r.children.map(c => c.slug).join() === 'a,c'
+  },
   'manager: a stash and a failed push in a section are passed on to the owner': async src => {
     const r = await runManager(src, { sections: [sec('a')] },
       () => ['a-a: merged (attempt 1) [push failed]', 'stashed: before a-a — uncommitted changes found in the shared tree are in git stash list', 'barrier: green after a-a'])
@@ -919,6 +1020,11 @@ const managerScenarios = {
   },
 }
 const managerMutants = {
+  'the manager drops a record that was not written': ["const rec = out.findIndex(l => l.startsWith('record: not written'))", "const rec = -1"],
+  'a stopAt that matches nothing is ignored': ["for (const slug of STOP_AT) if (!SECTIONS.some(s => s.slug === slug)) throw new Error(", "for (const slug of STOP_AT) if (false) throw new Error("],
+  'a child result that is not text crashes or hides': ["out = Array.isArray(raw) && raw.every(l => typeof l === 'string') ? raw : []", "out = Array.isArray(raw) ? raw : []"],
+  'an unreadable child result is not said': ["if (ran && !out.length) lines.push(", "if (false) lines.push("],
+  'a thrown non-Error hides its cause or crashes': ["${(e && e.message) || e}", "${e.message}"],
   'a feature called barrier is read as the barrier': ["const isBarrier = l => /^barrier: (green|red) after /.test(l)", "const isBarrier = l => l.startsWith('barrier: ')"],
   'a feature called triage is read as a triage line': ["/^triage: (repaired|not enough|stopped) \\(cycle \\d+\\)/.test(l))", "l.startsWith('triage: '))"],
   'a feature called stashed is relayed as a stash': ["l.startsWith('stashed: before ') ||", "l.startsWith('stashed: ') ||"],
