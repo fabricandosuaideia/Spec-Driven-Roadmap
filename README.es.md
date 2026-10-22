@@ -63,14 +63,14 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 .\install.ps1 -Global -Force
 ```
 
-La skill en sí es markdown más ocho scripts auxiliares en Python 3 (solo biblioteca estándar), así que
+La skill en sí es markdown más diez scripts auxiliares en Python 3 (solo biblioteca estándar), así que
 es totalmente multiplataforma; solo el instalador cambia según el SO. Convierten un proyecto de
 roadmap único en roadmaps por sección, revisan un roadmap, miden cuánto cuestan las ejecuciones de
 agentes, imprimen solo el tramo del roadmap que necesita quien construye una feature, mantienen
-pequeño el bloque de estado del roadmap, escriben las definiciones de sub-agente que dispara un loop, planifican una ejecución de la cadena y
-cronometran el gate completo del proyecto; cada uno necesita un `python3` funcionando en el PATH. En Claude
-Code la skill también trae un script de Workflow que construye un roadmap con un agente nuevo por rol
-— constructor, probador, verificador, revisor, fusionador — y solo corre cuando lo pides. En Windows, el `python3` a secas suele ser el stub de Microsoft Store, que
+pequeño el bloque de estado del roadmap, escriben las definiciones de sub-agente que dispara un loop, planifican una ejecución de la cadena,
+cronometran el gate completo del proyecto, ejecutan una prueba que falla antes y después de un lote de merges y registran el commit que una barrera en verde probó; cada uno necesita un `python3` funcionando en el PATH. En Claude
+Code la skill también trae dos scripts de Workflow: uno construye un roadmap con un agente nuevo por rol
+— constructor, probador, verificador, revisor, fusionador — y el otro ejecuta el modo gestor sobre todas las secciones; cada uno solo corre cuando lo pides. En Windows, el `python3` a secas suele ser el stub de Microsoft Store, que
 abre la Store en vez de ejecutar nada: instala Python desde python.org; después su lanzador
 `py -3` también funciona.
 
@@ -84,8 +84,8 @@ Cubre dependencias hacia adelante, nombres repetidos, el presupuesto de ocho tar
 ambos sentidos entre las preguntas abiertas de cada feature y el roll-up, una fila de ledger por
 tema, `uncovered: none`, que el nivel de riesgo de cada feature esté en su piso o por encima, que el `.txt` de orden de construcción coincida con el roadmap, los umbrales
 de tamaño, y la unicidad de nombre contra todo otro roadmap y todo directorio `.specs/features/` —
-incluida una feature construida que ningún roadmap nombra ya. Un fallo es una pregunta para ti, no un
-veredicto.
+incluida una feature construida que ningún roadmap nombra ya —, y un aviso para dos nombres en `docs/` que solo
+difieren en mayúsculas. Un fallo es una pregunta para ti, no un veredicto.
 
 La Fase 2 ejecuta las mismas comprobaciones al cerrar un roadmap; esto es para preguntar después.
 
@@ -129,7 +129,8 @@ El comando revisa primero la instalación de **proyecto** y cae a la **global** 
 que aplica Claude Code cuando ambas existen — e imprime `not installed` en la primera línea cuando no
 encuentra ninguna. Una segunda línea con `unreachable` significa que la descarga falló, no que estés
 al día — revisa la red y vuelve a ejecutarlo. En Windows, ejecútalo desde Git Bash o WSL. Cuando las
-dos líneas difieran, vuelve a ejecutar el instalador con `--force` (`-Force` en `install.ps1`).
+dos líneas difieran, sigue "Actualizar un proyecto que ya usa la skill" más abajo: el instalador con `--check`
+(`-Check` en `install.ps1`) primero, luego `--force` (`-Force`).
 
 La instalación de proyecto vive en `.claude/skills/spec-driven-roadmap/` y la global en
 `~/.claude/skills/`; las dos pueden coexistir en versiones distintas, y la versión que cuenta es
@@ -215,7 +216,7 @@ nombres y rutas ya resueltos. Pégalo en una sesión nueva.
 
 La [guía](guide/HOW-IT-WORKS.es.md) explica qué cede cada opción a cambio.
 
-**Modo gestor — el backlog entero, sin nadie mirando.** En un proyecto multi-sección, en Claude Code,
+**Modo gestor — el backlog entero, sin nadie mirando.** En Claude Code,
 puedes pedir el *"manager mode"* (modo gestor): un Workflow recorre cada sección pendiente, en el
 orden de construcción, descompone cada una justo antes de construirla — **decidiendo él mismo las
 preguntas abiertas y marcando cada decisión como `Decided by the manager`** para que la revises — y
@@ -223,7 +224,8 @@ la construye con el pipeline de la opción C. Solo se ejecuta con tu delegación
 (`manager.delegation` en `docs/process/pipeline.json`), se detiene antes de las secciones que
 reserves (`stopAt`), ante una barrera en rojo, y nunca construye sobre una sección que no terminó.
 Fuera del modo gestor, la skill nunca decide por ti. Dos niveles, como permisos más estrechos o más
-amplios: `decide` se detiene cuando algo se rompe y te espera; `unblock` también hace el triaje de una
+amplios: `decide` te deja lo que se rompe (una barrera en rojo detiene la ejecución; una sección que no termina te
+espera, con todo lo que depende de ella); `unblock` también hace el triaje de una
 barrera en rojo por script y la repara, con un verificador independiente antes de cualquier merge.
 Experimental.
 
@@ -241,9 +243,11 @@ el comportamiento nuevo en una sola ejecución:
 Entonces la skill guarda una línea base de costos a partir de las transcripciones del propio proyecto
 (`docs/process/cost-baseline.json`), revisa el roadmap con el linter, vuelve a ejecutar su seed — que
 mueve el `## Status` viejo y el handoff viejo, copias incluidas, a `docs/roadmap-history.md` — ofrece reemplazar las
-líneas puente antiguas en tu `CLAUDE.md` (solo si dices que sí) y pregunta cómo quieres construir.
-Nunca regenera el roadmap ni renombra una funcionalidad. Puedes pedirle a Claude Code ambos pasos en
-una frase: *"reinstall spec-driven-roadmap in this project, then upgrade this project"*. Cuando ya
+líneas puente antiguas en tu `CLAUDE.md` (solo si dices que sí), revisa `docs/process/pipeline.json`, te dice qué cambió
+por defecto desde tu versión y pregunta cómo quieres construir. Nunca regenera el roadmap ni renombra una funcionalidad.
+Abre una **sesión nueva de Claude Code** entre los dos pasos: una sesión que ya leyó la versión vieja conserva su texto,
+así que pedir ambos en una frase (*"reinstall spec-driven-roadmap in this project, then upgrade this project"*) ejecuta la
+ruta vieja. Cuando ya
 haya algunas funcionalidades construidas, pide otra vez *"measure my agent cost"*: la comparación con
 esa línea base es la única prueba de que la actualización ahorró algo.
 

@@ -69,8 +69,9 @@ upgrade: say so, and offer the normal first run (Phase 0).
    first.
 2. **Check `docs/process/pipeline.json` and tell the person what changed.** Skip it when the project has no
    `pipeline.json` (it never ran option C or manager mode). Otherwise:
-   - run `python3 <this-skill-dir>/scripts/plan-pipeline.py --root <project-root> --check-config`. It lists every
-     problem at once — a key this version does not read, a value it refuses — and what the file sets, and
+   - run `python3 <this-skill-dir>/scripts/plan-pipeline.py --root <project-root> --check-config`. It lists at once
+     what the planner would refuse in the file — a key this version does not read, a value it refuses, a main branch the
+     repository does not have — and what the file sets, and
      warns (without failing) about a script the config runs that is not in the project, with what that would do.
      Show each problem with the row of [upgrade-notes.md](upgrade-notes.md) that explains it (a warning has no
      row: explain it, and note when this upgrade is what turns an inert key into one that can stop a run), and fix a problem only with

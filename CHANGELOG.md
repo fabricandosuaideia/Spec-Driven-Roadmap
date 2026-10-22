@@ -9,6 +9,100 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.48.0 — 2026-10-22
+
+**A review of everything released today (3.46.0, 3.47.0) and of the code those releases lean on, asked for by the owner. Each defect was reproduced
+first — in a stub run of `check-pipeline.mjs`, a scratch repository or a selftest — and every prompt change was then run by blind agents, each in
+its own copy, 3.47.0's text against the new one.** Agent results are read from the git state of each copy, not from the agents' replies. An
+independent review of the draft then found nine defects the gates do not look at, and a second review of those fixes found seven more — one of them
+introduced by the first round of fixes — plus one older than this release. All but one are fixed below and tested the same way; that one is open.
+
+- **A verifier that said `pass` while listing an unmet criterion was merged.** `pass` and `notMet` are two fields of one reply and the pipeline read
+  only the first; it is now refused like a red gate, and the next builder gets the criterion. In the same loop: a `maxAttempts` naming one tier
+  (`{"A": 6}`) replaced the defaults instead of overriding them, so a B or C feature ran **no attempt at all** and was blocked; a tier A reviewer
+  that returned nothing, or a verifier that refused with nothing above `minor`, left the next builder an empty list of issues — each now says what
+  to do; and a branch left carrying a PASS report the tier A reviewer refused is said so in the account, with the attempt (its findings are claimed as the
+  issues listed only when that was the last attempt).
+- **The prover and the merger named "the branch" and tested `HEAD`.** The merger's prompt has no worktree block, so with one lane the tree is on
+  `main` after the previous merge, `--is-ancestor main HEAD` is trivially true, and the literal text gates `main`'s tree and then fast-forwards
+  `main` to a branch no gate ran on. The prover, the merger and a builder on an existing branch now name `feat/<name>`, abort a rebase or merge an
+  earlier agent left open, then check the branch out; with one lane every builder aborts one before anything else (the draft put its stash
+  first, and `git stash` refuses while a rebase is open): with a conflicted rebase of another branch open and an untracked file beside it,
+  **3 of 3** builders aborted, stashed, created their branch from `main` and replied `stashed=true`, the other branch untouched. With 3.47.0's text **1 of 2** Haiku mergers checked the branch out on its own and **1 stopped** with `ok=false` naming the
+  contradiction (neither took the literal path); with the new text **3 of 3** checked it out, and the gate recorded the branch tip as the
+  commit it ran on in all three. A second round, after a reword, put an abandoned conflicted rebase of **another** branch in the tree: **3 of 3**
+  provers aborted it, left that branch at its commit and proved the right one (no control arm: the clause did not exist).
+- **A conflict while bringing `main` in is undone and reported, never settled, by the prover and the merger.** 3.47.0 said nothing for them. With
+  that text **1 of 3** provers resolved the conflict by keeping the feature's value over the one `main` had (`LIMIT = 20` over `30`), committed a
+  receipt and replied `ready=true`, which would have reverted another feature's value on `main`; the other two aborted on their own. With the new
+  text **3 of 3** aborted and replied `ready=false` naming the file, and again **3 of 3** after a reword (three agents flagged "stop naming the
+  conflicting files" as ambiguous, and one read it as "do not name them"); **3 of 3** mergers on a conflicting fixture aborted, replied `ok=false`
+  and left `main` where it was.
+- **In manager mode the prover was handed the builder's rule for correcting an existing test.** It fixes nothing; it now gets one line: it edits no
+  test and no code. The prover also deletes a `gate-failure.md` note in its receipt commit once the gate passes (**0 of 2** did with the old text,
+  leaving a stale failure for the next builder to chase; **3 of 3** with the new), and its gate wait names the Bash tool's timeout, as the builder's
+  already did — at the default 120 seconds the wait is moved to the background.
+- **With one lane, a builder stashes what an earlier agent left in the shared tree, and commits before it replies.** On a fixture with another
+  feature's uncommitted edit and an untracked file: **0 of 2** stashed with the old text (both left the edit in the tree the gate would run on);
+  **3 of 3** with the new, none carrying it into the branch. What a builder stashed is now said in the account (`stashed: before <feature> — …`):
+  with one lane the first builder works in the owner's own tree, and stashed work nobody mentions reads as lost work. The stash leaves the
+  pipeline's own files in the tree even when they are uncommitted — `.claude`, `docs`, `.specs`: the draft's `git stash -u` took every untracked file,
+  and a project that installs its skills per project without committing them would have lost them for the rest of the run (the second review;
+  checked in a scratch repository). With the skills and `pipeline.json` uncommitted beside another agent's leftovers, **3 of 3** builders stashed
+  the leftovers alone and the skills stayed.
+- **The merger no longer reports a failure after `main` moved.** A failure deleting the branch or the worktree came back as `ok=false` and the
+  pipeline counted a merged feature as `merge-failed`; once step 3 has moved `main` it is a note with `ok=true`. A failed push (`push: true`) is one
+  too — the merge stays and the next push carries it — and the feature's line says `[push failed]` (the draft let it vanish). The triage merger now follows the
+  same rules: a failure after its fast-forward is a note, a conflicted rebase is undone, a failed push is marked on the triage line. With no remote, **3 of 3** mergers
+  moved `main`, replied `ok=true` with `pushed=false`, and the gate had run on the tip they merged.
+- **The tier A reviewer is given the builder's and the prover's notes**; it was told to spot-check them and never received them. Under
+  `gateOrder: verify-first` the prover comes after it, so it gets the builder's alone and is not told about the prover's.
+- **A scoped verification round covers the feature's own files.** Now that `main` can arrive by a merge, `git diff <report>..HEAD` included other
+  features' code; the round takes the files `git diff --name-only main...HEAD` lists, and adds what `main` gained since when it was brought in.
+  A report counts as an earlier round only if it was committed on this branch.
+- **Manager mode:** the child's feature lines are read anchored — a barrier or triage line such as `…: skipped rows` or `…: merged_totals` was
+  counted as a feature, so a test name could hold a section; a failed post-merge command now stops the manager instead of letting the next section
+  build on an environment out of step with the code; and a planner reply that dropped `statusPath`, `lanes`, `worktreeRoot` or `barrierGate` (the
+  recorder got `status-block.py undefined`), or that planned another project or roadmap, is refused and asked again; and what a child says about a
+  stash or a failed push is passed on to the owner's account. The planner prompt now says
+  stderr has two lines when a barrier is owed; **4 of 4** Haiku planners returned both lines and the exact plan with the old wording and with the
+  new, so that change is not shown to matter.
+- **`triage-probe.py` names the feature first.** It bisected commit by commit over `base..head`; after a branch took `main` by a merge, its commits
+  forked before `base` and the probe blamed a feature merged earlier. It now tests the main branch's state after each merge, names the feature of
+  the first that fails, and bisects inside it only when that stretch is one line of states — a merge of `main` into a feature qualifies, two
+  branches built side by side do not, and then the state is named with a note. The last state is tested, not assumed: in a second triage cycle the
+  first cycle's repair is merged after every feature, and a break it made names **no** feature (the draft pinned it on the last one; the triage
+  and repair prompts now say what that means). `--merged` must be given in merge order, and is refused otherwise instead of answered
+  wrong; a stretch with no path between its two commits says so; and a failing test the batch itself added — absent on the base — is classified,
+  where the probe used to stop with "fix its selector" (older than this release). The repair prompt finds the owner of a side-by-side stretch
+  through the failing test's files. Seven selftest cases on histories with merges; deleting each of the six rules in turn fails the selftest.
+- **`check-roadmap.py`'s case check is a warning again.** 3.47.0 failed while the slug could be renamed; in manager mode the decomposer must reach
+  `0 failed` and the check is project-wide, so one unbuilt `history` section blocked the decomposition of every other section. The owner's report had
+  asked for a warning.
+- **`plan-pipeline.py` refuses** a non-boolean `confirmed` or `push`, an empty `gate` or `model`, a `waitChunk` that is not a whole number and a
+  `featureStatus` value other than `done` or `build` — the planner and `--check-config` alike, so **a `pipeline.json` that ran under 3.47.0 can be
+  refused now** (each line names the key). One of them was live: `push: "no"` read as true in 3.47.0, and the merger **pushed**. `--check-config` also
+  checks that `mainBranch` exists, as the planner already did.
+- **Smaller:** the installers' hand-copy hint named one of the twelve required scripts; the pre-commit hook now also fires on `CHANGELOG.md`,
+  `CONTRIBUTING.md` and `benchmark/`, which the consistency check reads; the READMEs, guides and references describe manager mode's `decide` as it
+  behaves (a red barrier stops the run, an unfinished section waits with what depends on it), offer it in a single-section project, and quote
+  `decompose-phase.md`'s measured roadmap sizes; `SKILL.md` and `handover-prompt.md` said `unblock` repairs a feature that did not finish — it
+  repairs a red barrier and classifies a feature the gate cannot decide, and an unfinished one waits at both levels; option C is named as Claude Code only; a feature named `stashed` no longer
+  crashes the account; `benchmark/expected.md`'s manager-revoke key was brought up to the 3.40.0 and 3.43.1 rules
+  **without re-running that scenario**.
+- **Isolation, a fifth level.** A blind agent told to "start by running `cd`" ran its second command without it; a sub-agent's shell starts each
+  call in the launcher's working directory, and `git checkout -b feat/curation main` ran in this repository. One checkout, undone from the reflog
+  with the working tree intact. `benchmark/README.md`, `CLAUDE.md` and `run-benchmark.py setup` now say to start every command with `cd <copy> &&`,
+  and the second round did.
+
+`check-pipeline.mjs`: 241 passing checks at 3.47.0, 106 of them planted defects caught; 308 now, 141 of them; 0 failed. Blind agents: 49 runs (Haiku
+and Sonnet) in four rounds. **Seen, not changed:** 3 of the 18 agents that launched a gate (all Haiku) joined its launch line to the assignment before it with
+`&&`, which sends the assignment into the background and loses the gate's directory and PID; each found the directory by listing and read its exit file.
+**Not executed:** a real Workflow run with this text; the manager-revoke benchmark; the builder's second-attempt prompt; the triage and repair
+prompts' lines for a regression that names no feature. **Open:** in manager mode the verifier and the reviewer still receive the builder's
+REVOKED-TEST rule through the shared preamble; both are told elsewhere that they change nothing. A feature named `barrier` or `triage`
+still collides with the account's own lines.
+
 ## 3.47.0 — 2026-10-22
 
 **Four defects found by a long manager run on MakeContent (36 sections, ~250 features), each checked here before it was touched: a planner agent
@@ -25,8 +119,8 @@ below are from reading that project's journals and transcripts read-only, and fr
   journals end a section with the block message, and by the manager's code a block also skips the sections that depend on it. Now the manager checks that the object has
   `project, skillDir, downstream, downstreamDir, mainBranch, gate, effort, maxAttempts` and a non-empty `features` (or a `barrierPending`: `plan-pipeline.py` prints
   `features: []` when only a barrier is owed, and 4 of the 57 replies are exactly that — **the first version of this check refused them, which the independent review
-  of this release caught**, and it is now a scenario and a mutant), asks the planner again up to three
-  times saying what was missing and that `argsJson` must be the file's **content**, and a block names the missing keys. `plan-pipeline.py`'s own refusal
+  of this release caught**, and it is now a scenario and a mutant), runs the planner up to three
+  times in all, telling it the second and third time what was missing (this entry said "again up to three times" until 3.48.0; the code always meant three in all) and that `argsJson` must be the file's **content**, and a block names the missing keys. `plan-pipeline.py`'s own refusal
   (exit 1 or 2) is not asked again. The manager cannot read the file itself, only an agent can, so the report's first proposal (do not ask an LLM to
   copy) has no cheaper form here. Five scenarios and four mutants in `check-pipeline.mjs`, the harness stub now returns a complete plan.
   **Not executed:** a real planner on the retry text; it is the retry, not the wording, that the stubs prove.

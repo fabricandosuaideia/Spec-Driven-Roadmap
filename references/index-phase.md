@@ -67,8 +67,8 @@ waves is re-opened, whole, once per feature in all three.
   `docs/roadmap-<slug>.txt` (lowercase). **That holds only on a case-sensitive filesystem** (Linux, WSL), and two slugs
   break it elsewhere: `history` makes `docs/ROADMAP-history.md`, which Windows and macOS read as `docs/roadmap-history.md`,
   the log `status-block.py` appends to, and `index` makes `docs/ROADMAP-index.md`, which they read as the index. Do not
-  assign either; `check-roadmap.py` fails on it while the slug can still be renamed and warns once a feature is built under it. A slug is
-  frozen then (rule 6), which is why the choice is made here.
+  assign either; `check-roadmap.py` warns about it (a warning, not a failure: nothing is wrong on Linux, and a failure would block
+  manager mode's decomposer). A slug is frozen once a feature is built under it (rule 6), which is why the choice is made here.
 - **For a wave-shaped section**, prefer a thematic slug when the wave has a theme (`auth`, `bill`);
   fall back to a wave number (`w3`) only when it genuinely has none. The slug is permanent and shows
   up in every feature name in that section, and those names freeze once a `.specs/features/<name>/`

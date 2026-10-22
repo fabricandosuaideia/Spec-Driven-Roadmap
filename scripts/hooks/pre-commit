@@ -28,11 +28,11 @@ if ! command -v python3 >/dev/null 2>&1; then
     exit 0
 fi
 
-# Only the files the check actually reads. A commit touching nothing but the
-# benchmark fixture or the CHANGELOG has no invariant to break, and a hook that
-# fires on every commit regardless is a hook people learn to bypass.
+# Only the files the check actually reads — the CHANGELOG (an upgrade-notes row per release) and the benchmark's
+# answer key among them, which an earlier version of this hook skipped. A hook that fires on every commit
+# regardless is a hook people learn to bypass.
 if ! git diff --cached --name-only --diff-filter=ACMR \
-     | grep -qE '^(SKILL\.md|README.*\.md|CLAUDE\.md|references/|scripts/|guide/|install\.(sh|ps1)|\.claude-plugin/)'; then
+     | grep -qE '^(SKILL\.md|README.*\.md|CLAUDE\.md|CHANGELOG\.md|CONTRIBUTING\.md|references/|scripts/|guide/|benchmark/|install\.(sh|ps1)|\.claude-plugin/)'; then
     exit 0
 fi
 

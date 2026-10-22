@@ -288,15 +288,16 @@ open questions.
 
 **Option D, manager mode — experimental, and a different way of working.** A, B and C each build one roadmap and stop,
 because the seam between two sections is where a person re-plans. When nobody will be there — a
-build left running day and night — ask for *"manager mode"* in a multi-section project, in Claude
-Code. You write, once, what you delegate (`manager.delegation`) and which sections still need you
+build left running day and night — ask for *"manager mode"* in Claude
+Code (a single-section project is one section). You write, once, what you delegate (`manager.delegation`) and which sections still need you
 (`stopAt`). Then a Workflow — a script, not a conversation, so it cannot lose its mission to a
 long context — takes each remaining section in build order, decomposes it just before building it,
 answers the open questions itself (the conservative option, marked `Decided by the manager`), and
 builds it with option C's pipeline. It stops before a reserved section or on a red barrier, and skips
 anything that depends on a section that did not finish. Afterwards, the decisions are yours to review:
 each one is marked in the roadmaps and listed in the run's record. You also pick how far it may go
-without you: at `decide` it stops when something breaks; at `unblock` it triages a red barrier — a
+without you: at `decide` it leaves what breaks to you (a red barrier stops the run, and a section it cannot
+finish waits for you with what depends on it); at `unblock` it triages a red barrier — a
 script decides whether the merges broke the test or it was broken before — repairs it without
 loosening anything, and has the repair checked by an agent that did not write it.
 
@@ -357,7 +358,8 @@ eight-task budget, that every open question in a feature also appears in the rol
 way round*, that the coverage table closes with nothing uncovered, that the build-order `.txt` still
 matches the roadmap, and that no feature name collides with another roadmap or a directory under
 `.specs/`. It also flags the reverse: a feature you already built that no roadmap names any more,
-which is what a rename looks like after the fact.
+which is what a rename looks like after the fact; and it warns when two names in `docs/` differ only by case,
+which Windows and macOS read as one file.
 
 Two things worth knowing. **A failure is a question, not a verdict** — you own the roadmap, and the
 output is meant to be read before anything is changed. And it says when it *could not* judge
@@ -434,9 +436,9 @@ read their feature's slice through `feature-brief.py` — but every planning run
 reads the roadmap it works on, so one that grows wave after wave is carried through all of them. A
 finished section is never loaded whole again: progress is counted from its `.txt` and each feature's
 report, while pinpoint reads into its body — the `discharge:` test, the `## Open Questions` roll-up —
-still happen. Concretely: one feature costs the roadmap roughly 200-250 tokens, so the skill
-flags the size at around 2,000 — naming how many features are left before a split is needed — and
-re-raises the one-or-several question past roughly 3,000, about 12-15 features. Converting renames
+still happen. Concretely: a roadmap starts at roughly 900 tokens and each feature adds roughly 200-250, so the skill
+flags the size at around 2,000, about 5 features — naming how many are left before a split is needed — and
+re-raises the one-or-several question past roughly 3,000, about 9 features. Converting renames
 **files, not features**, so nothing already built is affected — with one caveat: the handoff pointer
 in `.specs/STATE.md` names files by path, so it goes stale and the skill re-runs its seed to repair
 it. If a feature is mid-build when you convert, that repair has to wait until it passes, and the

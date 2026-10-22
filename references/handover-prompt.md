@@ -35,7 +35,7 @@ template it goes into — a run that emits no loop never needs it.
 ## Step 8 — Ask which implementation prompt to hand over
 
 The roadmap is done and the user now has to actually build from it. There are two legitimate ways to
-drive that — three in Claude Code, and a fourth, experimental, in a multi-section project there — and **which one is the user's call — never pick for them, and never
+drive that — three in Claude Code, and a fourth there, experimental — and **which one is the user's call — never pick for them, and never
 default to the loop because it looks faster.** Ask, in the confirmed output language:
 
 - **Option A — one feature at a time.** They get the prompt for `<target>` only, run it, and come
@@ -80,10 +80,10 @@ default to the loop because it looks faster.** Ask, in the confirmed output lang
   **nobody asks them anything** — the manager answers every open question itself, taking the
   conservative option and marking each answer as its own for them to review afterwards, and it runs
   only on a delegation they write in their own words. Name its **two levels**, like narrower or wider
-  permissions for an agent: **decide** stops when something breaks (a red barrier, a feature the gate
-  cannot decide) and waits for them; **unblock** also triages and repairs those — by script where it
+  permissions for an agent: **decide** leaves what breaks to them (a red barrier stops the run; a feature the gate
+  cannot decide, or one that did not finish, holds its section and what depends on it until they answer); **unblock** also triages and repairs a red barrier and classifies a feature the gate cannot decide — by script where it
   classifies, with an independent checker before anything merges — at the price of more calls made
-  for them, test and code repairs included. At **both** levels a builder may also update an existing
+  for them, test and code repairs included; a feature that did not finish waits for them at both levels. At **both** levels a builder may also update an existing
   test whose assertion the feature's own spec changes: declared in a commit of its own whose first
   line is `REVOKED-TEST`, and checked by a verifier that did not write it — the user reviews those
   commits afterwards. Say that it is experimental: first run on a real project on 2026-09-29.
@@ -609,8 +609,8 @@ them for an unattended run:
      the roles `build`, `prove`, `verify`, `review`, `merge`, `record`, `triage` and `barrier` — `build`
      here where `"effort"` says `implement`; a role it does not name uses `"model"`. The repairer is a
      builder, the triage checker a verifier, the triage merger a merger. It covers the agents of one
-     section's pipeline only: manager mode's decomposer, planner and recorder take
-     `manager.decomposeModel` or `"model"`. The roles do not need the same care: `prove`, `merge`, `record` and `barrier` only
+     section's pipeline only: manager mode's decomposer and classifier take
+     `manager.decomposeModel` or `"model"`, its planner and final recorder `"model"`. The roles do not need the same care: `prove`, `merge`, `record` and `barrier` only
      run a command and report, while `build` and `verify` decide. Which split costs less without costing
      quality is not established (the one comparison there is, below, cannot separate the model) — say that,
      and offer `measure-agents.py` to compare. `plan-pipeline.py`
@@ -706,8 +706,8 @@ them for an unattended run:
 
    Only if the project's own rules mention such a step, also ask what the merged code needs **outside git**
    (`"postMerge"`): a command run once on the main branch after each fast-forward, such as a forward-only
-   database migration. The merge stays if it fails; the features after it are held, no barrier runs, and the
-   account says so. `plan-pipeline.py` refuses any key of `pipeline.json` that this version does not read, so a
+   database migration. The merge stays if it fails; the features after it are held, no barrier runs, the
+   account says so, and manager mode stops there instead of starting the next section. `plan-pipeline.py` refuses any key of `pipeline.json` that this version does not read, so a
    setting that exists only in a locally patched copy of the skill is named instead of silently ignored.
 
    Write their answers and `"confirmed": true` into the file. If `plan-pipeline.py` then refuses

@@ -18,14 +18,14 @@ Like running an agent with narrower or wider permissions, the owner picks how fa
 without them (`manager.autonomy` in `pipeline.json`):
 
 - **`decide` — level 1, the default.** It answers the open questions itself (marked as its own), and
-  in its builds it may update an existing test that asserts what the feature's spec changes. When something breaks — a red
-  batch barrier, a feature the downstream gate cannot decide, a chain blocked behind a failed feature
-  — it **stops** and waits for the owner.
+  in its builds it may update an existing test that asserts what the feature's spec changes. What breaks is left to the owner: a red
+  batch barrier **stops** the run; a feature the downstream gate cannot decide, or one that did not finish, holds its
+  section and everything that depends on it, which **wait** for the owner while independent sections still run.
 - **`unblock` — level 2, more permission.** Everything level 1 does, and it also **repairs what
   would stop it**:
   - **A red barrier is triaged, not just reported.** For each failing test `scripts/triage-probe.py`
     runs it on the main branch as it was before the merges being judged and as it is now: *regression*
-    (it names the merged feature that broke it, by bisection), *preexisting* (it failed before them
+    (it names the merged feature that broke it, by bisection — or none, when it broke after every merge), *preexisting* (it failed before them
     too — broken or flaky), or *not reproduced*. That classification is the script's, never an
     agent's view. A fresh repairer fixes each at the root — a regression in the feature's code, never
     in its test; a preexisting failure at its cause, never by raising a timeout, loosening an assertion,
@@ -116,7 +116,7 @@ section against the code as the previous ones left it.
    users, a vendor or paid-service choice, anything irreversible or outward-facing — and write their
    slugs into `manager.stopAt`. The manager stops before the first of them.
 4. **How much per run.** `manager.sectionsPerRun` (default 4): a Workflow run caps its agents at 1000,
-   and a section of ten tier-A features can use a hundred. The manager stops at the cap and says so;
+   and a section of ten tier-A features can use up to about two hundred (five attempts of four agents each). The manager stops at the cap and says so;
    launching again continues.
 5. **Speed.** The same five levers as option C, with the same prices — handover-prompt.md, Step 10,
    "Option C — the pipeline": `lanes` (measure first with `bench-gate.py --lanes 2`), the builder's
@@ -127,8 +127,8 @@ section against the code as the previous ones left it.
    (decompose-phase.md Step 3), so a section of small fixes pays the per-feature cycle fewer times.
 6. **The level.** `manager.autonomy`: `decide` (the default) or `unblock` — ask, with the price of each
    as "Two levels — how much permission the owner gives" above states it, and write the owner's answer; never raise it yourself.
-7. **Optionally, a stronger model for the decisions.** `manager.decomposeModel` sets the decomposer's
-   model on its own. Decomposition is where the manager decides; the builders follow what it wrote.
+7. **Optionally, a stronger model for the decisions.** `manager.decomposeModel` sets the model of the
+   decomposer and of the classifier; the planner and the final recorder take `model`. Decomposition is where the manager decides; the builders follow what it wrote.
 8. **A clean tree on the main branch**, and nothing else running in that folder: with one lane, the
    pipeline's builders switch branches in it.
 

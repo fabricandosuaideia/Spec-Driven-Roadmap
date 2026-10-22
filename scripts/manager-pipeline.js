@@ -72,12 +72,20 @@ Reply ok (true only when that commit exists) and decided (one line each: feature
 // sections after it. Eight parsed as objects that DESCRIBE the output ({"note":"stdout copied verbatim from /tmp/..."},
 // {"status":"ran on branch main, exit 0"}) and JSON.parse accepts those; four were not JSON. What the child pipeline needs
 // from the args is checked here, the planner is asked again with the reason, and a block names what was missing.
-const ARGS_NEEDED = ['project', 'skillDir', 'downstream', 'downstreamDir', 'mainBranch', 'gate', 'effort', 'maxAttempts', 'features']
+const ARGS_NEEDED = ['project', 'skillDir', 'downstream', 'downstreamDir', 'statusPath', 'mainBranch', 'gate', 'lanes', 'worktreeRoot', 'effort', 'maxAttempts', 'features']
 const PLAN_TRIES = 3
-const argsProblem = o => {
+// The review of 3.47.0 ran a reply that dropped keys the check did not name (the recorder got `status-block.py undefined`)
+// and one that carried another section's plan, which the child then built; both are refused here. `barrierGate` is always
+// printed, null when there is none, so its absence means a dropped key; `postMerge` is printed only when set and cannot be
+// told from a dropped one.
+const argsProblem = (o, s) => {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return 'it is not a JSON object'
   const lacks = ARGS_NEEDED.filter(k => o[k] === undefined || o[k] === null || o[k] === '')
+  if (!('barrierGate' in o)) lacks.push('barrierGate')
   if (lacks.length) return `it lacks ${lacks.join(', ')}`
+  if (o.project !== P) return `its project is ${o.project}, not ${P}`
+  const other = (Array.isArray(o.features) ? o.features : []).filter(f => !f || f.roadmap !== s.roadmap).map(f => f && f.name)
+  if (other.length) return `it plans features of another roadmap than ${s.roadmap}: ${other.join(', ')}`
   // plan-pipeline.py prints `features: []` with `barrierPending` when only a barrier is owed, and the child pipeline runs it
   return Array.isArray(o.features) && (o.features.length || o.barrierPending) ? '' : 'features is not a list with at least one feature'
 }
@@ -85,7 +93,7 @@ const argsProblem = o => {
 const PLAN = (s, why) => `You are the PLANNER of section \`${s.slug}\` in the project at ${P}.
 ${LAUNCHED}
 ROLE: on ${A.mainBranch}, run python3 ${SKILL}/scripts/plan-pipeline.py --root ${P} --roadmap ${s.roadmap} with its stdout to a temporary file and its stderr to another, and keep its exit code. Change nothing.
-Reply exitCode, line (the one line it printed to stderr, verbatim) and argsJson (the whole stdout, verbatim — it is JSON; empty when the exit code is not 0).${why ? `
+Reply exitCode, line (what it printed to stderr, verbatim: one line, or two when a barrier is owed) and argsJson (the whole stdout, verbatim — it is JSON; empty when the exit code is not 0).${why ? `
 A previous reply of yours was rejected because ${why}. argsJson must be the CONTENT of the stdout file itself — read it with cat and paste it whole — never a description of it, its path or a status.` : ''}`
 
 const FINAL = (lines, decisions) => `You are the FINAL agent of a manager run in the project at ${P}.
@@ -134,7 +142,7 @@ for (const s of SECTIONS) {
     if (!(p && p.exitCode === 0)) break  // plan-pipeline.py's own refusal is its answer, not a copy that went wrong
     let o = null
     try { o = JSON.parse(p.argsJson) } catch (e) { why = 'it is not valid JSON'; continue }
-    why = argsProblem(o)
+    why = argsProblem(o, s)
     if (!why) pargs = o
   }
   if (!pargs) {
@@ -151,8 +159,11 @@ for (const s of SECTIONS) {
   try { out = await workflow({ scriptPath: A.pipelineScript }, { ...pargs, managerMode: true, autonomy: AUTONOMY }) } catch (e) { out = null; lines.push(`${s.slug}: blocked — the pipeline did not run: ${e.message}`) }
   out = Array.isArray(out) ? out : []
   if (out.some(l => l.startsWith('barrier: '))) barrierOwed = false
-  const merged = out.filter(l => /: merged/.test(l)).length
-  const unfinished = out.filter(l => /: (blocked|skipped|held|merge-failed)/.test(l))
+  // A feature line is `<name>: <result>`, so the match is anchored: barrier and triage lines carry test names and failure
+  // text (`…: skipped rows`, `…: merged_totals`), and an unanchored one counted them as features (review of 3.47.0).
+  const merged = out.filter(l => /^[^\s:]+: merged\b/.test(l)).length
+  const unfinished = out.filter(l => /^[^\s:]+: (blocked|skipped|held|merge-failed)\b/.test(l))
+  const postMergeFailed = out.find(l => /^[^\s:]+: merged\b.*\[post-merge command failed\]/.test(l))
   // The last barrier line decides: at level unblock a red barrier can be repaired and run again
   // green, and a real run stopped on the first, red line after its triage had fixed the cause.
   const red = [...out].reverse().find(l => l.startsWith('barrier: '))
@@ -160,8 +171,13 @@ for (const s of SECTIONS) {
   const triaged = out.filter(l => l.startsWith('triage: '))
   if (out.length) lines.push(`${s.slug}: ${merged} merged${unfinished.length ? ', ' + unfinished.length + ' not finished (' + unfinished.map(l => l.split(':')[0]).join(', ') + ')' : ''}${stillRed ? ' — ' + stillRed : ''}`)
   for (const t of triaged) lines.push(`  ${s.slug} ${t}`)
+  // what a builder stashed and a push that failed are the owner's to know; the child says them, the manager passes them on
+  for (const l of out.filter(l => l.startsWith('stashed: ') || /^[^\s:]+: merged\b.*\[push failed\]/.test(l))) lines.push(`  ${s.slug} ${l}`)
   if (!out.length || unfinished.length) blockedSections.add(s.slug)
   if (stillRed) { stopped = `the barrier is red after ${s.slug}`; break }
+  // The child held what followed a failed post-merge command and ran no barrier; the next section would be built on an
+  // environment out of step with the code (handover-prompt.md Step 10 says nothing runs after it).
+  if (postMergeFailed) { stopped = `the post-merge command failed after ${postMergeFailed.split(':')[0]}, in ${s.slug}`; break }
 }
 
 phase('Final')

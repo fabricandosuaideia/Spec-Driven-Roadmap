@@ -744,6 +744,11 @@ def _frozen(root, name):
 
 
 def check_case_collisions(root):
+    """A WARNING, never a failure. The two names can only both exist on a case-sensitive filesystem, where nothing
+    is broken; the damage is on a Windows or macOS clone. 3.47.0 made it a failure while the slug could still be
+    renamed, and the independent review of 3.47.0 executed what that does in manager mode: the decomposer must
+    reach 0 failed, the check is project-wide, so one unbuilt `history` section blocked every other section's
+    decomposition. The owner's own report asked for a warning."""
     docs = os.path.join(root, "docs")
     rm = "(project)"
     names = sorted(os.listdir(docs)) if os.path.isdir(docs) else []
@@ -752,22 +757,20 @@ def check_case_collisions(root):
         groups.setdefault(n.lower(), []).append(n)
     clash = [g for g in groups.values() if len(g) > 1]
     clashed = {n for g in clash for n in g}
-    latent = [n for n in names if n.lower() in OWNED_NAMES and n != OWNED_NAMES[n.lower()][0] and n not in clashed]
-    # What can still be renamed fails; what is frozen with built features only warns, because the lint cannot be the
-    # thing that asks a decomposer to rename it, and the owner who stays on a case-sensitive filesystem loses nothing.
-    movable = [g for g in clash if not any(_frozen(root, n) for n in g)] + [[n] for n in latent if not _frozen(root, n)]
-    frozen = [g for g in clash if any(_frozen(root, n) for n in g)] + [[n] for n in latent if _frozen(root, n)]
-    why = ("on Windows and macOS these are one file: a clone there keeps only one of them, and the log is appended into the roadmap. "
-           "A slug is frozen once its features are built (rule 6), so a project that keeps it must stay on a case-sensitive "
-           "filesystem (Linux, WSL).")
-    lines = lambda gs: "\n".join("docs/" + "  and  docs/".join(g) + ("" if len(g) > 1 else
-                                  "  (differs only by case from docs/%s, %s)" % (OWNED_NAMES[g[0].lower()][0], OWNED_NAMES[g[0].lower()][1])) for g in gs)
-    if movable:
-        fail(rm, "no section file can be read as another file of docs/", lines(movable) + "\nRename the section's slug now, before its features are built; " + why)
-    else:
-        ok(rm, "no section file can be read as another file of docs/")
-    if frozen:
-        warn(rm, "a frozen section slug reads as another file of docs/", lines(frozen) + "\n" + why)
+    latent = [[n] for n in names if n.lower() in OWNED_NAMES and n != OWNED_NAMES[n.lower()][0] and n not in clashed]
+    found = clash + latent
+    if not found:
+        ok(rm, "no file of docs/ can be read as another one on Windows or macOS")
+        return
+    frozen = any(_frozen(root, n) for g in found for n in g)
+    warn(rm, "no file of docs/ can be read as another one on Windows or macOS",
+         "\n".join("docs/" + "  and  docs/".join(g) + ("" if len(g) > 1 else "  (differs only by case from docs/%s, %s)"
+                    % (OWNED_NAMES[g[0].lower()][0], OWNED_NAMES[g[0].lower()][1])) for g in found)
+         + "\nOn Windows and macOS these are one file: a clone there keeps only one of them, and the log is appended "
+           "into the roadmap. Nothing is wrong on Linux or WSL. "
+         + ("A feature is already built under that slug, which freezes it (rule 6): the project stays on a "
+            "case-sensitive filesystem." if frozen else
+            "Nothing is built under that slug yet: renaming the section now (index-phase.md Step 2) avoids it for good."))
 
 
 def selftest():
@@ -791,23 +794,26 @@ def selftest():
             del RESULTS[:]
             check_case_collisions(d)
             return {r[2]: r[0] for r in RESULTS}
-        MOV, FRZ = "no section file can be read as another file of docs/", "a frozen section slug reads as another file of docs/"
+        C = "no file of docs/ can be read as another one on Windows or macOS"
+        detail = lambda: next((r[3] for r in RESULTS if r[2] == C), "")
         got = run(["ROADMAP-INDEX.md", "ROADMAP-auth.md", "roadmap-auth.txt", "roadmap-history.md"])
-        expect("a normal tree passes", got == {MOV: "ok"})
+        expect("a normal tree passes", got == {C: "ok"})
         got = run(["ROADMAP-INDEX.md", "roadmap-history.md", "ROADMAP-history.md"])
-        expect("the log and a section slugged history, both present, with nothing built, FAIL", got.get(MOV) == "fail" and FRZ not in got)
+        expect("the log and a section slugged history, both present, WARN and never fail (a failure blocks manager mode)",
+               got == {C: "warn"} and "renaming the section now" in detail())
         got = run(["ROADMAP-INDEX.md", "roadmap-history.md", "ROADMAP-history.md"], built=["history-list"])
-        expect("the same with a feature built under that slug only WARNS: the slug can no longer be renamed", got.get(MOV) == "ok" and got.get(FRZ) == "warn")
+        expect("with a feature built under that slug it still only warns, and says the slug is frozen",
+               got == {C: "warn"} and "freezes it" in detail())
         got = run(["ROADMAP-INDEX.md", "ROADMAP-history.md"])
-        expect("a section slugged history before any log exists FAILS while it can still be renamed", got.get(MOV) == "fail")
-        got = run(["ROADMAP-INDEX.md", "ROADMAP-history.md"], built=["history-a"])
-        expect("and warns once its features are built", got.get(MOV) == "ok" and got.get(FRZ) == "warn")
+        expect("a section slugged history before any log exists warns", got == {C: "warn"} and "the log status-block.py appends to" in detail())
         got = run(["ROADMAP-INDEX.md", "ROADMAP-index.md"])
-        expect("a section slugged index next to the index fails", got.get(MOV) == "fail")
+        expect("a section slugged index next to the index warns", got == {C: "warn"})
         got = run(["ROADMAP-index.md"])
-        expect("a section slugged index with no index yet fails while it can be renamed", got.get(MOV) == "fail")
+        expect("a section slugged index with no index yet warns", got == {C: "warn"})
         got = run(["ROADMAP-INDEX.md", "ROADMAP-histories.md", "roadmap-history.md"], built=["histories-a"])
-        expect("a slug that only starts like history is fine, built or not", got == {MOV: "ok"})
+        expect("a slug that only starts like history is fine", got == {C: "ok"})
+        got = run(["Process.md", "process.md"])
+        expect("any two names that differ only by case warn", got == {C: "warn"})
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
         del RESULTS[:]

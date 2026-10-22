@@ -304,15 +304,16 @@ minutos de um comando roda desanexado e é esperado. Mesma precondição da B: z
 
 **Opção D, o modo gestor — experimental, e um outro jeito de trabalhar.** A, B e C constroem um roadmap cada
 e param, porque a costura entre duas seções é onde uma pessoa replaneja. Quando ninguém vai estar lá —
-um build deixado rodando dia e noite —, peça o *"manager mode"* num projeto multi-seção, no Claude
-Code. Você escreve, uma vez, o que delega (`manager.delegation`) e quais seções ainda precisam de você
+um build deixado rodando dia e noite —, peça o *"manager mode"* no Claude
+Code (um projeto de seção única é uma seção). Você escreve, uma vez, o que delega (`manager.delegation`) e quais seções ainda precisam de você
 (`stopAt`). Aí um Workflow — um script, não uma conversa, então não perde a missão num contexto
 comprido — pega cada seção que falta na ordem de construção, decompõe logo antes de construir,
 responde ele mesmo as perguntas abertas (a opção conservadora, marcada `Decided by the manager`) e
 constrói com a esteira da opção C. Ele para antes de uma seção reservada ou numa barreira vermelha, e
 pula o que depende de uma seção que não terminou. Depois, as decisões são suas para revisar: cada uma
 fica marcada nos roadmaps e listada no registro da execução. Você também escolhe até onde ele vai sem
-você: em `decide` ele para quando algo quebra; em `unblock` ele faz a triagem de uma barreira vermelha —
+você: em `decide` ele deixa com você o que quebra (uma barreira vermelha para a execução, e uma seção que ele
+não consegue terminar espera por você com o que depende dela); em `unblock` ele faz a triagem de uma barreira vermelha —
 um script decide se os merges quebraram o teste ou se ele já estava quebrado antes —, conserta sem
 afrouxar nada e manda o conserto ser conferido por um agente que não o escreveu.
 
@@ -379,7 +380,8 @@ nenhuma feature passa do orçamento de oito tasks, que toda pergunta aberta de u
 aparece no roll-up *e o contrário*, que a tabela de cobertura fecha sem nada descoberto, que o `.txt`
 de ordem de build ainda bate com o roadmap, e que nenhum nome de feature colide com outro roadmap ou
 com um diretório em `.specs/`. Ela também aponta o inverso: uma feature que você já construiu e que
-nenhum roadmap nomeia mais — que é a cara de um rename depois do fato.
+nenhum roadmap nomeia mais — que é a cara de um rename depois do fato; e avisa quando dois nomes em `docs/`
+só diferem por maiúsculas, o que Windows e macOS leem como um arquivo só.
 
 Duas coisas que valem saber. **Uma falha é uma pergunta, não um veredito** — o roadmap é seu, e a
 saída existe para ser lida antes de qualquer mudança. E ela diz quando *não conseguiu* julgar algo em
@@ -461,10 +463,10 @@ eles leem a fatia da própria feature pelo `feature-brief.py` —, mas toda exec
 seed ainda lê o roadmap em que trabalha, então um que cresce onda após onda é carregado por todos eles.
 Uma seção terminada nunca é carregada inteira de novo: o progresso é contado pelo `.txt` dela e pelo
 relatório de cada feature, enquanto leituras pontuais no corpo — o teste do `discharge:`, o roll-up de
-`## Open Questions` — continuam acontecendo. Em números: cada feature custa
-uns 200-250 tokens do roadmap, então a skill avisa por volta de 2.000 — dizendo quantas features
-ainda cabem antes de precisar dividir — e reabre a pergunta de um-ou-vários passando de uns 3.000,
-algo como 12-15 features. Converter renomeia **arquivos, não features**, então nada do que já foi
+`## Open Questions` — continuam acontecendo. Em números: um roadmap começa com uns
+900 tokens e cada feature soma uns 200-250, então a skill avisa por volta de 2.000, umas 5 features —
+dizendo quantas ainda cabem antes de precisar dividir — e reabre a pergunta de um-ou-vários passando de
+uns 3.000, algo como 9 features. Converter renomeia **arquivos, não features**, então nada do que já foi
 construído é afetado — com uma ressalva: o ponteiro de handoff em `.specs/STATE.md` nomeia arquivos
 por caminho, então ele fica obsoleto e a skill re-roda o seed dela para consertá-lo. Se uma feature
 estiver em construção na hora da conversão, esse conserto tem que esperar ela passar, e a skill te

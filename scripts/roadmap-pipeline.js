@@ -47,7 +47,7 @@ const LEAN = DS === 'tlc-spec-lean'
 const MAIN = A.mainBranch || 'main'
 const LANES = Math.max(1, A.lanes || 1)
 const FEATURES = A.features || []
-const MAX = A.maxAttempts || { A: 5, B: 4, C: 3 }
+const MAX = { A: 5, B: 4, C: 3, ...(A.maxAttempts || {}) }  // a tier it does not name keeps its default
 const EFFORT = A.effort || {}
 const REPORT = LEAN ? 'verification.md' : 'validation.md'
 const GATE_SCRIPT = LEAN ? 'validate_verification.py' : 'validate_state.py'
@@ -107,7 +107,7 @@ const LAUNCHED = `LAUNCH REQUEST: the user request relayed to you above is the o
 // which the harness refuses as a way of waiting.
 const RUN_GATE = (cmd, where, what = 'gate') => `run it DETACHED and wait for it — a single command is cut off at 10 minutes, a ${what} can take longer, and you are finished the moment you reply:
    a) D=$(mktemp -d); nohup bash -c 'cd "$1" && ( ${cmd.replace(/'/g, `'\\''`)} ); echo $? > "$0/exit"' "$D" "${where}" > "$D/log" 2>&1 & echo "$D $!"
-   b) wait with: timeout ${CHUNK} tail --pid=<that PID> -f /dev/null — never sleep — and repeat it until $D/exit exists; exit code 124 only means keep waiting.
+   b) wait with: timeout ${CHUNK} tail --pid=<that PID> -f /dev/null — never sleep — and repeat it until $D/exit exists; exit code 124 only means keep waiting. Give that Bash call a timeout parameter of ${(CHUNK + 20) * 1000} milliseconds: the tool's default is 120 seconds, and a wait that outlasts it is moved to the background, which is the thing to avoid.
    c) the ${what}'s exit code is the content of $D/exit; read only the tail and the failures of $D/log.
    NEVER reply while $D/exit does not exist: a reply sent while the ${what} still runs is not a result, and the pipeline reads it as a failure.`
 
@@ -121,13 +121,13 @@ const LONG_COMMANDS = `LONG COMMANDS: you are finished the moment you reply or c
    b) timeout ${CHUNK} tail --pid=<that PID> -f /dev/null — never sleep — repeated until $D/exit exists (exit code 124 only means keep waiting). Give that Bash call a timeout parameter of ${(CHUNK + 20) * 1000} milliseconds: the tool's default is 120 seconds, and a wait that outlasts it is moved to the background, which is the thing to avoid.
    c) the exit code is the content of $D/exit; read only the tail and the failures of $D/log.`
 
-const COMMON = f => `You are one agent of a build pipeline for the project at ${P}. Nobody is available to answer: decide, record the decision where ${DS} keeps assumptions, never ask.
+const COMMON = (f, prover = false) => `You are one agent of a build pipeline for the project at ${P}. Nobody is available to answer: decide, record the decision where ${DS} keeps assumptions, never ask.
 ${LAUNCHED}
 FEATURE: ${f.name}, risk tier ${tierOf(f)}. Its spec source is the output of: python3 ${SKILL}/scripts/feature-brief.py ${f.name} --root ${P} — the entry, the questions naming it, the contracts it consumes, the settled Cross-Cutting Decisions, and what tier ${tierOf(f)} sets for ${DS}. Never open a docs/ROADMAP*.md file whole.
 DOWNSTREAM SKILL: ${DS}, at ${DSDIR}. Read its SKILL.md and only the references your role needs.
 ${WORKTREE(f)}
 CONTEXT BUDGET: every turn re-reads your whole conversation. Read files with offset/limit, grep for a symbol instead of reading a directory, send long command output to a file and read back only the lines that matter, never paste a whole log or diff, never re-read a file that did not change.
-${MANAGED ? REVOKED_RULE : 'TESTS: never edit, weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green. A test that is genuinely wrong stays red, with the reason written down.'}`
+${prover ? 'TESTS: you edit no test and no code: a failure is reported, never fixed.' : MANAGED ? REVOKED_RULE : 'TESTS: never edit, weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green. A test that is genuinely wrong stays red, with the reason written down.'}`
 
 const REVOKED_RULE = `TESTS: never weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green.
 MANAGER MODE — one exception, because nobody is there to authorise it: an existing test is updated, not obeyed, when its assertion states a behaviour that this feature's spec changes — an acceptance criterion, an answered open question or a settled Cross-Cutting Decision states the new behaviour, and the old assertion contradicts it. The criterion or decision must come from the roadmap behind this feature (the entry, the answered questions and the Cross-Cutting Decisions that feature-brief.py prints), decided before you started — never from a spec, plan or check that you wrote on this branch. Update THAT assertion, and only it, to the behaviour the spec now states, at the same strength — as specific, no looser matcher, no removed check, no skip — in a commit of its own whose FIRST LINE is REVOKED-TEST <file>:<test name> (so that git log --grep=REVOKED-TEST finds it) and whose body quotes the criterion or decision and names where it is recorded. List each in your notes as well. A test red for any other reason is a defect in your change: fix the code, not the test, and if it truly cannot be fixed inside this feature's scope say exactly why in your notes. The independent verifier refuses every test change that is not such a correction.`
@@ -150,25 +150,31 @@ const ANGLES = [
 // it conflicts again on what those merges had settled — checked in a scratch repository: with the main branch an ANCESTOR of the
 // branch, rebase still stopped on the first replayed commit. A branch that contains the main branch needs nothing; one that has
 // merges of its own takes the main branch by a merge (the fast-forward into main still works); only a linear branch is rebased.
-const BRING_MAIN = `bring ${MAIN} into the branch: if \`git merge-base --is-ancestor ${MAIN} HEAD\` succeeds there is nothing to do and you do NOT rebase (a rebase would replay the branch's own commits and conflict again on what its merges already settled); otherwise, if \`git rev-list --merges ${MAIN}..HEAD\` prints anything, run \`git merge ${MAIN}\` (a rebase would drop those merges); otherwise run \`git rebase ${MAIN}\``
+// review of 3.47.0: the merger's prompt has no WORKTREE block, and "the branch" left it to whatever was checked out; a
+// prover that stopped inside a conflicted rebase left a detached HEAD on which `--is-ancestor main HEAD` said yes.
+const BRING_MAIN = f => `bring ${MAIN} into feat/${f.name}: first, if a rebase or merge is in progress in that tree, an earlier agent stopped inside it: run \`git rebase --abort\` or \`git merge --abort\`; then, if feat/${f.name} is not the branch checked out there, check it out; then, if \`git merge-base --is-ancestor ${MAIN} feat/${f.name}\` succeeds there is nothing to do and you do NOT rebase (a rebase would replay the branch's own commits and conflict again on what its merges already settled); otherwise, if \`git rev-list --merges ${MAIN}..feat/${f.name}\` prints anything, run \`git merge ${MAIN}\` (a rebase would drop those merges); otherwise run \`git rebase ${MAIN}\``
+// review of 3.48.0's draft: `git stash -u` took every untracked file, and a project that installed its skills per project without committing
+// them, or had not committed pipeline.json or the roadmap yet, lost them for the rest of the run.
+const OWN_FILES_OUT = "-- . ':(exclude).claude' ':(exclude)docs' ':(exclude).specs'"
+const NO_HALF_DONE = reply => `If that stops on a conflict, run \`git rebase --abort\` or \`git merge --abort\` so the branch is as it was, then stop and reply ${reply}=false, naming the conflicting files: resolving a conflict is the builder's work.`
 const TEST_CONFLICT = `In a test file never settle a conflict by the side that makes a test pass: keep ${MAIN}'s version of every line of an existing test, and this feature's own new tests; if the conflict is in an existing test that this feature changed and ${MAIN} also changed, run \`git rebase --abort\` or \`git merge --abort\` so the branch stays as you found it, and stop with ready=false naming the test.`
 
 const IMPLEMENT = (f, attempt, feedback) => `${COMMON(f)}
 
 ROLE: BUILDER, attempt ${attempt} of ${MAX[tierOf(f)]}. ${ANGLES[Math.min(attempt, ANGLES.length) - 1]}
-${attempt > 1 ? `First ${BRING_MAIN}, and resolve any conflict yourself, keeping what both sides intended. ${TEST_CONFLICT} Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}${attempt === 1 ? `If feat/${f.name} already exists, an earlier run built on it: first ${BRING_MAIN}, and resolve any conflict yourself, keeping what both sides intended — the prover brings ${MAIN} in again and fixes nothing, so a conflict left for it costs a whole attempt. ${TEST_CONFLICT}\nIf feat/${f.name} already exists and a refused ${REPORT} (or a gate-failure.md note) is committed in .specs/features/${f.name}/, an earlier run refused this feature: read that report or note first and resolve every gap it lists before anything else, as an attempt after a refusal does.\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
+${LANES > 1 ? '' : `Before anything else, in this shared tree: if a rebase or merge is in progress, abort it (git rebase --abort or git merge --abort) — nothing else works while one is; then, if git status --porcelain ${OWN_FILES_OUT} prints anything, an earlier agent left it here: run git stash push -u -m "left before feat/${f.name}" ${OWN_FILES_OUT}, say so in your notes and reply stashed=true — never carry it into this branch. (That pathspec leaves the pipeline's own files in the tree even when uncommitted: the installed skills under .claude, the roadmap and pipeline.json under docs, the specs under .specs.)\n`}${attempt > 1 ? `First ${BRING_MAIN(f)}, and resolve any conflict yourself, keeping what both sides intended. ${TEST_CONFLICT} Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}${attempt === 1 ? `If feat/${f.name} already exists, an earlier run built on it: first ${BRING_MAIN(f)}, and resolve any conflict yourself, keeping what both sides intended — the prover brings ${MAIN} in again and fixes nothing, so a conflict left for it costs a whole attempt. ${TEST_CONFLICT}\nIf feat/${f.name} already exists and a refused ${REPORT} (or a gate-failure.md note) is committed in .specs/features/${f.name}/, an earlier run refused this feature: read that report or note first and resolve every gap it lists before anything else, as an attempt after a refusal does.\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
 While you work, run only the tests related to what you touched${A.testHint ? ` (${A.testHint})` : ''}. Do NOT run the full gate and do NOT write ${REPORT}: a fresh prover and an independent verifier come after you.
 ${LONG_COMMANDS}
 ${A.checklist ? `Before you finish, check your diff against every item of ${A.checklist} (the problems reviewers kept finding in this project) and fix what fails.\n` : ''}DEFERRED SCOPE: an issue that is the declared scope of a LATER feature in the build order is not yours: name that feature in your notes and move on.
-Reply ready=true once every change is committed, even though the full gate has not run; otherwise ready=false with blockers.`
+Reply ready=true once every change is committed, even though the full gate has not run; otherwise ready=false with blockers — and commit what you keep before either reply: an uncommitted change is left for the next agent to trip on.`
 
-const PROVE = f => `${COMMON(f)}
+const PROVE = f => `${COMMON(f, true)}
 
 ROLE: PROVER, on a fresh context. A builder already committed this feature on feat/${f.name}${VERIFY_FIRST ? ' and an independent verifier has passed it' : ''}; you did not write it. Do not re-implement and do not widen scope${VERIFY_FIRST ? ', and do not verify again: you are the last step before the merge' : ''}.
-1. In the feature's working tree, ${BRING_MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
+1. In the feature's working tree, ${BRING_MAIN(f)}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}. ${NO_HALF_DONE('ready')}
 2. Run the GATE once on this exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
    A failure is a defect, never "environmental": reply ready=false naming the failing test or file, and fix nothing.${VERIFY_FIRST ? ` Because a verifier already passed this feature, first leave a note for the next builder: write .specs/features/${f.name}/gate-failure.md (the failing tests and the command, at most 10 lines) and commit only that file.` : ''}
-3. Write .specs/features/${f.name}/gate-receipt.json as {"codeHash":"<output of: ${HASH}>","base":"<output of: git merge-base ${MAIN} HEAD>","gate":"pass","command":<the gate command>} and commit it. (The base is the commit of ${MAIN} your tree is built on: if ${MAIN} moved while the gate ran, it is the older one, which is what makes the receipt honest.)
+3. Write .specs/features/${f.name}/gate-receipt.json as {"codeHash":"<output of: ${HASH}>","base":"<output of: git merge-base ${MAIN} HEAD>","gate":"pass","command":<the gate command>} and commit it; if .specs/features/${f.name}/gate-failure.md exists, delete it in that commit (the gate it described now passes). (The base is the commit of ${MAIN} your tree is built on: if ${MAIN} moved while the gate ran, it is the older one, which is what makes the receipt honest.)
 Reply ready=true only when ${MAIN} is in the branch without a conflict, the gate finished and passed, and the receipt is committed.`
 
 const VERIFY_RECEIPT = f => `GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, report that as a minor issue and run the gate yourself (${A.gate}) — ${RUN_GATE(A.gate, wt(f))}`
@@ -190,12 +196,12 @@ const SENSOR_POLICY = f => {
   if (VP.survivor) parts.push(`a surviving mutant is a ${VP.survivor} issue${VP.survivor === 'minor' ? ': list it in the report, it does not refuse the feature' : ''}`)
   return parts.length ? `SENSOR POLICY (this project's, over ${DS}'s own default): ${parts.join('; ')}.\n` : ''
 }
-const SCOPE = f => `its report is the committed ${REPORT} in .specs/features/${f.name}/ (its commit: the sha above); read it first. The round is SCOPED to (1) every row of that report whose result is not PASS or MET and (2) what changed since that commit (git diff <that sha>..HEAD over the files outside .specs and docs — scope by the diff, not by the fix's intent: a fix to a shared helper, fixture or config reaches further than its description). If the branch was rebased since (the base the report's Diff range names is no longer git merge-base ${MAIN} HEAD), what main gained in that rebase is new code too: add git diff <that base>..$(git merge-base ${MAIN} HEAD) over the files this feature touches. Every other row carries forward and says so ("carried from <that sha>"). The proofs re-run in full at HEAD. Fault injection is scoped the same way: a previous mutant that was killed, on code and proofs this diff did not touch, carries forward; re-inject the ones that survived and every one on a surface the diff touched or created, and add new mutants only on such a surface — the code it changed, and the code that a test or assertion it added or changed exercises (a new assertion has never been made to fail once, and a fix that only adds a test changes no code). Never new mutants on code and tests that did not change. Scope limits what you re-run, never what you may refuse: a defect you notice outside it — a criterion not met, a security or correctness flaw — keeps its true severity; only a weakness that lies OUTSIDE the scope and is not a defect (a test that could assert more, a mutant that survives there) is a minor issue: list it, it does not refuse the feature. Inside the scope, and in a first verification, nothing is demoted.${LEAN ? ' Write the Round line as verify.md prescribes (Round: N - scoped).' : ''}`
+const SCOPE = f => `its report is the committed ${REPORT} in .specs/features/${f.name}/ (its commit: the sha above); read it first. The round is SCOPED to (1) every row of that report whose result is not PASS or MET and (2) what changed since that commit in this feature's own files (git diff <that sha>..HEAD over the files that git diff --name-only ${MAIN}...HEAD lists, outside .specs and docs: what ${MAIN} brought in through a merge is not this feature's change — scope by the diff, not by the fix's intent: a fix to a shared helper, fixture or config reaches further than its description). If ${MAIN} was brought in since, by a rebase or a merge (the base the report's Diff range names is no longer git merge-base ${MAIN} HEAD), what main gained since is new code too: add git diff <that base>..$(git merge-base ${MAIN} HEAD) over the files this feature touches. Every other row carries forward and says so ("carried from <that sha>"). The proofs re-run in full at HEAD. Fault injection is scoped the same way: a previous mutant that was killed, on code and proofs this diff did not touch, carries forward; re-inject the ones that survived and every one on a surface the diff touched or created, and add new mutants only on such a surface — the code it changed, and the code that a test or assertion it added or changed exercises (a new assertion has never been made to fail once, and a fix that only adds a test changes no code). Never new mutants on code and tests that did not change. Scope limits what you re-run, never what you may refuse: a defect you notice outside it — a criterion not met, a security or correctness flaw — keeps its true severity; only a weakness that lies OUTSIDE the scope and is not a defect (a test that could assert more, a mutant that survives there) is a minor issue: list it, it does not refuse the feature. Inside the scope, and in a first verification, nothing is demoted.${LEAN ? ' Write the Round line as verify.md prescribes (Round: N - scoped).' : ''}`
 // `rounds: 'full'` turns the scoping off: a scoped round trusts the earlier round's verdict on the rows it carries
 // forward, so a first round that was loose leaves its loose PASS rows standing. That is the price, and the user's.
 // Whether a round is a later one depends on a report existing, never on the attempt counter: attempt 2 after a builder
 // that did not finish, or after a prover that failed first, is the first time a verifier sees the feature.
-const ROUND = (f, attempt) => VP.rounds === 'full' ? '' : `ROUND ${attempt}. Step 1: run git log -1 --format=%H -- .specs/features/${f.name}/${REPORT} . If it prints NOTHING, this is a FIRST verification: ignore the rest of this paragraph and verify everything by ${DS}'s own rules — a clause of a criterion that no test exercises is not proven, and a surviving mutant is a finding, exactly as those rules say. If it prints a sha, this is a LATER ROUND, that sha is the report's commit, and the rest of this paragraph applies — ${SCOPE(f)}\n`
+const ROUND = (f, attempt) => VP.rounds === 'full' ? '' : `ROUND ${attempt}. Step 1: run git log -1 --format=%H ${MAIN}..HEAD -- .specs/features/${f.name}/${REPORT} (only this branch's commits: a report already on ${MAIN} belongs to a run the gate did not accept). If it prints NOTHING, this is a FIRST verification: ignore the rest of this paragraph and verify everything by ${DS}'s own rules — a clause of a criterion that no test exercises is not proven, and a surviving mutant is a finding, exactly as those rules say. If it prints a sha, this is a LATER ROUND, that sha is the report's commit, and the rest of this paragraph applies — ${SCOPE(f)}\n`
 
 const VERIFY = (f, attempt) => `${COMMON(f)}
 
@@ -207,11 +213,11 @@ Reply with gateExit, pass (true only if gateExit is 0, every ${LEAN ? 'check' : 
 
 const REVOKED_CHECK = f => `REVOKED TESTS (manager mode): list every change on this branch to a test that already existed on ${MAIN} (git diff ${MAIN}...feat/${f.name}, over the project's test files: test sources, fixtures, conftest, test configuration and the gate script). Each must be a REVOKED-TEST the builder declared, in a commit of its own whose first line is REVOKED-TEST <file>:<test name> (git log ${MAIN}..feat/${f.name} --grep=REVOKED-TEST finds them) and whose body quotes an acceptance criterion, an answered question or a settled Cross-Cutting Decision. Read it where the commit says it is, and confirm (1) that it states a behaviour the OLD assertion contradicts, (2) that the new assertion states that behaviour at the same strength, and (3) that it was decided BEFORE this branch: run git log ${MAIN}..feat/${f.name} -- <the file it is recorded in>, and if the branch itself added or edited that text, or it appears only in a spec, plan or check the builder wrote on this branch with nothing in the roadmap behind it (python3 ${SKILL}/scripts/feature-brief.py ${f.name} --root ${P}), it is not a decision. Every change that fails any of this — an undeclared edit, no such criterion or decision, one the old assertion does not contradict, one the branch wrote itself, a weaker assertion, a skip or an expected-failure mark, a deletion — is a blocker issue at that file:line. A criterion that was written only to explain the edit, and states nothing the product needed, is the same blocker.`
 
-const REVIEW = f => `${COMMON(f)}
+const REVIEW = (f, notes) => `${COMMON(f)}
 
 ROLE: CODE REVIEWER, independent of the builder and the verifier. Review git diff ${MAIN}...feat/${f.name}; read a changed file in full only where the diff is not enough. You edit and commit nothing, and you do not run the full suite.
 Look for: correctness and unhandled edge cases; non-atomic read-then-write on shared state; state written before validation; security (injection, missing authorisation, secrets in logs or persisted text); swallowed errors; missing timeouts; unbounded queries or per-row query loops; a duplicate of a helper that already exists; weak or tautological tests; comments that claim more than the code does.${A.checklist ? ` Also every item of ${A.checklist}.` : ''}
-The builder's and the prover's notes are claims: spot-check the few most likely to be wrong instead of re-deriving everything.
+The builder's${VERIFY_FIRST ? '' : " and the prover's"} notes are claims: spot-check the few most likely to be wrong instead of re-deriving everything.${notes ? ` THE NOTES: ${JSON.stringify(notes)}` : ''}
 Report each issue with severity blocker | major | minor, where (file:line), problem and fix.`
 
 const MERGE_RECEIPT = f => `The gate receipt may stand in for the gate below. Run these checks in ${wt(f)}. Read .specs/features/${f.name}/gate-receipt.json: it proves this exact tree only if ALL of these hold — its gate is "pass"; its command is the same command as the gate named in this step, not a lighter one; it has a base, and the base equals the output of git -C ${wt(f)} rev-parse ${MAIN} (the prover recorded the commit of ${MAIN} its tree was built on, so a match means ${MAIN} has not moved since); git -C ${wt(f)} status --porcelain prints nothing; and its codeHash equals the hash this command prints: git -C ${wt(f)} diff ${MAIN}...HEAD -- . ':!.specs' ':!docs' | sha256sum | cut -d' ' -f1 . If they all hold, do NOT run the gate: write "gate skipped: receipt" in notes. If any one of them fails, or the file is missing or has no base, the receipt proves nothing: `
@@ -223,14 +229,14 @@ const POST_MERGE = A.postMerge ? `3b. Then, once, on ${MAIN} in ${P}, run the pr
    If it fails, the merge STAYS: never undo the fast-forward; reply ok=true with postMerge=false and the tail of its output in notes.
 ` : ''
 
-const MERGE = f => `You are the MERGER for feature ${f.name} in the project at ${P}. Verification passed. Nothing reaches ${MAIN} without the gate below${BY_RECEIPT ? ', or a receipt that proves this exact tree' : ''}. Stop with ok=false at the first failure and change nothing further.
+const MERGE = f => `You are the MERGER for feature ${f.name} in the project at ${P}. Verification passed. Nothing reaches ${MAIN} without the gate below${BY_RECEIPT ? ', or a receipt that proves this exact tree' : ''}. Stop with ok=false at the first failure and change nothing further — until step 3 has moved ${MAIN}: from then on the merge has happened, and a failure after it (${A.push ? 'the push, ' : ''}${LANES > 1 ? 'removing the worktree, ' : ''}deleting the branch) is reported in notes with ok=true, never as ok=false.
 ${LAUNCHED}
 0. Note the commit ${MAIN} points at now (git -C ${P} rev-parse ${MAIN}): that is \`before\`.
-1. In ${wt(f)}: ${BRING_MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
+1. In ${wt(f)}: ${BRING_MAIN(f)}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}. ${NO_HALF_DONE('ok')}
 2. ${BY_RECEIPT ? MERGE_RECEIPT(f) : ''}Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
 3. Fast-forward ${MAIN} to feat/${f.name}${LANES > 1 ? ` (git -C ${P} checkout ${MAIN} && git -C ${P} merge --ff-only feat/${f.name})` : ` (git checkout ${MAIN} && git merge --ff-only feat/${f.name})`}.${A.push ? ` Then git push origin ${MAIN}.` : ' Do not push: pushing is the owner\'s call.'}
 ${POST_MERGE}4. ${LANES > 1 ? `git -C ${P} worktree remove ${wt(f)}; ` : ''}git branch -d feat/${f.name}.
-Reply with ok, before, the new ${MAIN} commit and notes${A.postMerge ? ', and postMerge (true only if the post-merge command exited 0)' : ''}.`
+Reply with ok, before, the new ${MAIN} commit and notes${A.postMerge ? ', and postMerge (true only if the post-merge command exited 0)' : ''}${A.push ? ', and pushed (true only if the push succeeded)' : ''}.`
 
 // ---- triage (level unblock only): classify by script, repair without loosening, check, merge ----
 const TRIAGE = (merged, failures, base, specs, cycle) => `You are the TRIAGE of a build pipeline for the project at ${P}, manager mode at level unblock, cycle ${cycle}. The batch barrier (${A.barrierGate}) failed after these features merged into ${MAIN}: ${merged.join(', ')}. You change nothing.
@@ -238,14 +244,14 @@ ${LAUNCHED}
 THE FAILURES the barrier reported: ${JSON.stringify(failures || [])}
 For each failing test, write ONE command that runs just that test from the project root and exits non-zero when it fails. Select the test by its NAME or id, never a file:line — a line moves the moment anyone adds one above it, and the command then runs no test: a pytest node id (path.py::test_name), npx playwright test <file> --grep "<exact title>" (-g), -t "<exact name>" for jest and vitest, or the runner's own name filter; the filters are regular expressions, so escape the title's special characters and anchor it. Then run:
 python3 ${SKILL}/scripts/triage-probe.py --root ${P} --base ${base} --test "<that command>" --runs 3${A.setup ? ` --setup "${A.setup}"` : ''} ${specs.map(x => '--merged ' + x).join(' ')}
-It checks out ${MAIN} as it was before these merges and as it is now into temporary worktrees, runs the test in both, and prints its kind: regression (with the commit and the merged feature that introduced it), preexisting (it fails before the merges too), or not-reproduced. Its classification is the answer: copy it, never override it. If a failure is not a test (the barrier could not start, a service did not come up), report it as not-reproduced with what you saw.
+It checks out ${MAIN} as it was before these merges and as it is now into temporary worktrees, runs the test in both, and prints its kind: regression (with the commit, and the merged feature that introduced it when it names one — it names none when the test broke after every merge, as a first cycle's repair can), preexisting (it fails before the merges too), or not-reproduced. Its classification is the answer: copy it, never override it. If a failure is not a test (the barrier could not start, a service did not come up), report it as not-reproduced with what you saw.
 Reply with items: one per failing test, with test, command, kind, feature (for a regression) and evidence (the probe's JSON).`
 
 const REPAIR = (items, cycle) => `You are the REPAIRER of a triaged barrier failure in the project at ${P}, manager mode at level unblock. Nobody is available: decide, never ask.
 ${LAUNCHED}
 Work on a new branch triage/${cycle} created from ${MAIN} in ${P}. The items, classified by a script you do not second-guess:
 ${JSON.stringify(items, null, 1)}
-- A REGRESSION: the named merged feature broke that test. (If the feature is \`earlier-run\`, the break is in merges of an earlier run, not a feature name: find the owner with git log -1 <the commit in the evidence> and its feature-brief.py.) Fix the feature's code so the test passes and that feature's own acceptance criteria still hold (python3 ${SKILL}/scripts/feature-brief.py <feature> --root ${P}). Do not edit the test — the one exception is an owner decision recorded in the roadmap that revokes exactly its assertion, and then only as TESTS below allows.
+- A REGRESSION: the named merged feature broke that test. (If the feature is \`earlier-run\`, the break is in merges of an earlier run, not a feature name: find the owner with git log -1 <the commit in the evidence> and its feature-brief.py — unless the evidence's note says no commit inside is named: that commit is then only the last state, and the owner is found with git log <its base>..<that commit> -- <the files the failing test exercises>. If no feature is named, it broke after every merged feature — in a second cycle, by the first cycle's repair: that commit is what you fix.) Fix the feature's code so the test passes and that feature's own acceptance criteria still hold (python3 ${SKILL}/scripts/feature-brief.py <feature> --root ${P}). Do not edit the test — the one exception is an owner decision recorded in the roadmap that revokes exactly its assertion, and then only as TESTS below allows.
 - PREEXISTING: the test failed before these merges too — broken, or flaky. Find the cause and fix it at the root: in the test when the test is wrong about timing, ordering or shared state (an unordered result compared as ordered, a wait on the wrong event, state leaking between tests), in the code when the code is wrong. Never raise a timeout, never loosen, narrow or delete an assertion, never skip it or mark it expected to fail, never add a retry.
 Identify a test by its name, never a file:line, when you write a command or a note about it: a line moves when you add one above it. Your fix keeps the test's name, so a command that selects by name still finds the test.
 Prove each fix: run its test 10 times in a row with no retries; all 10 must pass. Commit each fix on its own, message "TRIAGE <kind> <test>: <cause>".
@@ -260,14 +266,14 @@ Refuse (ok=false) any change that raises a timeout, loosens, narrows or deletes 
 A command that selects by file:line can select nothing once the repair added or removed a line above the test; "No tests found", "no tests ran" or 0 collected is then a defective command, never evidence of a wrong repair. Derive the command from its NAME (a pytest node id, --grep or -g for Playwright, -t for jest and vitest), confirm with the runner's list or collect-only mode (--list, --collect-only, --listTests) that it selects exactly that test, and use that command for the 10 runs; each run's output must show that one test passing. The test must still exist under the same name in the diff: a rename or a move counts as a deletion, and is refused. If no command can be made to select exactly that test, reply ok=false with a major issue naming the missing selector — never ok=true on runs that ran nothing. Only a test that ran and failed counts against the repair.
 Reply ok and issues (each: severity, where, problem, fix).`
 
-const TRIAGE_MERGE = cycle => `You are the MERGER of a triage repair in the project at ${P}. Its checker passed. Nothing reaches ${MAIN} without the gate below. Stop with ok=false at the first failure and change nothing further.
+const TRIAGE_MERGE = cycle => `You are the MERGER of a triage repair in the project at ${P}. Its checker passed. Nothing reaches ${MAIN} without the gate below. Stop with ok=false at the first failure and change nothing further — until step 3 has moved ${MAIN}: from then on the repair is merged, and a failure after it (${A.push ? 'the push, ' : ''}deleting the branch) is reported in notes with ok=true, never as ok=false.
 ${LAUNCHED}
 0. Note the commit ${MAIN} points at now: that is \`before\`.
-1. In ${P}: rebase triage/${cycle} onto ${MAIN}.
+1. In ${P}: rebase triage/${cycle} onto ${MAIN}. If that stops on a conflict, run \`git rebase --abort\` and reply ok=false naming the conflicting files.
 2. Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, P)}
 3. Fast-forward ${MAIN} to triage/${cycle} (git checkout ${MAIN} && git merge --ff-only triage/${cycle}).${A.push ? ` Then git push origin ${MAIN}.` : ' Do not push.'}
 4. git branch -d triage/${cycle}.
-Reply with ok, before, the new ${MAIN} commit and notes.`
+Reply with ok, before, the new ${MAIN} commit and notes${A.push ? ', and pushed (true only if the push succeeded)' : ''}.`
 
 const EARLIER = 'earlier-run'
 const sinceText = merged => merged.map(n => n === EARLIER ? `an earlier run's merges (${A.barrierPending.base.slice(0, 9)}..${A.barrierPending.head.slice(0, 9)}), which no green barrier ever proved` : n).join(', ')
@@ -289,11 +295,11 @@ then delete the file, and commit exactly ${A.statusPath} and docs/roadmap-histor
 ${JSON.stringify(outcomes, null, 1)}`
 
 const ISSUES = { type: 'array', items: { type: 'object', properties: { severity: { type: 'string', enum: ['blocker', 'major', 'minor'] }, where: { type: 'string' }, problem: { type: 'string' }, fix: { type: 'string' } }, required: ['severity', 'where', 'problem', 'fix'] } }
-const BUILD_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' }, summary: { type: 'string' }, blockers: { type: 'array', items: { type: 'string' } } }, required: ['ready', 'summary', 'blockers'] }
+const BUILD_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' }, summary: { type: 'string' }, blockers: { type: 'array', items: { type: 'string' } }, stashed: { type: 'boolean' } }, required: ['ready', 'summary', 'blockers'] }
 const PROVE_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' }, notes: { type: 'string' }, blockers: { type: 'array', items: { type: 'string' } } }, required: ['ready', 'notes', 'blockers'] }
 const VERIFY_SCHEMA = { type: 'object', properties: { gateExit: { type: 'number' }, pass: { type: 'boolean' }, notMet: { type: 'array', items: { type: 'string' } }, issues: ISSUES }, required: ['gateExit', 'pass', 'notMet', 'issues'] }
 const REVIEW_SCHEMA = { type: 'object', properties: { issues: ISSUES }, required: ['issues'] }
-const MERGE_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, before: { type: 'string' }, commit: { type: 'string' }, notes: { type: 'string' }, postMerge: { type: 'boolean' } }, required: ['ok', 'before', 'commit', 'notes'] }
+const MERGE_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, before: { type: 'string' }, commit: { type: 'string' }, notes: { type: 'string' }, postMerge: { type: 'boolean' }, pushed: { type: 'boolean' } }, required: ['ok', 'before', 'commit', 'notes'] }
 const TRIAGE_SCHEMA = { type: 'object', properties: { items: { type: 'array', items: { type: 'object', properties: { test: { type: 'string' }, command: { type: 'string' }, kind: { type: 'string', enum: ['regression', 'preexisting', 'not-reproduced'] }, feature: { type: 'string' }, evidence: { type: 'string' } }, required: ['test', 'command', 'kind', 'evidence'] } } }, required: ['items'] }
 const REPAIR_SCHEMA = { type: 'object', properties: { ready: { type: 'boolean' }, fixed: { type: 'array', items: { type: 'string' } }, blockers: { type: 'array', items: { type: 'string' } } }, required: ['ready', 'fixed', 'blockers'] }
 const CHECK_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, issues: ISSUES }, required: ['ok', 'issues'] }
@@ -325,6 +331,7 @@ let mergeTail = Promise.resolve()
 const withMergeLock = fn => { const run = mergeTail.then(fn); mergeTail = run.then(() => {}, () => {}); return run }
 
 const outcomes = []
+const stashedBefore = []  // features whose builder stashed what it found in the shared tree (one lane)
 const blocked = new Set()
 const serious = list => (list || []).filter(i => i && i.severity !== 'minor')
 
@@ -364,7 +371,7 @@ const repair = async (merged, failures) => {
     if (!m || !m.ok) return stop('the repair did not merge: ' + (m ? m.notes : 'no result'), cycle)
     const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:after-triage-${cycle}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...modelFor('barrier') })
     const green = !!(b && b.ok && b.exitCode === 0)
-    outcomes.push({ name: 'triage', result: green ? 'repaired' : 'not enough', cycle, items: items.map(i => `${i.kind}${i.feature ? ' in ' + i.feature : ''}: ${i.test}`) })
+    outcomes.push({ name: 'triage', result: green ? 'repaired' : 'not enough', cycle, items: items.map(i => `${i.kind}${i.feature ? ' in ' + i.feature : ''}: ${i.test}`), ...(A.push && m.pushed !== true ? { pushFailed: true } : {}) })
     outcomes.push({ name: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
     log(`triage cycle ${cycle}: barrier ${green ? 'green' : 'still red'}`)
     if (green) return true
@@ -397,16 +404,20 @@ const runFeature = async f => {
   let feedback = f.feedback || null
   let passedAt = 0
   let staleReport = false
+  let reviewRefusedAt = 0  // the attempt whose PASS report the tier A reviewer refused, while the branch still carries it
   for (let attempt = f.startAttempt || 1; attempt <= MAX[tier] && !passedAt; attempt++) {
     if (barrierRed || postMergeFailed) { hold(f); return }
     const built = await agent(IMPLEMENT(f, attempt, feedback), { phase: 'Build', label: `build:${f.name}:${attempt}`, schema: BUILD_SCHEMA, effort: effortFor('implement', f), ...modelFor('build') })
+    if (built && built.stashed && !stashedBefore.includes(f.name)) stashedBefore.push(f.name)
     if (!built || !built.ready) {
       feedback = [{ severity: 'blocker', where: 'build', problem: 'the builder did not finish: ' + (built ? built.blockers.join('; ') : 'no result'), fix: 'finish the work on the existing branch' }]
       continue
     }
     let gateRefused = false
+    let proverNotes = ''
     const proveStep = async () => {
       const proved = await agent(PROVE(f), { phase: 'Build', label: `prove:${f.name}:${attempt}`, schema: PROVE_SCHEMA, effort: effortFor('prove', f), ...modelFor('prove') })
+      proverNotes = (proved && proved.notes) || ''
       if (proved && proved.ready) return true
       feedback = ((proved && proved.blockers.length) ? proved.blockers : ['the prover did not finish, or the gate failed'])
         .map(b => ({ severity: 'blocker', where: 'prove', problem: b, fix: 'make the gate pass on the tree with the main branch brought in' }))
@@ -414,9 +425,11 @@ const runFeature = async f => {
     }
     if (!VERIFY_FIRST && !(await proveStep())) continue
     const thunks = [() => agent(VERIFY(f, attempt), { phase: 'Verify', label: `verify:${f.name}:${attempt}`, schema: VERIFY_SCHEMA, effort: effortFor('verify', f), ...modelFor('verify') })]
-    if (tier === 'A') thunks.push(() => agent(REVIEW(f), { phase: 'Verify', label: `review:${f.name}:${attempt}`, schema: REVIEW_SCHEMA, effort: effortFor('review', f), ...modelFor('review') }))
+    if (tier === 'A') thunks.push(() => agent(REVIEW(f, { builder: built.summary || '', ...(VERIFY_FIRST ? {} : { prover: proverNotes }) }), { phase: 'Verify', label: `review:${f.name}:${attempt}`, schema: REVIEW_SCHEMA, effort: effortFor('review', f), ...modelFor('review') }))
     const [ver, rev] = await parallel(thunks)
-    let pass = !!(ver && ver.pass && ver.gateExit === 0 && serious(ver.issues).length === 0 &&
+    // 3.48.0: `pass` and `notMet` are two fields of one reply, and a verifier that said pass while listing a criterion
+    // not met was merged; it is refused like one whose gate exited non-zero.
+    let pass = !!(ver && ver.pass && ver.gateExit === 0 && serious(ver.issues).length === 0 && !((ver.notMet || []).length) &&
       (tier !== 'A' || (rev && serious(rev.issues).length === 0)))
     // verify-first: the full gate runs only now, for a feature that was passed. A refusal here leaves a PASS
     // report on the branch that the gate did not back; it is said in the run's account, not hidden.
@@ -429,11 +442,15 @@ const runFeature = async f => {
       ...((ver && ver.notMet) || []).map(n => ({ severity: 'blocker', where: 'criterion', problem: 'not met: ' + n, fix: 'meet it' }))]
     if (ver && ver.gateExit !== 0 && !feedback.length) feedback.push({ severity: 'blocker', where: 'gate', problem: `${GATE_SCRIPT} exited ${ver.gateExit}`, fix: 'read the report the verifier wrote' })
     if (!ver) feedback.push({ severity: 'blocker', where: 'verify', problem: 'the verifier returned nothing', fix: 're-run verification' })
+    if (tier === 'A' && !rev) feedback.push({ severity: 'blocker', where: 'review', problem: 'the reviewer returned nothing', fix: 'nothing to change for it: the next attempt reviews again' })
+    if (!feedback.length) feedback.push({ severity: 'blocker', where: 'verify', problem: `the verifier refused without a blocker, a major or an unmet criterion`, fix: `read .specs/features/${f.name}/${REPORT} and resolve what it refuses` })
+    if (ver) reviewRefusedAt = ver.pass && tier === 'A' && rev && serious(rev.issues).length ? attempt : 0  // a new report replaces the old
   }
   if (!passedAt) {
     blocked.add(f.name)
     outcomes.push({ name: f.name, result: 'blocked', lastIssues: (feedback || []).slice(0, 5),
-      ...(staleReport ? { because: `branch feat/${f.name} carries a PASS report that the gate refused` } : {}) })
+      ...(staleReport ? { because: `branch feat/${f.name} carries a PASS report that the gate refused` }
+        : reviewRefusedAt ? { because: `branch feat/${f.name} carries a PASS report the tier A reviewer refused in attempt ${reviewRefusedAt}${reviewRefusedAt === MAX[tier] ? ' (its findings are the issues above)' : ''}` } : {}) })
     log(`${f.name}: blocked after ${MAX[tier]} attempts`)
     return
   }
@@ -442,7 +459,9 @@ const runFeature = async f => {
     const m = await agent(MERGE(f), { phase: 'Merge', label: `merge:${f.name}`, schema: MERGE_SCHEMA, effort: effortFor('merge', f), ...modelFor('merge') })
     if (m && m.ok) {
       const postFailed = !!A.postMerge && m.postMerge !== true  // anything but an explicit true is a failure: it is the safe reading
-      outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit, ...(/gate skipped/i.test(m.notes || '') ? { gateSkipped: true } : {}), ...(postFailed ? { postMergeFailed: true } : {}) })
+      // a failed push leaves the merge in place (the next push carries it) but must not vanish from the account
+      const pushFailed = !!A.push && m.pushed !== true
+      outcomes.push({ name: f.name, result: 'merged', attempt: passedAt, commit: m.commit, ...(/gate skipped/i.test(m.notes || '') ? { gateSkipped: true } : {}), ...(postFailed ? { postMergeFailed: true } : {}), ...(pushFailed ? { pushFailed: true } : {}) })
       mergedAt[f.name] = { before: m.before, after: m.commit }
       log(`${f.name}: merged`)
       sinceBarrier.push(f.name)
@@ -467,10 +486,16 @@ await parallel(Object.values(queues).map(q => async () => {
 
 await withMergeLock(runBarrier)
 
+// With one lane the first builder works in the owner's own tree: what it stashed may be the owner's uncommitted work,
+// and an account that does not say so reads as lost work.
+if (stashedBefore.length) outcomes.push({ name: 'stashed', stash: stashedBefore })  // told apart by `stash`, never by a name a feature can have
+
 phase('Record')
 await agent(RECORD(outcomes), { phase: 'Record', label: 'record', schema: RECORD_SCHEMA, effort: effortFor('record', { tier: 'B' }), ...modelFor('record') })
-return outcomes.map(o => o.name === 'barrier'
+return outcomes.map(o => o.stash
+  ? `stashed: before ${o.stash.join(', ')} — uncommitted changes found in the shared tree are in git stash list ("left before feat/<name>"); none was carried into a branch`
+  : o.name === 'barrier'
   ? `barrier: ${o.result} after ${o.after.join(', ')}${o.result === 'red' ? ' — ' + (o.failures || []).slice(0, 5).join('; ') : ''}`
   : o.name === 'triage'
-  ? `triage: ${o.result} (cycle ${o.cycle})${o.items ? ' — ' + o.items.join('; ') : ''}${o.because ? ' — ' + o.because : ''}`
-  : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.gateSkipped ? ' [gate skipped: receipt]' : ''}${o.postMergeFailed ? ' [post-merge command failed]' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)
+  ? `triage: ${o.result} (cycle ${o.cycle})${o.pushFailed ? ' [push failed]' : ''}${o.items ? ' — ' + o.items.join('; ') : ''}${o.because ? ' — ' + o.because : ''}`
+  : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.gateSkipped ? ' [gate skipped: receipt]' : ''}${o.postMergeFailed ? ' [post-merge command failed]' : ''}${o.pushFailed ? ' [push failed]' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)

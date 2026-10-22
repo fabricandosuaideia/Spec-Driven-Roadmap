@@ -205,8 +205,8 @@ body — but a lookup is not a load. The economic point is what matters here: th
 roadmap never enters the per-feature context the loop builds. Extending forever therefore puts
 every past wave inside the context of every future feature. The number: roughly 200-250 tokens per
 feature, counting its entry, its coverage-table row, its `## Expected Gray Areas` lines and its
-matching `## Open Questions` roll-up entry — so decompose-phase.md's ~3,000-token
-sanity check fires at around 12-15 features. The loop path grows fastest of all: handoff-seed.md
+matching `## Open Questions` roll-up entry, over roughly 900 tokens the file carries before any feature — so
+decompose-phase.md's ~3,000-token sanity check fires at around 9 features. The loop path grows fastest of all: handoff-seed.md
 Step 9 requires every open question closed before the loop is handed over, and answered entries
 stay — never deleted (decompose-phase.md Step 8) — so every loop leaves a full set of them in the
 file for good.

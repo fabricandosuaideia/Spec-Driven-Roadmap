@@ -62,13 +62,13 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 .\install.ps1 -Global -Force
 ```
 
-The skill itself is markdown plus eight Python 3 helper scripts (standard library only), so it is
+The skill itself is markdown plus ten Python 3 helper scripts (standard library only), so it is
 fully cross-platform; only the installer differs by OS. They convert a single-roadmap project into
 section roadmaps, check a roadmap, measure what agent runs cost, print one feature's slice of the
 roadmap for its builder, keep the roadmap's status block small, write the sub-agent definitions a loop
-dispatches, plan a pipeline run, and time your project's full gate; each needs a working `python3` on PATH. In Claude Code the skill
-also ships a Workflow script that builds a roadmap with a fresh agent per role — builder, prover,
-verifier, reviewer, merger — and it runs only when you ask for it. On Windows the bare `python3` is usually the Microsoft Store stub, which opens the Store
+dispatches, plan a pipeline run, time your project's full gate, run one failing test before and after a batch of merges, and record the commit a green barrier proved; each needs a working `python3` on PATH. In Claude Code the skill
+also ships two Workflow scripts: one builds a roadmap with a fresh agent per role — builder, prover,
+verifier, reviewer, merger — and the other runs manager mode over every section; each runs only when you ask for it. On Windows the bare `python3` is usually the Microsoft Store stub, which opens the Store
 instead of running anything: install Python from python.org, after which its
 `py -3` launcher works too.
 
@@ -81,8 +81,8 @@ and what it could not judge; nothing is edited.
 It covers forward dependencies, duplicate names, the eight-task budget, the two-way agreement between
 each feature's open questions and the roll-up, one ledger row per theme, `uncovered: none`, every
 feature's risk tier at or above its floor, the build-order `.txt` agreeing with the roadmap, size thresholds, and name uniqueness against every other
-roadmap and every `.specs/features/` directory — including a built feature no roadmap names any more.
-A failure is a question for you, not a verdict.
+roadmap and every `.specs/features/` directory — including a built feature no roadmap names any more —
+and a warning for two names in `docs/` that differ only by case. A failure is a question for you, not a verdict.
 
 Phase 2 runs the same checks whenever it closes a roadmap, so this is for asking later.
 
@@ -124,7 +124,8 @@ The command checks the **project** install first and falls back to the **global*
 precedence Claude Code applies when both exist — and prints `not installed` on the first line when
 it finds neither. A second line reading `unreachable` means the download failed rather than that
 you are current — check the network and run it again. On Windows, run it from Git Bash or WSL. When
-the two lines differ, re-run the installer with `--force` (`-Force` for `install.ps1`).
+the two lines differ, follow "Upgrading a project that already uses the skill" below: the installer with `--check`
+(`-Check` for `install.ps1`) first, then `--force` (`-Force`).
 
 A project install lives in `.claude/skills/spec-driven-roadmap/` and a global one in
 `~/.claude/skills/`; the two can sit at different versions at the same time, and the version that
@@ -207,14 +208,15 @@ paths already resolved. Paste it into a fresh session.
 
 The [guide](guide/HOW-IT-WORKS.md) explains what each option trades away.
 
-**Manager mode — the whole backlog, unattended.** In a multi-section project, in Claude Code, you can
+**Manager mode — the whole backlog, unattended.** In Claude Code, you can
 ask for *"manager mode"*: a Workflow walks every section still to do, in build order, decomposes each
 one just before building it — **deciding the open questions itself and marking every decision
 `Decided by the manager`** for you to review — and builds it with option C's pipeline. It runs only
 on your written delegation (`manager.delegation` in `docs/process/pipeline.json`), stops before the
 sections you reserve (`stopAt`), on a red barrier, and never builds on a section that did not finish.
 Outside manager mode the skill never decides for you. Two levels, like narrower or wider
-permissions: `decide` stops when something breaks and waits for you; `unblock` also triages a red
+permissions: `decide` leaves what breaks to you (a red barrier stops the run; a section that cannot finish
+waits for you, with everything that depends on it); `unblock` also triages a red
 barrier by script and repairs it, with an independent checker before anything merges. Experimental.
 
 ## Upgrading a project that already uses the skill
@@ -231,9 +233,10 @@ run:
 The skill then saves a cost baseline from the project's own transcripts
 (`docs/process/cost-baseline.json`), lints the roadmap, re-runs its seed — which moves the old
 `## Status` and the old handoff, copies included, into `docs/roadmap-history.md` — offers to replace old bridge lines
-in your `CLAUDE.md` (only on your yes), and asks how you want to build. It never regenerates the
-roadmap or renames a feature. You can ask Claude Code for both steps in one sentence: *"reinstall
-spec-driven-roadmap in this project, then upgrade this project"*. Once a few features are built, ask
+in your `CLAUDE.md` (only on your yes), checks `docs/process/pipeline.json`, tells you what changed by default since your
+version, and asks how you want to build. It never regenerates the roadmap or renames a feature. Open a **new Claude Code
+session** between the two steps: a session that already read the old version keeps its text, so asking for both in one
+sentence (*"reinstall spec-driven-roadmap in this project, then upgrade this project"*) runs the old route. Once a few features are built, ask
 *"measure my agent cost"* again: the comparison with that baseline is the only proof the upgrade saved
 anything.
 

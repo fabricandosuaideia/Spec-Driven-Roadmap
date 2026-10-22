@@ -658,7 +658,8 @@ budget, the `discharge:` line verbatim, the two-way agreement between each featu
 and the roll-up, one row per rubric theme, every `not decided` row having its `cross-cutting` entry
 with an `affects:` line, `uncovered: none`, the derived `needs pre-written context.md` flag, every
 `risk tier` at or above its floor with any raise explained, the `.txt` agreeing with the roadmap, the size thresholds, and global name uniqueness against every other
-roadmap and every `.specs/features/` directory. A failure is a question, not a verdict: read the
+roadmap and every `.specs/features/` directory — and it warns when two names in `docs/` differ only by case. A failure is
+a question, not a verdict: read the
 detail before changing anything, and where a check reports `·` nothing was judged there — the detail
 says why.
 

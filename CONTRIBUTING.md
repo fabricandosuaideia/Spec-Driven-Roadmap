@@ -85,7 +85,7 @@ marker, because the console encoding has no `✗`. From WSL2 you can drive the h
 | `scripts/` | the ones in `install.sh`'s `REQUIRED_SCRIPTS` ship to users (`convert-to-multi.py`, `check-roadmap.py`, `measure-agents.py`, `feature-brief.py`, `status-block.py`, `write-agents.py`, `plan-pipeline.py`, `roadmap-pipeline.js`, `manager-pipeline.js`, `triage-probe.py`, `record-barrier.py`, `bench-gate.py`); the rest are maintainer-only ([`CLAUDE.md`](CLAUDE.md) lists them all) |
 | `benchmark/` | frozen fixture, answer key, scoreboard — see [`benchmark/README.md`](benchmark/README.md) |
 | `guide/` | the human guide, in three languages, kept at structural parity |
-| `install.sh` / `install.ps1` | must stay behaviourally identical; a check enforces the payload |
+| `install.sh` / `install.ps1` | must stay behaviourally identical (a check enforces the payload, and `check-installers.py` runs both); `--diff` is a unified diff in one and PowerShell's line comparison in the other |
 
 **Where the skill actually lives.** `references/` holds the procedures an agent executes. `SKILL.md`
 says outright that when the two disagree, **the reference wins** — so a change made only in
@@ -112,7 +112,8 @@ copy is a hard rule here — [`CLAUDE.md`](CLAUDE.md) states it and says why it 
 
 `guide/HOW-IT-WORKS.md` and the READMEs exist in English, Portuguese and Spanish at **exact
 structural parity**: same headings in the same order, same code spans, same table rows.
-`check-consistency.py` measures it, so a change to one is a change to three.
+`check-consistency.py` measures the headings and the code spans, not the prose — a change to one is a change to three,
+and reading the other two is the only check of what they say.
 
 Paths, field names, trigger phrases and code-block contents are **never translated** — they are keys
 the skill locates by exact name, and translating one breaks the handoff.

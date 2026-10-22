@@ -391,8 +391,11 @@ def _whole(n, least):
 
 def config_problems(cfg, ds=None):
     """Every problem with the pipeline.json values this script reads, as a list of sentences — each starts with
-    the key it is about. A value that is present but falsy (0, false, "", [], {}) is a problem, not an absence:
-    only a missing key or null means "unset". `ds` is the downstream skill, when known."""
+    the key it is about. A missing key or null means "unset". A value of the wrong type is a problem, and so is an empty
+    one where something must be given (gate, model, a models entry) and a postMerge of only spaces (leave the key
+    out); an empty barrierGate reads as none. 3.43.1 said every falsy value was a problem, which held for only a few keys (review of
+    3.47.0). The project's own state — whether the main branch exists, whether the person confirmed — is check_config's.
+    `ds` is the downstream skill, when known."""
     out = []
     if isinstance(cfg, dict):
         stray = sorted(k for k in cfg if k not in CONFIG_KEYS)
@@ -410,6 +413,17 @@ def config_problems(cfg, ds=None):
     for key in ("gate", "barrierGate", "postMerge", "setup", "testHint", "checklist", "mainBranch", "model"):
         if given(cfg, key) and not isinstance(cfg[key], str):
             out.append("%s takes a string; not: %r" % (key, cfg[key]))
+    for key in ("gate", "model"):
+        if isinstance(cfg.get(key), str) and not cfg[key].strip():
+            out.append("%s is empty: %s" % (key, "give the command every feature must pass" if key == "gate" else "leave it null to use the session's model, or name one"))
+    for key in ("confirmed", "push"):
+        if given(cfg, key) and not isinstance(cfg[key], bool):
+            out.append("%s takes true or false; not: %r" % (key, cfg[key]))
+    if given(cfg, "waitChunk") and not _whole(cfg["waitChunk"], 1):
+        out.append("waitChunk takes a whole number of seconds; not: %r" % (cfg["waitChunk"],))
+    fs = cfg.get("featureStatus")
+    if fs is not None and not (isinstance(fs, dict) and all(isinstance(k, str) and x in ("done", "build") for k, x in fs.items())):
+        out.append("featureStatus takes an object of feature name to \"done\" or \"build\"; not: %r" % (fs,))
     if isinstance(cfg.get("postMerge"), str) and not cfg["postMerge"].strip():
         out.append("postMerge is only spaces: leave the key out, or give the command to run once on the main branch after each merge")
     ef = cfg.get("effort")
@@ -491,6 +505,7 @@ def config_problems(cfg, ds=None):
         for k in ("delegation", "delegatedOn", "decomposeModel"):
             if given(mgr, k) and not isinstance(mgr[k], str):
                 out.append("manager.%s takes a string; not: %r" % (k, mgr[k]))
+        # an empty delegation is --init's default, and only manager mode needs one: manager_args refuses it there
         if given(mgr, "effort"):
             ef = mgr["effort"]
             if not isinstance(ef, dict):
@@ -858,19 +873,32 @@ x
         import io
         import contextlib
         os.makedirs(os.path.dirname(os.path.join(root, CONFIG)), exist_ok=True)
-        json.dump(cfg, open(os.path.join(root, CONFIG), "w"))
+        json.dump(dict(cfg, mainBranch="master"), open(os.path.join(root, CONFIG), "w"))  # this repository's branch is master
         out_cc = io.StringIO()
         with contextlib.redirect_stdout(out_cc), contextlib.redirect_stderr(io.StringIO()):
             rc_cc = main(["--root", root, "--check-config"])
         expect("--check-config on a valid file says so and plans nothing", rc_cc == 0 and "0 problem(s)" in out_cc.getvalue())
+        json.dump(dict(cfg, mainBranch="main"), open(os.path.join(root, CONFIG), "w"))
+        out_mb = io.StringIO()
+        with contextlib.redirect_stdout(out_mb), contextlib.redirect_stderr(io.StringIO()):
+            rc_mb = main(["--root", root, "--check-config"])
+        expect("--check-config names a mainBranch this repository does not have (the planner refuses it too)",
+               rc_mb == 1 and "PROBLEM  mainBranch 'main' is not a branch" in out_mb.getvalue())
         json.dump(dict(cfg, passes=1, manager={"delegation": "x", "passes": 2}, postMerg="y", gateOrder="x"), open(os.path.join(root, CONFIG), "w"))
         out_cc = io.StringIO()
         with contextlib.redirect_stdout(out_cc), contextlib.redirect_stderr(io.StringIO()):
             rc_cc = main(["--root", root, "--check-config"])
         said = out_cc.getvalue()
+        gaps = config_problems(dict(DEFAULT_CONFIG, confirmed=0, push="no", gate=" ", model="", waitChunk="fast",
+                                    featureStatus={"x-a": "skip"}))
+        expect("the review's file: a non-boolean confirmed and push, an empty gate and model, a waitChunk that is not a "
+               "number and a featureStatus that is not done or build are each a problem",
+               all(any(p.startswith(k) for p in gaps) for k in ("confirmed", "push", "gate is empty", "model is empty", "waitChunk", "featureStatus")))
+        expect("--init's own defaults (an empty delegation, an empty gate to fill in) leave only the gate to give",
+               [p for p in config_problems(DEFAULT_CONFIG) if not p.startswith("gate is empty")] == [])
         expect("--check-config lists every problem of a bad file at once",
                rc_cc == 1 and "passes" in said and "postMerg" in said and "gateOrder" in said and said.count("PROBLEM") >= 2)
-        json.dump(dict(cfg, postMerge="bash docs/process/migrate.sh", setup="npm ci && make"), open(os.path.join(root, CONFIG), "w"))
+        json.dump(dict(cfg, mainBranch="master", postMerge="bash docs/process/migrate.sh", setup="npm ci && make"), open(os.path.join(root, CONFIG), "w"))
         out_cc = io.StringIO()
         with contextlib.redirect_stdout(out_cc), contextlib.redirect_stderr(io.StringIO()):
             rc_cc = main(["--root", root, "--check-config"])
@@ -1057,7 +1085,8 @@ WARNED = [0]  # warnings printed by the last check_config call
 
 
 def check_config(root, cfg_path):
-    """Everything the planner would refuse in pipeline.json, listed at once, without planning anything: the check an
+    """What the planner would refuse in pipeline.json, listed at once, without planning anything — the file's keys and values
+    (config_problems) and the main branch it names — and whether the person confirmed it: the check an
     upgrade runs first, because a key that a locally patched copy of the skill read and this version does not is only
     found, otherwise, by a run that stops. Exit 0: no problem. 1: problems, one per line. 2: no readable file."""
     if not os.path.isfile(cfg_path):
@@ -1075,6 +1104,11 @@ def check_config(root, cfg_path):
     ds, _d = downstream(root)
     problems = config_problems(cfg, ds)
     WARNED[0] = 0
+    mb = cfg.get("mainBranch") or "main"
+    if git(root, "rev-parse", "--git-dir") is not None and isinstance(mb, str) \
+            and git(root, "rev-parse", "--verify", "--quiet", "refs/heads/" + mb) is None:  # the planner's own check
+        problems.append("mainBranch %r is not a branch of this repository: every merge would fail; set it to the branch "
+                        "features merge into" % mb)
     for pr in problems:
         print("PROBLEM  " + pr)
     # Not a problem of the file, but the commonest reason a command it names fails at the first run: the script it

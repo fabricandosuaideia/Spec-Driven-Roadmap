@@ -251,6 +251,9 @@ def cmd_setup(args):
     print("launch rules — fresh agent, follow literally, friction is the output,")
     print("never say what changed. Tell it to keep scratch files inside that path:")
     print("sub-agents inherit the launcher's scratchpad, so parallel agents share one.")
+    print("And tell it to start EVERY shell command with `cd <that path> &&`: a sub-agent's")
+    print("shell does not keep its directory between calls and starts in the launcher's")
+    print("working directory — this repository.")
     return 0
 
 

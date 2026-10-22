@@ -201,7 +201,7 @@ if ! curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/skill.tar.gz"; then
     echo "requests. This installer only downloads — it has no local-source mode," >&2
     echo "so re-running it from a checkout fails the same way. From a clone:" >&2
     echo "  mkdir -p \"$DEST/scripts\" && cp -r SKILL.md references \"$DEST/\"" >&2
-    echo "  cp scripts/convert-to-multi.py \"$DEST/scripts/\"" >&2
+    echo "  cp scripts/{convert-to-multi.py,check-roadmap.py,measure-agents.py,feature-brief.py,status-block.py,write-agents.py,plan-pipeline.py,roadmap-pipeline.js,manager-pipeline.js,triage-probe.py,record-barrier.py,bench-gate.py} \"$DEST/scripts/\"" >&2
     exit 1
 fi
 

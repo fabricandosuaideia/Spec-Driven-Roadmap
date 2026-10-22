@@ -107,6 +107,13 @@ test two blind agents wrote `status-body.md` and `handoff-body.md` to the same s
 the same second; their trees came out different, so each had read its own, but that was luck.
 `setup` prints the reminder.
 
+**And tell each agent to start every shell command with `cd <its copy> &&`.** A sub-agent's shell
+does not keep its directory between calls: each call starts in the launching session's working
+directory, which is this repository. In 3.48.0's test a blind agent told only to "start by running
+`cd`" ran its second command without it, and `git checkout -b feat/curation main` ran here, on the
+maintainer's uncommitted work. It was one checkout, undone from the reflog; but a copy isolates
+nothing while the real tree is one forgotten `cd` away. `setup` prints this reminder too.
+
 ## Reading a result
 
 Two numbers, and they answer different questions.

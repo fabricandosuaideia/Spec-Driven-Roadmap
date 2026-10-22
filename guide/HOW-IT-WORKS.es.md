@@ -305,7 +305,7 @@ comando se ejecuta desacoplado y se espera. Misma precondición que B: cero preg
 **Opción D, el modo gestor — experimental, y otra forma de trabajar.** A, B y C construyen un roadmap
 cada una y se detienen, porque la costura entre dos secciones es donde una persona vuelve a planificar.
 Cuando nadie va a estar ahí — un build que se deja corriendo día y noche —, pide el *"manager mode"*
-en un proyecto multi-sección, en Claude Code. Escribes, una vez, lo que delegas (`manager.delegation`)
+en Claude Code (un proyecto de una sola sección es una sección). Escribes, una vez, lo que delegas (`manager.delegation`)
 y qué secciones todavía te necesitan (`stopAt`). Entonces un Workflow — un script, no una
 conversación, así que no pierde su misión en un contexto largo — toma cada sección pendiente en el
 orden de construcción, la descompone justo antes de construirla, responde él mismo las preguntas
@@ -313,7 +313,8 @@ abiertas (la opción conservadora, marcada `Decided by the manager`) y la constr
 la opción C. Se detiene antes de una sección reservada o ante una barrera en rojo, y omite lo que
 depende de una sección que no terminó. Después, las decisiones son tuyas para revisar: cada una queda
 marcada en los roadmaps y listada en el registro de la ejecución. También eliges hasta dónde llega
-sin ti: en `decide` se detiene cuando algo se rompe; en `unblock` hace el triaje de una barrera en rojo
+sin ti: en `decide` te deja lo que se rompe (una barrera en rojo detiene la ejecución, y una sección que no
+puede terminar te espera con lo que depende de ella); en `unblock` hace el triaje de una barrera en rojo
 — un script decide si los merges rompieron la prueba o si ya estaba rota antes —, la repara sin aflojar
 nada y hace que un agente que no la escribió revise la reparación.
 
@@ -379,7 +380,8 @@ una feature aparezca también en el roll-up *y al revés*, que la tabla de cober
 descubierto, que el `.txt` de orden de construcción siga coincidiendo con el roadmap, y que ningún
 nombre de feature choque con otro roadmap o con un directorio bajo `.specs/`. También señala lo
 inverso: una feature que ya construiste y que ningún roadmap nombra ya, que es como se ve un cambio
-de nombre después del hecho.
+de nombre después del hecho; y avisa cuando dos nombres en `docs/` solo difieren en mayúsculas, que Windows
+y macOS leen como un único archivo.
 
 Dos cosas que vale saber. **Un fallo es una pregunta, no un veredicto** — el roadmap es tuyo, y la
 salida existe para leerse antes de cambiar nada. Y dice cuándo *no pudo* juzgar algo en vez de
@@ -462,9 +464,9 @@ tras ola se arrastra a través de todas ellas. Una sección terminada nunca se v
 el progreso se cuenta desde su `.txt` y desde el reporte de cada feature, mientras que las lecturas
 puntuales en su cuerpo — el test de `discharge:`, el roll-up de `## Open Questions` — siguen
 ocurriendo. En
-números: cada feature cuesta unos 200-250 tokens del roadmap, así que la skill avisa cerca de 2.000
-— diciendo cuántas features caben aún antes de dividir — y vuelve a plantear la pregunta de
-uno-o-varios pasados unos 3.000, unas 12-15 features. Convertir renombra **archivos, no features**,
+números: un roadmap empieza con unos 900 tokens y cada feature suma unos 200-250, así que la skill avisa
+cerca de 2.000, unas 5 features — diciendo cuántas caben aún antes de dividir — y vuelve a plantear la
+pregunta de uno-o-varios pasados unos 3.000, unas 9 features. Convertir renombra **archivos, no features**,
 así que nada de lo ya construido se ve afectado — con una salvedad: el puntero de handoff en
 `.specs/STATE.md` nombra archivos por ruta, así que queda obsoleto y la skill vuelve a ejecutar su
 siembra para repararlo. Si una feature está a medio construir cuando conviertes, esa reparación

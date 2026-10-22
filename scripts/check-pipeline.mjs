@@ -459,9 +459,20 @@ const CLAUSES = [
   ['prove: the prover brings main in by the same rule', 'prove', 'there is nothing to do and you do NOT rebase', {}],
   ['merge: the merger brings main in by the same rule', 'merge', 'there is nothing to do and you do NOT rebase', {}],
   ['verify: no report means verify everything and ignore the scope', 'verify', 'this is a FIRST verification: ignore the rest of this paragraph and verify everything', {}],
+  ['verify: an earlier report counts only on this branch', 'verify', "only this branch's commits: a report already on", {}],
   ['verify: a first verification demotes nothing', 'verify', 'a clause of a criterion that no test exercises is not proven', {}],
   ['verify: inside the scope and in a first verification nothing is demoted', 'verify', 'Inside the scope, and in a first verification, nothing is demoted', { round2: true }],
-  ['verify: a rebase brings main into scope', 'verify', 'what main gained in that rebase is new code too', { round2: true }],
+  ['verify: main brought in by a rebase or a merge is in scope', 'verify', 'what main gained since is new code too', { round2: true }],
+  ['verify: a scoped round covers this feature\'s own files, not what a merge of main brought', 'verify', 'brought in through a merge is not this feature', { round2: true }],
+  ['build: a half-done rebase or merge left by an earlier agent is undone first', 'build', 'an earlier agent stopped inside it', {}],
+  ['prove: a conflict is undone and left to the builder', 'prove', "resolving a conflict is the builder", {}],
+  ['prove: the prover changes no test and no code', 'prove', 'a failure is reported, never fixed.', {}],
+  ['prove: a gate-failure note the gate no longer backs is deleted', 'prove', 'delete it in that commit (the gate it described now passes)', {}],
+  ['merge: after the fast-forward the merge has happened', 'merge', 'from then on the merge has happened', {}],
+  ['merge: the feature branch is checked out, after an abort', 'merge', 'is not the branch checked out there, check it out', {}],
+  ['build: a shared tree left dirty is stashed, never carried', 'build', 'an earlier agent left it here: run git stash push', {}],
+  ['build: in a shared tree an open rebase or merge is aborted before the stash', 'build', 'abort it (git rebase --abort or git merge --abort) — nothing else works while one is', {}],
+  ['build: what is kept is committed before either reply', 'build', 'an uncommitted change is left for the next agent to trip on', {}],
   ['verify: other rows carry forward and say so', 'verify', 'Every other row carries forward and says so', { round2: true }],
   ['verify: proofs re-run in full', 'verify', 'The proofs re-run in full at HEAD', { round2: true }],
   ['verify: a killed mutant on untouched code carries forward', 'verify', 'a previous mutant that was killed', { round2: true }],
@@ -499,6 +510,121 @@ for (const c of CLAUSES) {
 clauseMutants['repair loses LONG_COMMANDS'] = ['${LONG_COMMANDS}\n${REPAIR_TESTS}', '${REPAIR_TESTS}']
 clauseMutants['repair gets the wide rule again'] = ['${LONG_COMMANDS}\n${REPAIR_TESTS}', '${LONG_COMMANDS}\n${REVOKED_RULE}']
 Object.assign(mutants, clauseMutants)
+
+// ---- 3.48.0: defects found by the independent review of 3.47.0, each proved by a stub run first ----
+Object.assign(scenarios, {
+  'a verifier that says pass while listing a criterion not met is refused, never merged': async src => {
+    const r = await run(src, { features: [feat('a', 'C')] }, pass({ verify: () => ({ gateExit: 0, pass: true, notMet: ['AC-2: the export keeps the order'], issues: [] }) }))
+    return !r.calls.some(c => c.role === 'merge') && line(r.out, 'a').includes('blocked') &&
+      /not met: AC-2/.test((r.calls.filter(c => c.role === 'build')[1] || {}).prompt || '')
+  },
+  'a maxAttempts that names one tier keeps the default for the others': async src => {
+    const r = await run(src, { maxAttempts: { A: 6 }, features: [feat('a', 'B')] }, pass({ verify: () => ({ gateExit: 1, pass: false, notMet: ['x'], issues: [] }) }))
+    return r.calls.filter(c => c.role === 'build').length === 4 && line(r.out, 'a').includes('blocked')
+  },
+  'a tier A reviewer that returns nothing leaves the next builder something to act on': async src => {
+    const r = await run(src, { features: [feat('a', 'A')] }, pass({ review: (n, att) => att === 1 ? null : undefined }))
+    const b2 = r.calls.find(c => c.role === 'build' && c.attempt === 2)
+    return !!b2 && /the reviewer returned nothing/.test(b2.prompt) && line(r.out, 'a').includes('merged')
+  },
+  'a verifier that refuses with nothing serious and nothing unmet sends the next builder to its report': async src => {
+    const r = await run(src, { features: [feat('a', 'C')] }, pass({ verify: (n, att) => att === 1 ? { gateExit: 0, pass: false, notMet: [], issues: [{ severity: 'minor', where: 'x', problem: 'p', fix: 'f' }] } : undefined }))
+    const b2 = r.calls.find(c => c.role === 'build' && c.attempt === 2)
+    return !!b2 && /refused without a blocker, a major or an unmet criterion/.test(b2.prompt)
+  },
+  'a PASS report the tier A reviewer refused is said in the account': async src => {
+    const r = await run(src, { features: [feat('a', 'A')] }, pass({ review: () => ({ issues: [{ severity: 'major', where: 'x', problem: 'p', fix: 'f' }] }) }))
+    return /a: blocked.*carries a PASS report the tier A reviewer refused in attempt 5 \(its findings are the issues above\)/.test(line(r.out, 'a'))
+  },
+  'a last attempt whose builder did not finish is not blamed on an earlier reviewer': async src => {
+    const r = await run(src, { features: [feat('a', 'A')] }, pass({
+      review: () => ({ issues: [{ severity: 'major', where: 'x', problem: 'p', fix: 'f' }] }),
+      build: (n, att) => att === 5 ? { ready: false, summary: '', blockers: ['ran out'] } : undefined }))
+    return line(r.out, 'a').includes('blocked') && /the tier A reviewer refused in attempt 4/.test(line(r.out, 'a')) && !/its findings are the issues above/.test(line(r.out, 'a'))
+  },
+  'a FAIL report after the reviewer refused a PASS one clears the refusal from the account': async src => {
+    const r = await run(src, { features: [feat('a', 'A')] }, pass({
+      review: (n, att) => att === 1 ? { issues: [{ severity: 'major', where: 'x', problem: 'p', fix: 'f' }] } : undefined,
+      verify: (n, att) => att > 1 ? { gateExit: 0, pass: false, notMet: ['C1'], issues: [] } : undefined }))
+    return line(r.out, 'a').includes('blocked') && !/reviewer refused/.test(line(r.out, 'a'))
+  },
+  'the triage merger keeps a merged repair merged, undoes a conflicted rebase, and its failed push is in the account': async src => {
+    const r = await unblockRun(src, { push: true, features: [feat('a')] })
+    const r2 = await run(src, { managerMode: true, autonomy: 'unblock', barrierGate: 'make all', barrierEvery: 1, push: true, features: [feat('a')] },
+      pass({ barrier: (() => { let n = 0; return () => (n++ === 0 ? { ok: false, exitCode: 1, failures: ['t::x'] } : undefined) })(),
+             triage: () => ({ items: [{ test: 't::x', command: 'pytest x', kind: 'preexisting', evidence: '{}' }] }),
+             repair: () => ({ ready: true, fixed: ['t'], blockers: [] }), check: () => ({ ok: true, issues: [] }),
+             merge: n => n === 'triage-1' ? { ok: true, before: 'b', commit: 'c', notes: 'push rejected', pushed: false } : undefined }))
+    const tm = r.calls.find(c => c.role === 'merge' && c.name === 'triage-1')
+    return !!tm && tm.prompt.includes('from then on the repair is merged') && tm.prompt.includes('run `git rebase --abort` and reply ok=false') &&
+      (r2.out || []).some(l => /^triage: repaired \(cycle 1\) \[push failed\]/.test(l))
+  },
+  'a feature named stashed is a feature, not the stash line': async src => {
+    const r = await run(src, { features: [feat('stashed')] }, pass())
+    return line(r.out, 'stashed').includes('merged')
+  },
+  'under verify-first the reviewer, who runs before the prover, is not sent to the prover\'s notes': async src => {
+    const r = await run(src, { gateOrder: 'verify-first', features: [feat('a', 'A')] }, pass())
+    const rv = r.calls.find(c => c.role === 'review')
+    return !!rv && !/prover's notes|"prover"/.test(rv.prompt) && /The builder's notes are claims/.test(rv.prompt)
+  },
+  'what a builder stashed in the shared tree is said in the account': async src => {
+    const r = await run(src, { features: [feat('a'), feat('b')] }, pass({ build: n => n === 'a' ? { ready: true, summary: '', blockers: [], stashed: true } : undefined }))
+    const s = r.out.filter(l => l.startsWith('stashed: '))
+    return s.length === 1 && /^stashed: before a — .*git stash list/.test(s[0]) && line(r.out, 'a').includes('merged')
+  },
+  'a failed push is in the account, and the merge stays': async src => {
+    const r = await run(src, { push: true, features: [feat('a')] }, pass({ merge: () => ({ ok: true, before: 'b0', commit: 'c1', notes: 'push rejected', pushed: false }) }))
+    const m = r.calls.find(c => c.role === 'merge')
+    return /a: merged.*\[push failed\]/.test(line(r.out, 'a')) && !!m && m.prompt.includes('(the push, deleting the branch)')
+  },
+})
+Object.assign(mutants, {
+  'a pass with an unmet criterion merges': ['serious(ver.issues).length === 0 && !((ver.notMet || []).length) &&', 'serious(ver.issues).length === 0 &&'],
+  'a partial maxAttempts drops the other tiers': ['const MAX = { A: 5, B: 4, C: 3, ...(A.maxAttempts || {}) }', 'const MAX = A.maxAttempts || { A: 5, B: 4, C: 3 }'],
+  'a reviewer that returned nothing is not said': ["if (tier === 'A' && !rev) feedback.push(", 'if (false) feedback.push('],
+  'a refusal with nothing to act on is left empty': ['if (!feedback.length) feedback.push({ severity: \'blocker\', where: \'verify\', problem: `the verifier refused', 'if (false) feedback.push({ severity: \'blocker\', where: \'verify\', problem: `the verifier refused'],
+  'a PASS report the reviewer refused is not said': [': reviewRefusedAt ? {', ': false ? {'],
+  'an earlier reviewer\'s findings are claimed for a later attempt': ["${reviewRefusedAt === MAX[tier] ? ' (its findings are the issues above)' : ''}", ' (its findings are the issues above)'],
+  'a FAIL report does not clear the reviewer\'s refusal': ['? attempt : 0  // a new report replaces the old', '? attempt : reviewRefusedAt'],
+  'the triage merger reports a failure after the move as ok=false': ["from then on the repair is merged, and a failure after it", 'XXXX'],
+  'a failed triage push vanishes': ["${o.pushFailed ? ' [push failed]' : ''}${o.items", '${o.items'],
+  'the stash line is told apart by name': ['return outcomes.map(o => o.stash\n', "return outcomes.map(o => o.name === 'stashed'\n"],
+  'a failed push vanishes from the account': ["${o.pushFailed ? ' [push failed]' : ''}", ''],
+  'a stash is never said': ["if (stashedBefore.length) outcomes.push(", 'if (false) outcomes.push('],
+  'the verify-first reviewer is sent to notes no prover wrote yet': ["...(VERIFY_FIRST ? {} : { prover: proverNotes })", 'prover: proverNotes'],
+  'the push is not named among what follows the move': ["${A.push ? 'the push, ' : ''}${LANES > 1", '${LANES > 1'],
+  'the merger is told to reply with the prover\'s key on a conflict': ["${NO_HALF_DONE('ok')}", "${NO_HALF_DONE('ready')}"],
+  'a conflict tells no one which reply it is': ['then stop and reply ${reply}=false, naming', 'and stop naming'],
+})
+
+Object.assign(scenarios, {
+  'a conflict stops the prover with ready=false and the merger with ok=false, each naming the files': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    const p = r.calls.find(c => c.role === 'prove'), m = r.calls.find(c => c.role === 'merge')
+    return !!p && !!m && p.prompt.includes('then stop and reply ready=false, naming the conflicting files') &&
+      m.prompt.includes('then stop and reply ok=false, naming the conflicting files')
+  },
+  'the prover\'s gate wait names the tool\'s timeout, as the builder\'s does': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    const p = r.calls.find(c => c.role === 'prove')
+    return !!p && /keep waiting\. Give that Bash call a timeout parameter of \d+ milliseconds/.test(p.prompt)
+  },
+  'the reviewer is given the builder\'s and the prover\'s notes it is told to spot-check': async src => {
+    const r = await run(src, { features: [feat('a', 'A')] }, pass({ build: () => ({ ready: true, summary: 'BUILT-IT-THIS-WAY', blockers: [] }), prove: () => ({ ready: true, notes: 'GATE-GREEN-NOTE', blockers: [] }) }))
+    const rv = r.calls.find(c => c.role === 'review')
+    return !!rv && /THE NOTES: .*BUILT-IT-THIS-WAY.*GATE-GREEN-NOTE/.test(rv.prompt)
+  },
+  'every role that brings main in names the feature branch, never just the branch checked out': async src => {
+    const r = await run(src, { features: [feat('a')] }, pass())
+    return ['prove', 'merge'].every(role => /is-ancestor main feat\/a/.test(r.calls.find(c => c.role === role).prompt))
+  },
+})
+Object.assign(mutants, {
+  'the gate wait loses the tool timeout': ['means keep waiting. Give that Bash call a timeout parameter of ${(CHUNK + 20) * 1000} milliseconds: the tool\'s default is 120 seconds, and a wait that outlasts it is moved to the background, which is the thing to avoid.\n   c) the ${what}', 'means keep waiting.\n   c) the ${what}'],
+  'the reviewer gets no notes': ["REVIEW(f, { builder: built.summary || '', ...(VERIFY_FIRST ? {} : { prover: proverNotes }) })", 'REVIEW(f)'],
+  'main is brought into HEAD, not the feature branch': ['--is-ancestor ${MAIN} feat/${f.name}', '--is-ancestor ${MAIN} HEAD'],
+})
 
 // ---- 3.44.0: the command that applies what merged code needs outside git (a database migration) ----
 const PM = { postMerge: 'bash docs/process/migrate.sh' }
@@ -593,7 +719,7 @@ const MBASE = {
   delegatedOn: '2026-09-29', stopAt: [], sectionsPerRun: 4, effort: { decompose: 'xhigh', plan: 'low', final: 'medium' },
 }
 const sec = (slug, over = {}) => ({ slug, roadmap: `docs/ROADMAP-${slug}.md`, txt: `docs/roadmap-${slug}.txt`, dependsOn: [], decomposed: false, pending: [], ...over })
-const planArgs = slug => ({ project: '/p', skillDir: '/s', downstream: 'tlc-spec-lean', downstreamDir: '/d', statusPath: 'docs/ROADMAP-INDEX.md', mainBranch: 'main', gate: 'make check', effort: {}, maxAttempts: { A: 5, B: 4, C: 3 }, features: [{ name: slug + '-a' }], roadmap: `docs/ROADMAP-${slug}.md` })
+const planArgs = slug => ({ project: '/p', skillDir: '/s', downstream: 'tlc-spec-lean', downstreamDir: '/d', statusPath: 'docs/ROADMAP-INDEX.md', mainBranch: 'main', gate: 'make check', barrierGate: null, lanes: 1, worktreeRoot: '/p.lanes', effort: {}, maxAttempts: { A: 5, B: 4, C: 3 }, features: [{ name: slug + '-a', roadmap: `docs/ROADMAP-${slug}.md` }], roadmap: `docs/ROADMAP-${slug}.md` })
 async function runManager(src, argsOver, child = () => ['x: merged (attempt 1)', 'barrier: green after x'], behave = {}) {
   const calls = [], children = []
   const agent = async (prompt, opts) => {
@@ -720,6 +846,36 @@ const managerScenarios = {
       { plan: () => ({ exitCode: 1, line: 'a: 3 done, 0 question-only, 0 to build (nothing); scriptPath x', argsJson: '' }) })
     return r.calls.filter(c => c.role === 'plan').length === 1 && r.out.some(l => l === 'a: already done')
   },
+  'manager: barrier and triage lines are not read as features (their test names say merged or skipped)': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('b', { dependsOn: ['a'] })] },
+      slug => slug === 'a' ? ['a-a: merged (attempt 1)', 'barrier: red after a-a — tests/test_rows.py::test_skipped_rows: skipped rows were not released', 'triage: fixed (cycle 1) — regression in x: merged_totals', 'barrier: green after a-a'] : ['b-a: merged (attempt 1)'])
+    return r.children.map(c => c.slug).join() === 'a,b' && r.out.some(l => /^a: 1 merged($| —)/.test(l)) && !r.out.some(l => /^b: skipped/.test(l))
+  },
+  'manager: a failed post-merge command stops the run': async src => {
+    const r = await runManager(src, { sections: [sec('a'), sec('b')] },
+      slug => slug === 'a' ? ['a-a: merged (attempt 1) [post-merge command failed]', 'a-b: held — the post-merge command failed after a-a'] : ['b-a: merged (attempt 1)'])
+    return r.children.map(c => c.slug).join() === 'a' && r.out.some(l => /stopped: the post-merge command failed after a-a, in a/.test(l))
+  },
+  'manager: a stash and a failed push in a section are passed on to the owner': async src => {
+    const r = await runManager(src, { sections: [sec('a')] },
+      () => ['a-a: merged (attempt 1) [push failed]', 'stashed: before a-a — uncommitted changes found in the shared tree are in git stash list', 'barrier: green after a-a'])
+    return r.out.some(l => /^  a a-a: merged .*\[push failed\]/.test(l)) && r.out.some(l => /^  a stashed: before a-a/.test(l)) && r.out.some(l => /^a: 1 merged/.test(l))
+  },
+  'manager: a plan for another section is refused and asked again': async src => {
+    let n = 0
+    const r = await runManager(src, { sections: [sec('b', { decomposed: true, pending: ['b-a'] })] }, undefined,
+      { plan: slug => n++ === 0 ? { exitCode: 0, line: 'ok', argsJson: JSON.stringify(planArgs('a')) } : undefined })
+    const plans = r.calls.filter(c => c.role === 'plan')
+    return plans.length === 2 && /another roadmap than docs\/ROADMAP-b\.md: a-a/.test(plans[1].prompt) && r.children.length === 1
+  },
+  'manager: a plan that dropped barrierGate or statusPath is asked again': async src => {
+    let n = 0
+    const { barrierGate, statusPath, ...dropped } = planArgs('a')
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: ['a-a'] })] }, undefined,
+      { plan: slug => n++ === 0 ? { exitCode: 0, line: 'ok', argsJson: JSON.stringify(dropped) } : undefined })
+    const plans = r.calls.filter(c => c.role === 'plan')
+    return plans.length === 2 && /it lacks statusPath, barrierGate/.test(plans[1].prompt)
+  },
   'manager: every agent carries the launch scoping, and the decomposer the delegation and the marking': async src => {
     const r = await runManager(src, { sections: [sec('a')] })
     const d = r.calls.find(c => c.role === 'decompose')
@@ -746,6 +902,7 @@ const managerScenarios = {
   },
 }
 const managerMutants = {
+  'the manager drops what the child said about a stash and a push': ["for (const l of out.filter(l => l.startsWith('stashed: ')", "for (const l of [].filter(l => l.startsWith('stashed: ')"],
   'dependants of an unfinished section not skipped': ['if (bad) { blockedSections.add', 'if (false) { blockedSections.add'],
   'a finished section called done with a barrier owed': ['if (s.decomposed && !(s.pending || []).length && !barrierOwed) {', 'if (s.decomposed && !(s.pending || []).length) {'],
   'stopAt ignored': ['if (STOP_AT.has(s.slug))', 'if (false)'],
@@ -754,8 +911,12 @@ const managerMutants = {
   'the first barrier line decides': ["const red = [...out].reverse().find(l => l.startsWith('barrier: '))", "const red = out.find(l => l.startsWith('barrier: '))"],
   'doubtful features built anyway': ['if (doubt.length) {', 'if (false) {'],
   'child pipelines not told they run in manager mode': ['{ ...pargs, managerMode: true, autonomy: AUTONOMY }', 'pargs'],
-  'the planner reply is not validated': ['why = argsProblem(o)', "why = ''"],
+  'the planner reply is not validated': ['why = argsProblem(o, s)', "why = ''"],
   'an empty plan is refused even with a barrier owed': ['(o.features.length || o.barrierPending)', '(o.features.length)'],
+  'a feature line is matched anywhere in the line': ["out.filter(l => /^[^\\s:]+: (blocked|skipped|held|merge-failed)\\b/.test(l))", 'out.filter(l => /: (blocked|skipped|held|merge-failed)/.test(l))'],
+  'a merged line is matched anywhere in the line': ["out.filter(l => /^[^\\s:]+: merged\\b/.test(l)).length", 'out.filter(l => /: merged/.test(l)).length'],
+  'a failed post-merge command does not stop the manager': ['if (postMergeFailed) { stopped =', 'if (false) { stopped ='],
+  'a plan for another section is accepted': ['if (other.length) return `it plans features', 'if (false) return `it plans features'],
   'the planner is never asked again': ['const PLAN_TRIES = 3', 'const PLAN_TRIES = 1'],
   'the planner is not told why it was rejected': ['A previous reply of yours was rejected because ${why}.', 'A previous reply of yours was rejected.'],
   'a refusal of plan-pipeline.py is asked again': ['if (!(p && p.exitCode === 0)) break', ''],

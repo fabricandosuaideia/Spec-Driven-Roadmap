@@ -69,7 +69,9 @@ Every shipped script with a `--selftest` has it run by the release gate; the gat
 the fixture, under its own parent directory. Never point two agents at one tree, never reuse a tree a
 previous run wrote to, and never score a run whose directory you did not create for it. That includes
 scratch space: sub-agents inherit the launcher's scratchpad, so tell each to keep its scratch files
-inside its own copy. Use
+inside its own copy. And the shell: a sub-agent's starts every call in the launcher's working directory —
+this repository — so tell each to begin every command with `cd <its copy> &&` (3.48.0: one that did not ran
+a `git checkout -b` here). Use
 `scripts/run-benchmark.py setup --agents N`, which builds N isolated copies and refuses to reuse a
 path; hand-rolling the setup is where this goes wrong every time.
 
@@ -108,7 +110,8 @@ in the `CHANGELOG.md` entry that made them — the third, 3.32.0, gave rules 1 a
 exception. Two prompt clauses of `scripts/roadmap-pipeline.js` are protected the same way even though they are
 not among the 13 — the `TESTS` clause of the builder and of the unblock repairer (3.33.0, widened in 3.40.0 and
 bounded in 3.43.1) and the verifier's check of every change to an existing test: loosening either lets an
-unattended agent edit a test to pass.
+unattended agent edit a test to pass. Since 3.47.0 the builder's test-conflict clause is protected for the same reason: a
+conflict in an existing test is never settled by the side that makes it pass.
 
 **Reading the downstream skill.** `references/handoff-seed.md` requires reading the downstream skill's
 real schema from disk, never from memory — `tlc-spec-lean` by default, `tlc-spec-driven` also
@@ -339,8 +342,8 @@ Recorded so it is not attempted again:
   release: it becomes theatre, producing an artifact that *resembles* verification.
 - **Clauses for the reviewer, tested on fixtures** (3.46.0): a severity scale, "grep who else reads what the diff writes", "list every major in one
   pass". Fourteen blind Sonnet reviewers, on a five-file repo and on a 55-file repo with three readers outside the diff: every one found every planted
-  defect with and without the clauses, so fixtures of that size cannot show a gain in recall, and the clauses only moved severity — down by 1.75 majors on
-  the small repo, up by 1 on the large one. What loops tier A is a large diff the reviewer does not exhaust in one pass; build that fixture before
+  defect with and without the clauses, so fixtures of that size cannot show a gain in recall, and the clauses only moved severity — the mean of blockers plus majors
+  fell from 8.0 to 6.25 on the small repo and rose from 7.0 to 8.0 on the large one. What loops tier A is a large diff the reviewer does not exhaust in one pass; build that fixture before
   writing the clause again. The change that did pay was the one whose failure is a plain omission (the builder's first attempt never rebased an existing
   branch: 0 of 3 finished controls did, 10 of 10 with the sentence), because there the control shows the defect. And count a `git merge` as what it is: an
   ancestor test cannot tell it from a rebase.
