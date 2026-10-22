@@ -466,7 +466,9 @@ const CLAUSES = [
   ['verify: a scoped round covers this feature\'s own files, not what a merge of main brought', 'verify', 'brought in through a merge is not this feature', { round2: true }],
   ['build: a half-done rebase or merge left by an earlier agent is undone first', 'build', 'an earlier agent stopped inside it', {}],
   ['prove: a conflict is undone and left to the builder', 'prove', "resolving a conflict is the builder", {}],
-  ['prove: the prover changes no test and no code', 'prove', 'a failure is reported, never fixed.', {}],
+  ['prove: the prover changes no test and no code', 'prove', 'TESTS: you edit no test and no code of the branch: what you find is reported, never fixed.', {}],
+  ['verify: the verifier changes no test and no code, in manager mode too', 'verify', 'TESTS: you edit no test and no code of the branch: what you find is reported, never fixed.', { args: { managerMode: true } }],
+  ['review: the reviewer changes no test and no code, in manager mode too', 'review', 'TESTS: you edit no test and no code of the branch: what you find is reported, never fixed.', { tier: 'A', args: { managerMode: true } }],
   ['prove: a gate-failure note the gate no longer backs is deleted', 'prove', 'delete it in that commit (the gate it described now passes)', {}],
   ['merge: after the fast-forward the merge has happened', 'merge', 'from then on the merge has happened', {}],
   ['merge: the feature branch is checked out, after an abort', 'merge', 'is not the branch checked out there, check it out', {}],
@@ -559,6 +561,11 @@ Object.assign(scenarios, {
     return !!tm && tm.prompt.includes('from then on the repair is merged') && tm.prompt.includes('run `git rebase --abort` and reply ok=false') &&
       (r2.out || []).some(l => /^triage: repaired \(cycle 1\) \[push failed\]/.test(l))
   },
+  'the account\'s barrier and triage lines are told apart by what they are, not by a name a feature can have': async src => {
+    const r = await unblockRun(src, { features: [feat('barrier'), feat('triage')] })
+    const out = r.out || []
+    return out.some(l => /^barrier: merged \(attempt \d+\)/.test(l)) && out.some(l => /^triage: merged \(attempt \d+\)/.test(l)) && out.some(l => /^barrier: red after/.test(l)) && out.some(l => /^triage: (repaired|stopped)/.test(l))
+  },
   'a feature named stashed is a feature, not the stash line': async src => {
     const r = await run(src, { features: [feat('stashed')] }, pass())
     return line(r.out, 'stashed').includes('merged')
@@ -589,7 +596,11 @@ Object.assign(mutants, {
   'a FAIL report does not clear the reviewer\'s refusal': ['? attempt : 0  // a new report replaces the old', '? attempt : reviewRefusedAt'],
   'the triage merger reports a failure after the move as ok=false': ["from then on the repair is merged, and a failure after it", 'XXXX'],
   'a failed triage push vanishes': ["${o.pushFailed ? ' [push failed]' : ''}${o.items", '${o.items'],
+  'the barrier line is told apart by name again': ["  : o.kind === 'barrier'\n", "  : o.name === 'barrier'\n"],
+  'the triage line is told apart by name again': ["  : o.kind === 'triage'\n", "  : o.name === 'triage'\n"],
   'the stash line is told apart by name': ['return outcomes.map(o => o.stash\n', "return outcomes.map(o => o.name === 'stashed'\n"],
+  'the verifier is handed the builder\'s rule for correcting a test again': ['const VERIFY = (f, attempt) => `${COMMON(f, true)}', 'const VERIFY = (f, attempt) => `${COMMON(f)}'],
+  'the reviewer is handed the builder\'s rule for correcting a test again': ['const REVIEW = (f, notes) => `${COMMON(f, true)}', 'const REVIEW = (f, notes) => `${COMMON(f)}'],
   'a failed push vanishes from the account': ["${o.pushFailed ? ' [push failed]' : ''}", ''],
   'a stash is never said': ["if (stashedBefore.length) outcomes.push(", 'if (false) outcomes.push('],
   'the verify-first reviewer is sent to notes no prover wrote yet': ["...(VERIFY_FIRST ? {} : { prover: proverNotes })", 'prover: proverNotes'],
@@ -856,6 +867,12 @@ const managerScenarios = {
       slug => slug === 'a' ? ['a-a: merged (attempt 1) [post-merge command failed]', 'a-b: held — the post-merge command failed after a-a'] : ['b-a: merged (attempt 1)'])
     return r.children.map(c => c.slug).join() === 'a' && r.out.some(l => /stopped: the post-merge command failed after a-a, in a/.test(l))
   },
+  'manager: a feature called barrier, triage or stashed is a feature, not the run\'s own line': async src => {
+    const r = await runManager(src, { sections: [sec('a')] },
+      () => ['triage: blocked after 3 attempts', 'stashed: merged (attempt 2)', 'barrier: red after barrier, triage — t::x', 'triage: stopped (cycle 1) — nothing could be classified', 'barrier: merged (attempt 1)'])
+    return r.out.some(l => /^a: 2 merged, 1 not finished \(triage\) — barrier: red/.test(l)) && r.out.filter(l => /^  a triage: stopped/.test(l)).length === 1 && !r.out.some(l => /^  a triage: blocked/.test(l)) &&
+      !r.out.some(l => /^  a stashed:/.test(l)) && r.out.some(l => /stopped: the barrier is red after a/.test(l))
+  },
   'manager: a stash and a failed push in a section are passed on to the owner': async src => {
     const r = await runManager(src, { sections: [sec('a')] },
       () => ['a-a: merged (attempt 1) [push failed]', 'stashed: before a-a — uncommitted changes found in the shared tree are in git stash list', 'barrier: green after a-a'])
@@ -902,13 +919,16 @@ const managerScenarios = {
   },
 }
 const managerMutants = {
-  'the manager drops what the child said about a stash and a push': ["for (const l of out.filter(l => l.startsWith('stashed: ')", "for (const l of [].filter(l => l.startsWith('stashed: ')"],
+  'a feature called barrier is read as the barrier': ["const isBarrier = l => /^barrier: (green|red) after /.test(l)", "const isBarrier = l => l.startsWith('barrier: ')"],
+  'a feature called triage is read as a triage line': ["/^triage: (repaired|not enough|stopped) \\(cycle \\d+\\)/.test(l))", "l.startsWith('triage: '))"],
+  'a feature called stashed is relayed as a stash': ["l.startsWith('stashed: before ') ||", "l.startsWith('stashed: ') ||"],
+  'the manager drops what the child said about a stash and a push': ["for (const l of out.filter(l => l.startsWith('stashed: before ')", "for (const l of [].filter(l => l.startsWith('stashed: before ')"],
   'dependants of an unfinished section not skipped': ['if (bad) { blockedSections.add', 'if (false) { blockedSections.add'],
   'a finished section called done with a barrier owed': ['if (s.decomposed && !(s.pending || []).length && !barrierOwed) {', 'if (s.decomposed && !(s.pending || []).length) {'],
   'stopAt ignored': ['if (STOP_AT.has(s.slug))', 'if (false)'],
   'red barrier ignored': ["if (stillRed) { stopped = `the barrier is red after ${s.slug}`; break }", ''],
   'decisions not marked': ['**Decided by the manager', '**Decided'],
-  'the first barrier line decides': ["const red = [...out].reverse().find(l => l.startsWith('barrier: '))", "const red = out.find(l => l.startsWith('barrier: '))"],
+  'the first barrier line decides': ["const red = [...out].reverse().find(isBarrier)", "const red = out.find(isBarrier)"],
   'doubtful features built anyway': ['if (doubt.length) {', 'if (false) {'],
   'child pipelines not told they run in manager mode': ['{ ...pargs, managerMode: true, autonomy: AUTONOMY }', 'pargs'],
   'the planner reply is not validated': ['why = argsProblem(o, s)', "why = ''"],

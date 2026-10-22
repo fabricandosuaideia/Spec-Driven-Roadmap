@@ -121,13 +121,13 @@ const LONG_COMMANDS = `LONG COMMANDS: you are finished the moment you reply or c
    b) timeout ${CHUNK} tail --pid=<that PID> -f /dev/null — never sleep — repeated until $D/exit exists (exit code 124 only means keep waiting). Give that Bash call a timeout parameter of ${(CHUNK + 20) * 1000} milliseconds: the tool's default is 120 seconds, and a wait that outlasts it is moved to the background, which is the thing to avoid.
    c) the exit code is the content of $D/exit; read only the tail and the failures of $D/log.`
 
-const COMMON = (f, prover = false) => `You are one agent of a build pipeline for the project at ${P}. Nobody is available to answer: decide, record the decision where ${DS} keeps assumptions, never ask.
+const COMMON = (f, readOnly = false) => `You are one agent of a build pipeline for the project at ${P}. Nobody is available to answer: decide, record the decision where ${DS} keeps assumptions, never ask.
 ${LAUNCHED}
 FEATURE: ${f.name}, risk tier ${tierOf(f)}. Its spec source is the output of: python3 ${SKILL}/scripts/feature-brief.py ${f.name} --root ${P} — the entry, the questions naming it, the contracts it consumes, the settled Cross-Cutting Decisions, and what tier ${tierOf(f)} sets for ${DS}. Never open a docs/ROADMAP*.md file whole.
 DOWNSTREAM SKILL: ${DS}, at ${DSDIR}. Read its SKILL.md and only the references your role needs.
 ${WORKTREE(f)}
 CONTEXT BUDGET: every turn re-reads your whole conversation. Read files with offset/limit, grep for a symbol instead of reading a directory, send long command output to a file and read back only the lines that matter, never paste a whole log or diff, never re-read a file that did not change.
-${prover ? 'TESTS: you edit no test and no code: a failure is reported, never fixed.' : MANAGED ? REVOKED_RULE : 'TESTS: never edit, weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green. A test that is genuinely wrong stays red, with the reason written down.'}`
+${readOnly ? 'TESTS: you edit no test and no code of the branch: what you find is reported, never fixed. (A fault-injection mutant is reverted before you finish and never committed.)' : MANAGED ? REVOKED_RULE : 'TESTS: never edit, weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green. A test that is genuinely wrong stays red, with the reason written down.'}`
 
 const REVOKED_RULE = `TESTS: never weaken, skip, delete or add a test to reach a pass, and never change behaviour against an acceptance criterion or a settled Cross-Cutting Decision to turn a test green.
 MANAGER MODE — one exception, because nobody is there to authorise it: an existing test is updated, not obeyed, when its assertion states a behaviour that this feature's spec changes — an acceptance criterion, an answered open question or a settled Cross-Cutting Decision states the new behaviour, and the old assertion contradicts it. The criterion or decision must come from the roadmap behind this feature (the entry, the answered questions and the Cross-Cutting Decisions that feature-brief.py prints), decided before you started — never from a spec, plan or check that you wrote on this branch. Update THAT assertion, and only it, to the behaviour the spec now states, at the same strength — as specific, no looser matcher, no removed check, no skip — in a commit of its own whose FIRST LINE is REVOKED-TEST <file>:<test name> (so that git log --grep=REVOKED-TEST finds it) and whose body quotes the criterion or decision and names where it is recorded. List each in your notes as well. A test red for any other reason is a defect in your change: fix the code, not the test, and if it truly cannot be fixed inside this feature's scope say exactly why in your notes. The independent verifier refuses every test change that is not such a correction.`
@@ -203,7 +203,7 @@ const SCOPE = f => `its report is the committed ${REPORT} in .specs/features/${f
 // that did not finish, or after a prover that failed first, is the first time a verifier sees the feature.
 const ROUND = (f, attempt) => VP.rounds === 'full' ? '' : `ROUND ${attempt}. Step 1: run git log -1 --format=%H ${MAIN}..HEAD -- .specs/features/${f.name}/${REPORT} (only this branch's commits: a report already on ${MAIN} belongs to a run the gate did not accept). If it prints NOTHING, this is a FIRST verification: ignore the rest of this paragraph and verify everything by ${DS}'s own rules — a clause of a criterion that no test exercises is not proven, and a surviving mutant is a finding, exactly as those rules say. If it prints a sha, this is a LATER ROUND, that sha is the report's commit, and the rest of this paragraph applies — ${SCOPE(f)}\n`
 
-const VERIFY = (f, attempt) => `${COMMON(f)}
+const VERIFY = (f, attempt) => `${COMMON(f, true)}
 
 ROLE: VERIFIER. You did not build this; try to show it is NOT done. Follow ${DS}'s ${LEAN ? 'references/verify.md' : 'references/validate.md'} over every ${LEAN ? 'check' : 'acceptance criterion'}. You change no code.
 ${VERIFY_FIRST ? VERIFY_GATE(f) : VERIFY_RECEIPT(f)}
@@ -213,7 +213,7 @@ Reply with gateExit, pass (true only if gateExit is 0, every ${LEAN ? 'check' : 
 
 const REVOKED_CHECK = f => `REVOKED TESTS (manager mode): list every change on this branch to a test that already existed on ${MAIN} (git diff ${MAIN}...feat/${f.name}, over the project's test files: test sources, fixtures, conftest, test configuration and the gate script). Each must be a REVOKED-TEST the builder declared, in a commit of its own whose first line is REVOKED-TEST <file>:<test name> (git log ${MAIN}..feat/${f.name} --grep=REVOKED-TEST finds them) and whose body quotes an acceptance criterion, an answered question or a settled Cross-Cutting Decision. Read it where the commit says it is, and confirm (1) that it states a behaviour the OLD assertion contradicts, (2) that the new assertion states that behaviour at the same strength, and (3) that it was decided BEFORE this branch: run git log ${MAIN}..feat/${f.name} -- <the file it is recorded in>, and if the branch itself added or edited that text, or it appears only in a spec, plan or check the builder wrote on this branch with nothing in the roadmap behind it (python3 ${SKILL}/scripts/feature-brief.py ${f.name} --root ${P}), it is not a decision. Every change that fails any of this — an undeclared edit, no such criterion or decision, one the old assertion does not contradict, one the branch wrote itself, a weaker assertion, a skip or an expected-failure mark, a deletion — is a blocker issue at that file:line. A criterion that was written only to explain the edit, and states nothing the product needed, is the same blocker.`
 
-const REVIEW = (f, notes) => `${COMMON(f)}
+const REVIEW = (f, notes) => `${COMMON(f, true)}
 
 ROLE: CODE REVIEWER, independent of the builder and the verifier. Review git diff ${MAIN}...feat/${f.name}; read a changed file in full only where the diff is not enough. You edit and commit nothing, and you do not run the full suite.
 Look for: correctness and unhandled edge cases; non-atomic read-then-write on shared state; state written before validation; security (injection, missing authorisation, secrets in logs or persisted text); swallowed errors; missing timeouts; unbounded queries or per-row query loops; a duplicate of a helper that already exists; weak or tautological tests; comments that claim more than the code does.${A.checklist ? ` Also every item of ${A.checklist}.` : ''}
@@ -356,7 +356,7 @@ const TRIAGE_EFFORT = EFFORT.triage || 'high'
 const repair = async (merged, failures) => {
   const base = mergedAt[merged[0]] && mergedAt[merged[0]].before
   const specs = merged.filter(n => mergedAt[n]).map(n => `${n}:${mergedAt[n].before}:${mergedAt[n].after}`)
-  const stop = (because, cycle) => { outcomes.push({ name: 'triage', result: 'stopped', cycle, because }); log(`triage: stopped — ${because}`); return false }
+  const stop = (because, cycle) => { outcomes.push({ name: 'triage', kind: 'triage', result: 'stopped', cycle, because }); log(`triage: stopped — ${because}`); return false }
   if (!base) return stop('no base commit was recorded for these merges', 1)
   for (let cycle = 1; cycle <= 2; cycle++) {
     const t = await agent(TRIAGE(merged, failures, base, specs, cycle), { phase: 'Barrier', label: `triage:${cycle}`, schema: TRIAGE_SCHEMA, effort: TRIAGE_EFFORT, ...modelFor('triage') })
@@ -371,8 +371,8 @@ const repair = async (merged, failures) => {
     if (!m || !m.ok) return stop('the repair did not merge: ' + (m ? m.notes : 'no result'), cycle)
     const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:after-triage-${cycle}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...modelFor('barrier') })
     const green = !!(b && b.ok && b.exitCode === 0)
-    outcomes.push({ name: 'triage', result: green ? 'repaired' : 'not enough', cycle, items: items.map(i => `${i.kind}${i.feature ? ' in ' + i.feature : ''}: ${i.test}`), ...(A.push && m.pushed !== true ? { pushFailed: true } : {}) })
-    outcomes.push({ name: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
+    outcomes.push({ name: 'triage', kind: 'triage', result: green ? 'repaired' : 'not enough', cycle, items: items.map(i => `${i.kind}${i.feature ? ' in ' + i.feature : ''}: ${i.test}`), ...(A.push && m.pushed !== true ? { pushFailed: true } : {}) })
+    outcomes.push({ name: 'barrier', kind: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
     log(`triage cycle ${cycle}: barrier ${green ? 'green' : 'still red'}`)
     if (green) return true
     failures = b ? b.failures : []
@@ -386,7 +386,7 @@ const runBarrier = async () => {
   sinceBarrier = []
   const b = await agent(BARRIER(merged), { phase: 'Barrier', label: `barrier:${merged[merged.length - 1]}`, schema: BARRIER_SCHEMA, effort: effortFor('merge', { tier: 'B' }), ...modelFor('barrier') })
   let green = !!(b && b.ok && b.exitCode === 0)
-  outcomes.push({ name: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
+  outcomes.push({ name: 'barrier', kind: 'barrier', result: green ? 'green' : 'red', after: merged, failures: b ? b.failures : ['the barrier returned nothing'] })
   log(`barrier after ${merged.join(', ')}: ${green ? 'green' : 'red'}`)
   if (!green && UNBLOCK) green = await repair(merged, b ? b.failures : [])
   if (!green) barrierRed = merged
@@ -494,8 +494,8 @@ phase('Record')
 await agent(RECORD(outcomes), { phase: 'Record', label: 'record', schema: RECORD_SCHEMA, effort: effortFor('record', { tier: 'B' }), ...modelFor('record') })
 return outcomes.map(o => o.stash
   ? `stashed: before ${o.stash.join(', ')} — uncommitted changes found in the shared tree are in git stash list ("left before feat/<name>"); none was carried into a branch`
-  : o.name === 'barrier'
+  : o.kind === 'barrier'
   ? `barrier: ${o.result} after ${o.after.join(', ')}${o.result === 'red' ? ' — ' + (o.failures || []).slice(0, 5).join('; ') : ''}`
-  : o.name === 'triage'
+  : o.kind === 'triage'
   ? `triage: ${o.result} (cycle ${o.cycle})${o.pushFailed ? ' [push failed]' : ''}${o.items ? ' — ' + o.items.join('; ') : ''}${o.because ? ' — ' + o.because : ''}`
   : `${o.name}: ${o.result}${o.attempt ? ' (attempt ' + o.attempt + ')' : ''}${o.gateSkipped ? ' [gate skipped: receipt]' : ''}${o.postMergeFailed ? ' [post-merge command failed]' : ''}${o.pushFailed ? ' [push failed]' : ''}${o.result === 'skipped' ? ' — depends on ' + o.because : o.because ? ' — ' + o.because : ''}`)

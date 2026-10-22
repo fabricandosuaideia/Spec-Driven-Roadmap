@@ -158,7 +158,9 @@ for (const s of SECTIONS) {
   // verifier check every test change; option C, run by a person, never gets it.
   try { out = await workflow({ scriptPath: A.pipelineScript }, { ...pargs, managerMode: true, autonomy: AUTONOMY }) } catch (e) { out = null; lines.push(`${s.slug}: blocked — the pipeline did not run: ${e.message}`) }
   out = Array.isArray(out) ? out : []
-  if (out.some(l => l.startsWith('barrier: '))) barrierOwed = false
+  // The run's own lines are read by their exact shape: a feature called `barrier` writes `barrier: merged (attempt 1)`.
+  const isBarrier = l => /^barrier: (green|red) after /.test(l)
+  if (out.some(isBarrier)) barrierOwed = false
   // A feature line is `<name>: <result>`, so the match is anchored: barrier and triage lines carry test names and failure
   // text (`…: skipped rows`, `…: merged_totals`), and an unanchored one counted them as features (review of 3.47.0).
   const merged = out.filter(l => /^[^\s:]+: merged\b/.test(l)).length
@@ -166,13 +168,13 @@ for (const s of SECTIONS) {
   const postMergeFailed = out.find(l => /^[^\s:]+: merged\b.*\[post-merge command failed\]/.test(l))
   // The last barrier line decides: at level unblock a red barrier can be repaired and run again
   // green, and a real run stopped on the first, red line after its triage had fixed the cause.
-  const red = [...out].reverse().find(l => l.startsWith('barrier: '))
+  const red = [...out].reverse().find(isBarrier)
   const stillRed = red && red.startsWith('barrier: red') ? red : null
-  const triaged = out.filter(l => l.startsWith('triage: '))
+  const triaged = out.filter(l => /^triage: (repaired|not enough|stopped) \(cycle \d+\)/.test(l))
   if (out.length) lines.push(`${s.slug}: ${merged} merged${unfinished.length ? ', ' + unfinished.length + ' not finished (' + unfinished.map(l => l.split(':')[0]).join(', ') + ')' : ''}${stillRed ? ' — ' + stillRed : ''}`)
   for (const t of triaged) lines.push(`  ${s.slug} ${t}`)
   // what a builder stashed and a push that failed are the owner's to know; the child says them, the manager passes them on
-  for (const l of out.filter(l => l.startsWith('stashed: ') || /^[^\s:]+: merged\b.*\[push failed\]/.test(l))) lines.push(`  ${s.slug} ${l}`)
+  for (const l of out.filter(l => l.startsWith('stashed: before ') || /^[^\s:]+: merged\b.*\[push failed\]/.test(l))) lines.push(`  ${s.slug} ${l}`)
   if (!out.length || unfinished.length) blockedSections.add(s.slug)
   if (stillRed) { stopped = `the barrier is red after ${s.slug}`; break }
   // The child held what followed a failed post-merge command and ran no barrier; the next section would be built on an

@@ -9,6 +9,33 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.49.0 — 2026-10-22
+
+**Two of the four items 3.48.0 left open, and a measurement that closes a third without a change.** No agent was needed for the fixes: both are
+deterministic, so each is a scenario and a planted defect in `check-pipeline.mjs`, and the prompt change is a tightening.
+
+- **The verifier and the reviewer no longer receive the builder's rule for correcting a test.** In manager mode the shared preamble gave every
+  role "update THAT assertion … in a commit of its own"; 3.48.0 took it from the prover, and the verifier and the reviewer, who change nothing, still
+  had it. All three now read "you edit no test and no code of the branch: what you find is reported, never fixed", with the one thing a verifier does
+  change said outright — a fault-injection mutant is reverted before it finishes and never committed (the independent review saw that an absolute
+  "no code" could make a literal verifier skip its mutants). The verifier's check of every change to an existing
+  test (`REVOKED_CHECK`) and the builder's clauses are untouched. **Not run by an agent**: a stub proves the line is in the three prompts and that deleting it
+  from either is caught; whether a verifier ever acted on the old line is not measured.
+- **A feature named `barrier`, `triage` or `stashed` no longer collides with the run's own account.** The barrier and triage lines were told apart by a
+  `name` a feature could also have; they carry a `kind` now (the stash line already told itself apart by its own field). The manager read the child's
+  lines by prefix, so a feature called `barrier` wrote `barrier: merged …`, cleared the owed barrier and, as the last such line, hid a red one; it now
+  reads each of the run's own lines by its exact shape (`barrier: green|red after …`, `triage: repaired|not enough|stopped (cycle N)`, `stashed: before …`).
+  My first remedy was a planner refusal of the three names; the review pointed out it also stops option C projects that never had the problem, and a
+  lint would not have caught it before a section blocked mid-run. Three scenarios and three planted defects. The feature prefix makes the case rare.
+- **The gate's launch line is not changed.** 3.48.0 reported 3 of 18 Haiku agents losing the gate's PID by joining its launch with `&&`. Measured now in
+  the transcripts of the two projects that run it (read-only; a pattern of mine, so a count that can miss forms): **14 of 841 real launches** (Infinity-Agent-Creator 443,
+  MakeContent 398; tool calls containing both `nohup bash -c` and `mktemp`) put an `&&` before `nohup`; the independent review counted the same 14 over
+  723 launches in Infinity and the WordPress project. Of the 10 whose output I could read, 4 printed a PID, 2 printed nothing useful and 4 cannot be told from the output alone. The 3 of 18 came from my own test wrapper, which told the
+  agents to keep scratch inside their copy and so made them rewrite the `mktemp`. A wording change would cost tokens in every gate prompt for a form that is under 2% of launches
+  and has a way out (the exit file is read whether or not the PID was); if it matters, it should be measured on a real run first.
+
+**Not executed:** a real Workflow run with this text; the manager-revoke benchmark; the builder's second-attempt prompt.
+
 ## 3.48.0 — 2026-10-22
 
 **A review of everything released today (3.46.0, 3.47.0) and of the code those releases lean on, asked for by the owner. Each defect was reproduced
