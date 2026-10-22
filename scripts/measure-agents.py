@@ -138,7 +138,7 @@ def classify(path, root):
 # shape (a key missing, the wrong type) is not an outcome of that role and is left out of the count.
 STAGE_REFUSALS = {
     "build": ("the builder did not finish", lambda o: o["ready"] is False if isinstance(o.get("ready"), bool) else None),
-    "prove": ("the prover refused (a red gate or a rebase it could not do)", lambda o: o["ready"] is False if isinstance(o.get("ready"), bool) else None),
+    "prove": ("the prover refused (a red gate, or the main branch it could not bring in)", lambda o: o["ready"] is False if isinstance(o.get("ready"), bool) else None),
     "review": ("the reviewer found a blocker or a major", lambda o: any(isinstance(i, dict) and i.get("severity") in ("blocker", "major") for i in o["issues"]) if isinstance(o.get("issues"), list) else None),
     "merge": ("the merge failed", lambda o: o["ok"] is False if isinstance(o.get("ok"), bool) else None),
 }

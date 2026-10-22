@@ -3,7 +3,7 @@ export const meta = {
   description: 'Build pending roadmap features: implement, prove on a fresh context, verify (and review for tier A), merge only on pass',
   whenToUse: 'Run with the args printed by spec-driven-roadmap scripts/plan-pipeline.py, only when the user asked to run the pipeline',
   phases: [
-    { title: 'Build', detail: 'a builder implements on feat/<name>; a fresh prover rebases, runs the full gate once and writes the receipt (after the verifier, with gateOrder verify-first)' },
+    { title: 'Build', detail: 'a builder implements on feat/<name>; a fresh prover brings the main branch in, runs the full gate once and writes the receipt (after the verifier, with gateOrder verify-first)' },
     { title: 'Verify', detail: 'the downstream skill verifier (and, for tier A, an independent reviewer) — never the builder' },
     { title: 'Merge', detail: 'the authoritative gate on the exact tree (or the prover\'s receipt, with mergeGate receipt), then a fast-forward into the main branch' },
     { title: 'Barrier', detail: 'only when barrierGate is set: the whole suite on the merged main branch; red stops further merges' },
@@ -69,7 +69,7 @@ const modelFor = role => (A.models && A.models[role]) ? { model: A.models[role] 
 const VERIFY_FIRST = A.gateOrder === 'verify-first'
 // 3.43.0: the merge ran the whole gate again on a tree the prover had just proved, 9 times in 24 minutes on the
 // project that measured it (10% of its time). `mergeGate: 'receipt'` lets the receipt stand in when it proves
-// the exact tree: same code hash, and the main branch where the prover rebased onto it. A receipt is written by
+// the exact tree: same code hash, and the main branch where the prover brought it in. A receipt is written by
 // an agent, so plan-pipeline.py refuses this without a barrierGate, the one gate nobody's word stands in for.
 const BY_RECEIPT = A.mergeGate === 'receipt' && !!A.barrierGate
 // Set by manager-pipeline.js only. In manager mode nobody is there to authorise a test correction,
@@ -145,10 +145,18 @@ const ANGLES = [
   'Several attempts have been refused, each time on a narrower variant of the same cause. Fix ONLY the blocker and major issues below, at the root (state the invariant, enforce it in one place), leave minor ones alone, do not refactor.',
 ]
 
+// 3.47.0, from MakeContent (the owner counted 4 rounds): rounds stopped on a conflict while a builder, a prover or a merger "rebased" a branch that already
+// held the main branch through merge commits. `git rebase` drops the merges and replays the branch's own commits one by one, so
+// it conflicts again on what those merges had settled — checked in a scratch repository: with the main branch an ANCESTOR of the
+// branch, rebase still stopped on the first replayed commit. A branch that contains the main branch needs nothing; one that has
+// merges of its own takes the main branch by a merge (the fast-forward into main still works); only a linear branch is rebased.
+const BRING_MAIN = `bring ${MAIN} into the branch: if \`git merge-base --is-ancestor ${MAIN} HEAD\` succeeds there is nothing to do and you do NOT rebase (a rebase would replay the branch's own commits and conflict again on what its merges already settled); otherwise, if \`git rev-list --merges ${MAIN}..HEAD\` prints anything, run \`git merge ${MAIN}\` (a rebase would drop those merges); otherwise run \`git rebase ${MAIN}\``
+const TEST_CONFLICT = `In a test file never settle a conflict by the side that makes a test pass: keep ${MAIN}'s version of every line of an existing test, and this feature's own new tests; if the conflict is in an existing test that this feature changed and ${MAIN} also changed, run \`git rebase --abort\` or \`git merge --abort\` so the branch stays as you found it, and stop with ready=false naming the test.`
+
 const IMPLEMENT = (f, attempt, feedback) => `${COMMON(f)}
 
 ROLE: BUILDER, attempt ${attempt} of ${MAX[tierOf(f)]}. ${ANGLES[Math.min(attempt, ANGLES.length) - 1]}
-${attempt > 1 ? `First rebase feat/${f.name} onto ${MAIN}. Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}${attempt === 1 ? `If feat/${f.name} already exists, an earlier run built on it: first rebase it onto ${MAIN} and resolve any conflict yourself, keeping what both sides intended — the prover rebases it again and fixes nothing, so a conflict left for it costs a whole attempt.\nIf feat/${f.name} already exists and a refused ${REPORT} (or a gate-failure.md note) is committed in .specs/features/${f.name}/, an earlier run refused this feature: read that report or note first and resolve every gap it lists before anything else, as an attempt after a refusal does.\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
+${attempt > 1 ? `First ${BRING_MAIN}, and resolve any conflict yourself, keeping what both sides intended. ${TEST_CONFLICT} Issues to resolve (check each against the code first; if one is wrong, say why in your notes):\n${JSON.stringify(feedback || [], null, 1)}\n` : ''}${attempt === 1 ? `If feat/${f.name} already exists, an earlier run built on it: first ${BRING_MAIN}, and resolve any conflict yourself, keeping what both sides intended — the prover brings ${MAIN} in again and fixes nothing, so a conflict left for it costs a whole attempt. ${TEST_CONFLICT}\nIf feat/${f.name} already exists and a refused ${REPORT} (or a gate-failure.md note) is committed in .specs/features/${f.name}/, an earlier run refused this feature: read that report or note first and resolve every gap it lists before anything else, as an attempt after a refusal does.\n` : ''}Run ${DS}'s cycle for this feature through its last commit: ${LEAN ? 'plan and checks (approve them yourself and write that you did in plan.md under ## Assumptions), then build' : 'spec, design and tasks at the depth the tier sets (approve them yourself and write that you did in the spec under Assumptions & Open Questions), then execute'}. Commit atomically.
 While you work, run only the tests related to what you touched${A.testHint ? ` (${A.testHint})` : ''}. Do NOT run the full gate and do NOT write ${REPORT}: a fresh prover and an independent verifier come after you.
 ${LONG_COMMANDS}
 ${A.checklist ? `Before you finish, check your diff against every item of ${A.checklist} (the problems reviewers kept finding in this project) and fix what fails.\n` : ''}DEFERRED SCOPE: an issue that is the declared scope of a LATER feature in the build order is not yours: name that feature in your notes and move on.
@@ -157,11 +165,11 @@ Reply ready=true once every change is committed, even though the full gate has n
 const PROVE = f => `${COMMON(f)}
 
 ROLE: PROVER, on a fresh context. A builder already committed this feature on feat/${f.name}${VERIFY_FIRST ? ' and an independent verifier has passed it' : ''}; you did not write it. Do not re-implement and do not widen scope${VERIFY_FIRST ? ', and do not verify again: you are the last step before the merge' : ''}.
-1. Rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
+1. In the feature's working tree, ${BRING_MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
 2. Run the GATE once on this exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
    A failure is a defect, never "environmental": reply ready=false naming the failing test or file, and fix nothing.${VERIFY_FIRST ? ` Because a verifier already passed this feature, first leave a note for the next builder: write .specs/features/${f.name}/gate-failure.md (the failing tests and the command, at most 10 lines) and commit only that file.` : ''}
 3. Write .specs/features/${f.name}/gate-receipt.json as {"codeHash":"<output of: ${HASH}>","base":"<output of: git merge-base ${MAIN} HEAD>","gate":"pass","command":<the gate command>} and commit it. (The base is the commit of ${MAIN} your tree is built on: if ${MAIN} moved while the gate ran, it is the older one, which is what makes the receipt honest.)
-Reply ready=true only when the rebase is clean, the gate finished and passed, and the receipt is committed.`
+Reply ready=true only when ${MAIN} is in the branch without a conflict, the gate finished and passed, and the receipt is committed.`
 
 const VERIFY_RECEIPT = f => `GATES BY RECEIPT: recompute the code hash (${HASH}); if it equals .specs/features/${f.name}/gate-receipt.json's codeHash and the receipt says pass, do NOT re-run the full gate — run only this feature's tests and ${DS}'s own fault injection or discrimination sensor. If it differs or is missing, report that as a minor issue and run the gate yourself (${A.gate}) — ${RUN_GATE(A.gate, wt(f))}`
 // verify-first: no receipt exists yet, and the full gate belongs to the prover who follows a PASS.
@@ -218,7 +226,7 @@ const POST_MERGE = A.postMerge ? `3b. Then, once, on ${MAIN} in ${P}, run the pr
 const MERGE = f => `You are the MERGER for feature ${f.name} in the project at ${P}. Verification passed. Nothing reaches ${MAIN} without the gate below${BY_RECEIPT ? ', or a receipt that proves this exact tree' : ''}. Stop with ok=false at the first failure and change nothing further.
 ${LAUNCHED}
 0. Note the commit ${MAIN} points at now (git -C ${P} rev-parse ${MAIN}): that is \`before\`.
-1. In ${wt(f)}: rebase feat/${f.name} onto ${MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
+1. In ${wt(f)}: ${BRING_MAIN}${A.setup ? ` (if dependency manifests changed, run: ${A.setup})` : ''}.
 2. ${BY_RECEIPT ? MERGE_RECEIPT(f) : ''}Run the GATE once on that exact tree — ${A.gate} — and ${RUN_GATE(A.gate, wt(f))}
 3. Fast-forward ${MAIN} to feat/${f.name}${LANES > 1 ? ` (git -C ${P} checkout ${MAIN} && git -C ${P} merge --ff-only feat/${f.name})` : ` (git checkout ${MAIN} && git merge --ff-only feat/${f.name})`}.${A.push ? ` Then git push origin ${MAIN}.` : ' Do not push: pushing is the owner\'s call.'}
 ${POST_MERGE}4. ${LANES > 1 ? `git -C ${P} worktree remove ${wt(f)}; ` : ''}git branch -d feat/${f.name}.
@@ -401,7 +409,7 @@ const runFeature = async f => {
       const proved = await agent(PROVE(f), { phase: 'Build', label: `prove:${f.name}:${attempt}`, schema: PROVE_SCHEMA, effort: effortFor('prove', f), ...modelFor('prove') })
       if (proved && proved.ready) return true
       feedback = ((proved && proved.blockers.length) ? proved.blockers : ['the prover did not finish, or the gate failed'])
-        .map(b => ({ severity: 'blocker', where: 'prove', problem: b, fix: 'make the gate pass on the rebased tree' }))
+        .map(b => ({ severity: 'blocker', where: 'prove', problem: b, fix: 'make the gate pass on the tree with the main branch brought in' }))
       return false
     }
     if (!VERIFY_FIRST && !(await proveStep())) continue

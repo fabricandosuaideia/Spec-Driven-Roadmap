@@ -68,10 +68,25 @@ The downstream gate cannot decide these features: ${JSON.stringify(s.doubtful)}.
 Never edit a report. Write your decisions into docs/process/pipeline.json under "featureStatus" (add only these features, change nothing else) and commit on ${A.mainBranch}, message "chore(process): classify doubtful features of ${s.slug} (manager mode)".
 Reply ok (true only when that commit exists) and decided (one line each: feature → done or build, Decided by the manager (owner's delegation of ${A.delegatedOn || 'the recorded date'}): why).`
 
-const PLAN = s => `You are the PLANNER of section \`${s.slug}\` in the project at ${P}.
+// 3.47.0, from MakeContent: 12 of 57 planner replies (Haiku) were unusable, and every one blocked its section and the
+// sections after it. Eight parsed as objects that DESCRIBE the output ({"note":"stdout copied verbatim from /tmp/..."},
+// {"status":"ran on branch main, exit 0"}) and JSON.parse accepts those; four were not JSON. What the child pipeline needs
+// from the args is checked here, the planner is asked again with the reason, and a block names what was missing.
+const ARGS_NEEDED = ['project', 'skillDir', 'downstream', 'downstreamDir', 'mainBranch', 'gate', 'effort', 'maxAttempts', 'features']
+const PLAN_TRIES = 3
+const argsProblem = o => {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return 'it is not a JSON object'
+  const lacks = ARGS_NEEDED.filter(k => o[k] === undefined || o[k] === null || o[k] === '')
+  if (lacks.length) return `it lacks ${lacks.join(', ')}`
+  // plan-pipeline.py prints `features: []` with `barrierPending` when only a barrier is owed, and the child pipeline runs it
+  return Array.isArray(o.features) && (o.features.length || o.barrierPending) ? '' : 'features is not a list with at least one feature'
+}
+
+const PLAN = (s, why) => `You are the PLANNER of section \`${s.slug}\` in the project at ${P}.
 ${LAUNCHED}
 ROLE: on ${A.mainBranch}, run python3 ${SKILL}/scripts/plan-pipeline.py --root ${P} --roadmap ${s.roadmap} with its stdout to a temporary file and its stderr to another, and keep its exit code. Change nothing.
-Reply exitCode, line (the one line it printed to stderr, verbatim) and argsJson (the whole stdout, verbatim — it is JSON; empty when the exit code is not 0).`
+Reply exitCode, line (the one line it printed to stderr, verbatim) and argsJson (the whole stdout, verbatim — it is JSON; empty when the exit code is not 0).${why ? `
+A previous reply of yours was rejected because ${why}. argsJson must be the CONTENT of the stdout file itself — read it with cat and paste it whole — never a description of it, its path or a status.` : ''}`
 
 const FINAL = (lines, decisions) => `You are the FINAL agent of a manager run in the project at ${P}.
 ${LAUNCHED}
@@ -113,13 +128,19 @@ for (const s of SECTIONS) {
     log(`${s.slug}: decomposed, ${(d.features || []).length} features, ${(d.decided || []).length} decisions`)
   }
 
-  const p = await agent(PLAN(s), { phase: 'Plan', label: `plan:${s.slug}`, schema: PLAN_SCHEMA, effort: EFFORT.plan, ...MODEL })
-  let pargs = null
-  if (p && p.exitCode === 0) { try { pargs = JSON.parse(p.argsJson) } catch (e) { pargs = null } }
+  let pargs = null, p = null, why = ''
+  for (let t = 0; t < PLAN_TRIES && !pargs; t++) {
+    p = await agent(PLAN(s, why), { phase: 'Plan', label: `plan:${s.slug}`, schema: PLAN_SCHEMA, effort: EFFORT.plan, ...MODEL })
+    if (!(p && p.exitCode === 0)) break  // plan-pipeline.py's own refusal is its answer, not a copy that went wrong
+    let o = null
+    try { o = JSON.parse(p.argsJson) } catch (e) { why = 'it is not valid JSON'; continue }
+    why = argsProblem(o)
+    if (!why) pargs = o
+  }
   if (!pargs) {
     if (p && p.exitCode === 1 && / 0 to build /.test(p.line || '')) { lines.push(`${s.slug}: already done`); continue }
     blockedSections.add(s.slug)
-    lines.push(`${s.slug}: blocked — planning failed: ${p ? p.line : 'no result'}`)
+    lines.push(`${s.slug}: blocked — ${p && p.exitCode === 0 ? `the planner's reply was unusable after ${PLAN_TRIES} tries: ${why}` : `planning failed: ${p ? p.line : 'no result'}`}`)
     continue
   }
 

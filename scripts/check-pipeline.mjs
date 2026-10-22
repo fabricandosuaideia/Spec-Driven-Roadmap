@@ -450,7 +450,14 @@ const CLAUSES = [
   ['prove: verify-first does not verify again', 'prove', 'do not verify again', { args: { gateOrder: 'verify-first' } }],
   ['prove: verify-first leaves a note for the next builder', 'prove', 'gate-failure.md (the failing tests and the command', { args: { gateOrder: 'verify-first' } }],
   ['build: an earlier gate-failure note is read', 'build', 'or a gate-failure.md note) is committed', {}],
-  ['build: an existing branch is rebased by the builder, not left to the prover', 'build', 'the prover rebases it again and fixes nothing, so a conflict left for it costs a whole attempt', {}],
+  ['build: an existing branch gets main from the builder, not from the prover', 'build', 'fixes nothing, so a conflict left for it costs a whole attempt', {}],
+  ['build: a branch that holds main is not rebased', 'build', 'there is nothing to do and you do NOT rebase', {}],
+  ['build: a branch with merges takes main by a merge', 'build', 'a rebase would drop those merges', {}],
+  ['build: a conflict in a test is not settled by the side that passes', 'build', 'never settle a conflict by the side that makes a test pass', {}],
+  ['build: a contradiction in a test stops the builder', 'build', 'stop with ready=false naming the test', {}],
+  ['build: a stop leaves the branch as it was', 'build', 'so the branch stays as you found it', {}],
+  ['prove: the prover brings main in by the same rule', 'prove', 'there is nothing to do and you do NOT rebase', {}],
+  ['merge: the merger brings main in by the same rule', 'merge', 'there is nothing to do and you do NOT rebase', {}],
   ['verify: no report means verify everything and ignore the scope', 'verify', 'this is a FIRST verification: ignore the rest of this paragraph and verify everything', {}],
   ['verify: a first verification demotes nothing', 'verify', 'a clause of a criterion that no test exercises is not proven', {}],
   ['verify: inside the scope and in a first verification nothing is demoted', 'verify', 'Inside the scope, and in a first verification, nothing is demoted', { round2: true }],
@@ -586,6 +593,7 @@ const MBASE = {
   delegatedOn: '2026-09-29', stopAt: [], sectionsPerRun: 4, effort: { decompose: 'xhigh', plan: 'low', final: 'medium' },
 }
 const sec = (slug, over = {}) => ({ slug, roadmap: `docs/ROADMAP-${slug}.md`, txt: `docs/roadmap-${slug}.txt`, dependsOn: [], decomposed: false, pending: [], ...over })
+const planArgs = slug => ({ project: '/p', skillDir: '/s', downstream: 'tlc-spec-lean', downstreamDir: '/d', statusPath: 'docs/ROADMAP-INDEX.md', mainBranch: 'main', gate: 'make check', effort: {}, maxAttempts: { A: 5, B: 4, C: 3 }, features: [{ name: slug + '-a' }], roadmap: `docs/ROADMAP-${slug}.md` })
 async function runManager(src, argsOver, child = () => ['x: merged (attempt 1)', 'barrier: green after x'], behave = {}) {
   const calls = [], children = []
   const agent = async (prompt, opts) => {
@@ -593,7 +601,7 @@ async function runManager(src, argsOver, child = () => ['x: merged (attempt 1)',
     calls.push({ role, slug, prompt, model: opts.model, effort: opts.effort })
     if (behave[role]) { const r = behave[role](slug); if (r !== undefined) return r }
     if (role === 'decompose') return { ok: true, features: [slug + '-a'], decided: ['q? → a'] }
-    if (role === 'plan') return { exitCode: 0, line: 'ok', argsJson: JSON.stringify({ features: [{ name: slug + '-a' }], roadmap: `docs/ROADMAP-${slug}.md` }) }
+    if (role === 'plan') return { exitCode: 0, line: 'ok', argsJson: JSON.stringify(planArgs(slug)) }
     if (role === 'final') return { recorded: true, summary: 's' }
   }
   const workflow = async (ref, a) => { const slug = a.roadmap.match(/ROADMAP-(.+)\.md/)[1]; children.push({ ref, slug, managerMode: a.managerMode, autonomy: a.autonomy }); return child(slug) }
@@ -675,6 +683,43 @@ const managerScenarios = {
       { plan: () => ({ exitCode: 1, line: 'docs/ROADMAP-a.md: a is in the build order but has no entry', argsJson: '' }) })
     return r.children.length === 0 && r.out.some(l => /a: blocked — planning failed/.test(l))
   },
+  // 3.47.0: MakeContent, 12 of 57 planner replies unusable (8 objects that describe the output, 4 not JSON); each blocked its section.
+  'manager: a planner reply that describes the output instead of copying it is asked again with the reason, and the section is built': async src => {
+    let n = 0
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: ['a-a'] })] }, undefined,
+      { plan: slug => n++ === 0 ? { exitCode: 0, line: 'ok', argsJson: '{"note":"stdout copied verbatim from /tmp/x/plan.stdout (1767 bytes)"}' } : undefined })
+    const plans = r.calls.filter(c => c.role === 'plan')
+    return plans.length === 2 && !/rejected because/.test(plans[0].prompt) && /rejected because it lacks project, skillDir/.test(plans[1].prompt) &&
+      /never a description of it/.test(plans[1].prompt) && r.children.length === 1 && !r.out.some(l => /blocked/.test(l))
+  },
+  'manager: a planner reply that is not JSON is asked again': async src => {
+    let n = 0
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: ['a-a'] })] }, undefined,
+      { plan: slug => n++ === 0 ? { exitCode: 0, line: 'ok', argsJson: '{ "project": "/p", "skillDir": ' } : undefined })
+    return r.calls.filter(c => c.role === 'plan').length === 2 && /rejected because it is not valid JSON/.test(r.calls.filter(c => c.role === 'plan')[1].prompt) && r.children.length === 1
+  },
+  'manager: three unusable replies block the section, name what is missing, and skip what depends on it': async src => {
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: ['a-a'] }), sec('b', { dependsOn: ['a'], decomposed: true, pending: ['b-a'] })] }, undefined,
+      { plan: slug => ({ exitCode: 0, line: 'ok', argsJson: '{"status":"ran on branch main, exit 0, nothing changed"}' }) })
+    return r.calls.filter(c => c.role === 'plan' && c.slug === 'a').length === 3 && r.children.length === 0 &&
+      r.out.some(l => /^a: blocked — the planner's reply was unusable after 3 tries: it lacks project/.test(l)) && r.out.some(l => /^b: skipped/.test(l))
+  },
+  'manager: plan-pipeline.py\'s own refusal is not asked again': async src => {
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: ['a-a'] })] }, undefined,
+      { plan: () => ({ exitCode: 2, line: 'docs/process/pipeline.json is not confirmed', argsJson: '' }) })
+    return r.calls.filter(c => c.role === 'plan').length === 1 && r.out.some(l => /a: blocked — planning failed: docs\/process\/pipeline.json is not confirmed/.test(l))
+  },
+  // review of 3.47.0: the first validator refused `features: []`, which plan-pipeline.py prints when only a barrier is owed (4 of MakeContent's 57 replies)
+  'manager: a plan with no feature but a barrier owed is built by the child, planned once': async src => {
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: [] })], barrierPending: { base: 'b0', head: 'h0' } }, undefined,
+      { plan: () => ({ exitCode: 0, line: 'ok', argsJson: JSON.stringify({ ...planArgs('a'), features: [], barrierPending: { base: 'b0', head: 'h0' } }) }) })
+    return r.calls.filter(c => c.role === 'plan').length === 1 && r.children.length === 1 && !r.out.some(l => /blocked/.test(l))
+  },
+  'manager: a plan with nothing to build is still "already done", asked once': async src => {
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: ['a-a'] })] }, undefined,
+      { plan: () => ({ exitCode: 1, line: 'a: 3 done, 0 question-only, 0 to build (nothing); scriptPath x', argsJson: '' }) })
+    return r.calls.filter(c => c.role === 'plan').length === 1 && r.out.some(l => l === 'a: already done')
+  },
   'manager: every agent carries the launch scoping, and the decomposer the delegation and the marking': async src => {
     const r = await runManager(src, { sections: [sec('a')] })
     const d = r.calls.find(c => c.role === 'decompose')
@@ -709,6 +754,11 @@ const managerMutants = {
   'the first barrier line decides': ["const red = [...out].reverse().find(l => l.startsWith('barrier: '))", "const red = out.find(l => l.startsWith('barrier: '))"],
   'doubtful features built anyway': ['if (doubt.length) {', 'if (false) {'],
   'child pipelines not told they run in manager mode': ['{ ...pargs, managerMode: true, autonomy: AUTONOMY }', 'pargs'],
+  'the planner reply is not validated': ['why = argsProblem(o)', "why = ''"],
+  'an empty plan is refused even with a barrier owed': ['(o.features.length || o.barrierPending)', '(o.features.length)'],
+  'the planner is never asked again': ['const PLAN_TRIES = 3', 'const PLAN_TRIES = 1'],
+  'the planner is not told why it was rejected': ['A previous reply of yours was rejected because ${why}.', 'A previous reply of yours was rejected.'],
+  'a refusal of plan-pipeline.py is asked again': ['if (!(p && p.exitCode === 0)) break', ''],
   'doubtful features classified at level decide': ["if (doubt.length && AUTONOMY === 'unblock') {", "if (doubt.length) {"],
 }
 

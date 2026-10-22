@@ -64,7 +64,11 @@ waves is re-opened, whole, once per feature in all three.
   is load-bearing: the conversion below *requires* a section to take the prefix its own built
   features already carry, so a check that ignored ownership would reject the only legal answer.
 - Filenames are exact and case-sensitive: `docs/ROADMAP-<slug>.md` (uppercase ROADMAP) and
-  `docs/roadmap-<slug>.txt` (lowercase).
+  `docs/roadmap-<slug>.txt` (lowercase). **That holds only on a case-sensitive filesystem** (Linux, WSL), and two slugs
+  break it elsewhere: `history` makes `docs/ROADMAP-history.md`, which Windows and macOS read as `docs/roadmap-history.md`,
+  the log `status-block.py` appends to, and `index` makes `docs/ROADMAP-index.md`, which they read as the index. Do not
+  assign either; `check-roadmap.py` fails on it while the slug can still be renamed and warns once a feature is built under it. A slug is
+  frozen then (rule 6), which is why the choice is made here.
 - **For a wave-shaped section**, prefer a thematic slug when the wave has a theme (`auth`, `bill`);
   fall back to a wave number (`w3`) only when it genuinely has none. The slug is permanent and shows
   up in every feature name in that section, and those names freeze once a `.specs/features/<name>/`

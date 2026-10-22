@@ -666,10 +666,10 @@ them for an unattended run:
        Its prices: a feature the verifier passed and the gate then refuses leaves a PASS report on its
        branch that the gate did not back (the run's account says so, the prover leaves a short
        `gate-failure.md` for the next builder, and the next verification is a later round scoped by
-       the diff); and with several lanes the verifier sees the tree before the prover rebases it onto
-       a main branch another lane may have moved, so only the gate sees the merged result.
+       the diff); and with several lanes the verifier sees the tree before the prover brings the main branch into it, and
+       another lane may have moved that branch meanwhile, so only the gate sees the merged result.
      - **Whether the merge runs the gate again** (`"mergeGate"`: `"rerun"`, the default, or `"receipt"`).
-       The merger rebases the branch and runs the whole gate on the exact tree before it fast-forwards
+       The merger brings the main branch into the branch (a rebase for a linear one, a merge for one that has merges of its own, nothing when it already holds it) and runs the whole gate on the exact tree before it fast-forwards
        the main branch; the prover already ran it on the same tree a moment earlier. With `"receipt"`
        the merger skips it when the prover's receipt proves that tree: gate `pass`, the same command as the
        pipeline's gate, a clean tree, the same code hash, and the main branch exactly at the commit the
@@ -695,8 +695,8 @@ them for an unattended run:
        `tlc-spec-driven` (`tlc-spec-lean`'s completion gate refuses a PASS above a surviving mutant,
        and `plan-pipeline.py` refuses it; with both skills installed the planner uses `tlc-spec-lean`).
        `"rounds"` is `"scoped"` (the default) or `"full"`: every verification after the first is scoped
-       to the rows the last report did not pass and to what changed since (and to what a rebase
-       brought in), as `tlc-spec-lean`'s verify.md already prescribes, so a refusal fixed in one
+       to the rows the last report did not pass and to what changed since (and to what bringing the main
+       branch in brought), as `tlc-spec-lean`'s verify.md already prescribes, so a refusal fixed in one
        round is not followed by a fresh sweep that finds something new elsewhere. A defect noticed
        outside the scope keeps its true severity; only a weakness that is not a defect is minor. The
        price is on the other side: a scoped round trusts the earlier round's verdict on the rows it

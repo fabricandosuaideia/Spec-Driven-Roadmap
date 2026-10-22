@@ -9,6 +9,62 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.47.0 — 2026-10-22
+
+**Four defects found by a long manager run on MakeContent (36 sections, ~250 features), each checked here before it was touched: a planner agent
+that returned a description instead of the plan, a `rebase` that reapplies what a merge had settled, a builder told to settle a test conflict
+itself, and a section called `history`.** The scripts the owner checked were identical to the published ones; the findings are theirs, the numbers
+below are from reading that project's journals and transcripts read-only, and from tests of mine.
+
+- **The manager asks the planner again when its reply cannot be used.** The planner agent runs `plan-pipeline.py` and must return its stdout whole
+  in `argsJson`; the manager did `JSON.parse` and passed the result to the child pipeline, which threw `args incomplete` when `gate` and the others were
+  missing. In MakeContent's transcripts **12 of 57 planner replies were unusable, all from Haiku** (56 of the 57; the one Sonnet reply was fine, so
+  "it continued with Sonnet" cannot be tested in what I read): 8 were objects that **describe** the file instead of copying it
+  (`{"note":"stdout copied verbatim from /tmp/…/plan-history.stdout (1767 bytes)"}`, `{"status":"ran on branch main, exit 0"}`), which `JSON.parse`
+  accepts, and 4 were not JSON. The well-formed plans are 1.4–2.9 KB and the notes in the bad replies cite 1.6–2.3 KB files, so this is not a long JSON being truncated, as the report guessed. 8 of that project's 21
+  journals end a section with the block message, and by the manager's code a block also skips the sections that depend on it. Now the manager checks that the object has
+  `project, skillDir, downstream, downstreamDir, mainBranch, gate, effort, maxAttempts` and a non-empty `features` (or a `barrierPending`: `plan-pipeline.py` prints
+  `features: []` when only a barrier is owed, and 4 of the 57 replies are exactly that — **the first version of this check refused them, which the independent review
+  of this release caught**, and it is now a scenario and a mutant), asks the planner again up to three
+  times saying what was missing and that `argsJson` must be the file's **content**, and a block names the missing keys. `plan-pipeline.py`'s own refusal
+  (exit 1 or 2) is not asked again. The manager cannot read the file itself, only an agent can, so the report's first proposal (do not ask an LLM to
+  copy) has no cheaper form here. Five scenarios and four mutants in `check-pipeline.mjs`, the harness stub now returns a complete plan.
+  **Not executed:** a real planner on the retry text; it is the retry, not the wording, that the stubs prove.
+- **The pipeline no longer rebases a branch that already holds the main branch.** Checked in a scratch repository: a branch that merged `main`
+  and resolved a conflict there is still **stopped by `git rebase main` at the first replayed commit, even with `main` an ancestor of it**, because a
+  rebase drops the merges and replays the branch's own commits, and the same when `main` gained only a docs commit. The builder (both attempts),
+  the prover and the merger now share one instruction: nothing to do if `git merge-base --is-ancestor main HEAD`; a `git merge main` if
+  `git rev-list --merges main..HEAD` prints anything (the fast-forward into `main` still works); a rebase only for a linear branch. The triage merger
+  keeps its rebase (its branch is cut from `main`). Executed by 12 blind agents, each in its own copy (a branch with a merge that resolved to a value
+  neither side wrote; Sonnet and Haiku): **with the previous text 5 of 6 rebased, flattened the merge away and lost the branch's own commit to the value** (and the sixth
+  changed the value without rebasing), ending with the value `main` had, or one they picked; **with the new text 0 of 6 rebased** and the history was
+  kept (4 where `main` was already an ancestor, 2 where it had gained a docs commit and the agents merged it without a conflict). Two of the six still
+  changed the settled value by a decision of their own, reported as one; the rule does not stop that. **Only the builder's first-attempt prompt was run by an agent**:
+  the prover's and the merger's text, the builder's second-attempt text and the case of a branch with merges whose merge of `main` conflicts were not, and the new
+  arm also carried the test clause below, so the comparison is two changes, not one.
+- **A builder stops on a conflict in a test that both the feature and `main` changed.** 3.46.0 told it to "resolve any conflict yourself, keeping what
+  both sides intended", which the report rightly says should not apply to a test. The added clause: keep `main`'s version of every line of an existing
+  test and the feature's own new tests; if the feature changed an existing test that `main` also changed, stop with `ready=false` naming it. Executed
+  by 8 blind agents on a fixture where the feature's commit and `main` give the same existing test two different expected values: **with the previous
+  text 4 of 4 settled it and said `ready=true`** — three kept `main`'s side and dropped the feature's change, one **combined the two increments and rewrote
+  the existing test to a value neither side asserted**; **with the clause 4 of 4 stopped**, named the test, aborted the rebase and left the branch as it
+  was — all four improvised the abort, so the clause now says it (`git rebase --abort` or `git merge --abort`) and fires only on a conflict in an existing test that
+  the feature changed and `main` also changed. **That final wording was run again by 8 agents** (Sonnet and Haiku, 2 each): **4 of 4 stopped** on the contradicting
+  fixture, with the branch at the feature's own commit, no rebase left open and no marker; and on a second fixture where the feature only **adds** a test beside the
+  line `main` changed, **4 of 4 kept `main`'s assertion and the new test and went on** — the clause does not over-trigger there.
+  In manager mode the verifier would have flagged the undeclared edit afterwards. **The stop costs an attempt, and so does each one after it**: the next builder gets
+  the same clause and stops the same way, up to the tier's ceiling, and the feature ends blocked with the test named; each stop took under a minute in the tests.
+- **`check-roadmap.py` sees names that differ only by case, and has a `--selftest`** (in the release gate's list). A section slugged `history` is
+  `docs/ROADMAP-history.md`, which Windows and macOS read as `docs/roadmap-history.md`, the log `status-block.py` appends to — the log is written into
+  the roadmap there; `index` does the same to `docs/ROADMAP-INDEX.md`. Two such files both present, or a section file that could be read as one of
+  them, **fail while the slug can still be renamed and only warn once a feature is built under it** (a slug is frozen then, and a lint must not ask a decomposer to rename
+  it; this part came from the independent review). `index-phase.md` Step 2 says not to assign either slug. 8 assertions. **Not done:** renaming the log (the
+  report's `ROADMAP-LOG.md` would collide with a slug `log`, and the name is written in some twenty documents and every project's history), and a
+  refusal in `convert-to-multi.py` when the slug it derives from built features is one of the two — those names are frozen, so there is no other slug to
+  offer; the project that hit this renamed its section's slug to `histlong`, against `index-phase.md`'s "slug = prefix", and that is still the way out.
+
+**Not executed:** a real Workflow run with this text.
+
 ## 3.46.0 — 2026-10-21
 
 **A second round of the same project, measured, and what it adds to 3.37.0–3.45.0: one sentence in the builder's prompt, one line in the
