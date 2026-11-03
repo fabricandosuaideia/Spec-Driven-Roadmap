@@ -139,6 +139,9 @@ section against the code as the previous ones left it.
    `barrierEvery` of at least 1) and `verifier` (a cap on the sensor's mutants, what a survivor is —
    `minor` only under `tlc-spec-driven` — and `rounds`, scoped or full). A sixth happens by itself: Phase 2 groups small same-area units into one feature
    (decompose-phase.md Step 3), so a section of small fixes pays the per-feature cycle fewer times.
+   **Effort.** The roles that write code and judge tests — builder, verifier, reviewer — default to `xhigh` at every tier, whichever model runs
+   them: changing a test and judging the change is work for someone who understands the product. `plan-pipeline.py --check-config` warns when a
+   manager project sets them lower; the value stays the owner's.
 6. **The level.** `manager.autonomy`: `decide` (the default) or `unblock` — ask, with the price of each
    as "Two levels — how much permission the owner gives" above states it, and write the owner's answer; never raise it yourself.
 7. **Optionally, a stronger model for the decisions.** `manager.decomposeModel` sets the model of the

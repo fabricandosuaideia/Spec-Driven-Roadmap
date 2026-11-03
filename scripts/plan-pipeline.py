@@ -79,8 +79,11 @@ DEFAULT_CONFIG = {
     "mainBranch": "main",
     "lanes": 1,
     "checklist": None,
-    "effort": {"implement": {"A": "xhigh", "B": "high", "C": "medium"}, "prove": "medium",
-               "verify": {"A": "high", "B": "high", "C": "medium"}, "review": "high",
+    # The roles that write code, edit and judge tests (build, verify, review) default to xhigh at every tier, whichever model runs
+    # them (3.51.0, the owner's: changing or judging a test needs the care of a person who understands the product).
+    # prove, merge and record run a command and report.
+    "effort": {"implement": {"A": "xhigh", "B": "xhigh", "C": "xhigh"}, "prove": "medium",
+               "verify": {"A": "xhigh", "B": "xhigh", "C": "xhigh"}, "review": "xhigh",
                "merge": "medium", "record": "low"},
     "maxAttempts": {"A": 5, "B": 4, "C": 3},
     "manager": {"delegation": "", "delegatedOn": "", "autonomy": "decide", "stopAt": [], "sectionsPerRun": 4,
@@ -1091,6 +1094,28 @@ x
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             rc = main(["--root", root])
         expect("once the barrier is green and recorded, nothing to build is a refusal again", rc == 1)
+        # 3.51.0: build, verify and review default to xhigh at every tier, and a manager project that sets them lower is told.
+        eff = DEFAULT_CONFIG["effort"]
+        expect("build, verify and review default to xhigh at every tier, whichever model runs them",
+               all(eff[r][t] == "xhigh" for r in ("implement", "verify") for t in TIERS) and eff["review"] == "xhigh")
+        cfgp = os.path.join(root, CONFIG)
+
+        def check_with(over):
+            with open(cfgp, "w", encoding="utf-8") as fh:
+                json.dump(dict(written, **over), fh)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = check_config(root, cfgp)
+            return code, buf.getvalue()
+        low = {"implement": {"A": "xhigh", "B": "high", "C": "medium"}, "verify": "high", "review": "xhigh"}
+        code, out = check_with({"manager": dict(mw["manager"]), "effort": low})
+        expect("a manager project with build below xhigh is warned, per tier, and not refused",
+               code == 0 and "effort.implement is high for B" in out and "effort.implement is medium for C" in out and "effort.verify is high for every tier" in out
+               and "effort.review" not in out and "xhigh whichever model" in out)
+        code, out = check_with({"manager": dict(mw["manager"], delegation=""), "effort": low})
+        expect("a project that does not use manager mode is not warned", code == 0 and "WARNING  effort" not in out)
+        code, out = check_with({"manager": dict(mw["manager"]), "effort": {"implement": "xhigh", "verify": {"A": "max", "B": "xhigh", "C": "xhigh"}, "review": "max"}})
+        expect("xhigh and max are not warned about", code == 0 and "WARNING  effort" not in out)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("\n%d failed" % len(failures))
@@ -1139,6 +1164,19 @@ def check_config(root, cfg_path):
                     "setup": "a new worktree cannot be prepared"}[key]
             WARNED[0] += 1
             print("WARNING  %s runs %s, which is not in the project (%s): %s" % (key, parts[1], root, what))
+    # Manager mode corrects tests and judges the corrections with nobody to ask: the roles that do it are asked to run at xhigh.
+    # The file's own value stands (it is the owner's); this only says so. A role the file does not name inherits the session's effort.
+    mgr = cfg.get("manager") if isinstance(cfg.get("manager"), dict) else {}
+    ef = cfg.get("effort") if isinstance(cfg.get("effort"), dict) else {}
+    if str(mgr.get("delegation") or "").strip():
+        rank = {lv: i for i, lv in enumerate(EFFORT_LEVELS)}
+        for role in ("implement", "verify", "review"):
+            val = ef.get(role)
+            for tier, lv in ((t, val.get(t)) for t in TIERS) if isinstance(val, dict) else [("every tier", val)]:
+                if isinstance(lv, str) and lv in rank and rank[lv] < rank["xhigh"]:
+                    WARNED[0] += 1
+                    print("WARNING  effort.%s is %s for %s: manager mode edits and judges tests, work that is asked to run at xhigh "
+                          "whichever model runs it (the file's value stands; it is yours to change)" % (role, lv, tier))
     v = cfg.get("verifier") if isinstance(cfg.get("verifier"), dict) else {}
     print("downstream: %s%s" % (ds or "none installed", "" if ds else " (verifier.survivor could not be checked against it)"))
     print("confirmed: %s%s" % (bool(cfg.get("confirmed")), "" if cfg.get("confirmed") else "  (nothing runs until the person confirms the gate)"))

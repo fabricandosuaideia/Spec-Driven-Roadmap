@@ -647,8 +647,9 @@ them for an unattended run:
        worktree's own directory, which is unique per feature. The pipeline has no teardown hook, by
        choice: a hook would be one more thing for every project to get right, and the gate already
        runs at every point a lane's resources are needed.
-     - **The builder's effort at risk tier A** (`"effort"` → `"implement"` → `"A"`, `"xhigh"` by
-       default). Where the time goes differs by project: builders were 52% of the cost on one
+     - **The effort of the roles that write code and judge it** (`"effort"` → `"implement"`, `"verify"`, `"review"`: `"xhigh"` at every tier by default
+       since 3.51.0, whichever model runs them — changing a test and judging the change is work for someone who understands the product; in manager mode
+       `plan-pipeline.py --check-config` warns about a lower value, and the value stays the user's). Where the time goes differs by project: builders were 52% of the cost on one
        (WordPress, measured by tokens) and 24% of the agent time on another (Infinity-Agent-Creator,
        where a 24-minute gate made the prover and the merger about 60% of it), so run
        `measure-agents.py` and look before choosing; `"high"` thinks less per turn. What it does to quality and to refused attempts is not
