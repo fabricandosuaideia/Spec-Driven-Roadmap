@@ -628,7 +628,7 @@ them for an unattended run:
      ending without finishing (8 of 56 attempts, then 1 of 31) is not a model signal either: three of the eight
      were the old test rule working as designed, two waited on a background command and three needed an owner
      decision or a permission. Say that, and say it was one project.
-   - **Speed — five levers, each with its price, all the user's to choose:**
+   - **Speed — six levers, each with its price, all the user's to choose:**
      - **Lanes** (`"lanes"`): how many features are proved at once, each in its own git worktree. It
        only helps features that do not depend on each other; a chain gains nothing. Before setting it
        above 1, run `python3 <this-skill-dir>/scripts/bench-gate.py --root <project-root> --lanes 2`:
@@ -704,6 +704,17 @@ them for an unattended run:
        carries forward, so a first round that was loose leaves its loose PASS rows standing. Say so,
        and offer `"full"` to a user who prefers to re-verify everything each time at the cost of the
        loop.
+     - **Whether the builder breaks its own code before it hands over** (`"selfMutate"`: `{"A": n, "B": n, "C": n}`, a cap of mutants per tier; off unless set,
+       and a tier at 0 or not named breaks nothing). The sensor refuses a feature whose tests do not notice a deliberate break; this moves the discovery to
+       the builder, in a scratch copy of the branch and never the real tree, instead of a refused round of build, verify and prove (0.74 agent-hours per round on the
+       one project measured, the mean of the 12 rounds whose only findings were weak tests or undeclared test edits). What the builder pays was measured only on a toy
+       project: five mutants added 47 seconds (+45%) to a builder that took 104, and its tests already killed 16 of 16 hidden mutants without them, so that run could
+       not show a gain. A test batch on the real project took 74 to 89 seconds (p75 and p90 of 333 calls). The cap is the price and the reason it is a cap: that project's features had 9 to 37 acceptance criteria
+       (mean 26), so "a mutant per criterion" would have cost about 26 per feature. Set it near `verifier.sensor` for the same tier. It says nothing when
+       `verifier.survivor` is `minor` (a survivor that refuses nothing), and under `tlc-spec-lean` a feature whose `checks.md` carries `Profile: light` skips it (no
+       fault injection runs). It cannot save more than the rounds that were refused only for weak tests: on that project 12 of 17 refusals, across 11 features.
+       Where mutants kept surviving in this project (a threshold's other side, every caller of a shared function, a failure path that must not persist) belongs in
+       `"checklist"`, the file every builder checks its diff against, not in the skill. Say it is one project, and measure with `measure-agents.py` before and after.
 
    Only if the project's own rules mention such a step, also ask what the merged code needs **outside git**
    (`"postMerge"`): a command run once on the main branch after each fast-forward (a feature's, and in manager mode at level `unblock` a barrier repair's), such as a forward-only

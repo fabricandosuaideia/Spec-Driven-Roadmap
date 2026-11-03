@@ -72,6 +72,7 @@ DEFAULT_CONFIG = {
     "gateOrder": "gate-first",
     "mergeGate": "rerun",
     "verifier": {"sensor": None, "survivor": None, "rounds": "scoped"},
+    "selfMutate": None,
     "model": None,
     "testHint": "",
     "setup": "",
@@ -347,7 +348,7 @@ def plan(root, roadmap_rel, cfg):
         "statusPath": status, "mainBranch": cfg.get("mainBranch") or "main", "gate": cfg["gate"],
         "barrierGate": (cfg.get("barrierGate") or "").strip() or None, **({"postMerge": cfg["postMerge"].strip()} if isinstance(cfg.get("postMerge"), str) and cfg["postMerge"].strip() else {}), "barrierEvery": int(cfg.get("barrierEvery") or 0),
         "model": cfg.get("model") or None, "gateOrder": cfg.get("gateOrder") or "gate-first", "mergeGate": cfg.get("mergeGate") or "rerun",
-        "verifier": verifier_policy(cfg),
+        "verifier": verifier_policy(cfg), "selfMutate": self_mutate_policy(cfg),
         **({"models": models_policy(cfg)} if models_policy(cfg) else {}),
         "testHint": cfg.get("testHint") or "", "setup": cfg.get("setup") or "", "push": bool(cfg.get("push")),
         "lanes": lanes, "worktreeRoot": root.rstrip("/") + ".lanes", "checklist": cfg.get("checklist"),
@@ -377,7 +378,7 @@ EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 # Every key of pipeline.json this version reads. A key outside the list used to be ignored, which is how a setting
 # that does nothing gets trusted: a project's `postMerge` lived only in a local patch of the skill and a reinstall
 # would have dropped it without a word.
-CONFIG_KEYS = ("confirmed", "gate", "barrierGate", "barrierEvery", "gateOrder", "mergeGate", "verifier", "model", "models",
+CONFIG_KEYS = ("confirmed", "gate", "barrierGate", "barrierEvery", "gateOrder", "mergeGate", "verifier", "selfMutate", "model", "models",
                "testHint", "setup", "postMerge", "push", "mainBranch", "lanes", "checklist", "effort", "maxAttempts",
                "manager", "featureStatus", "waitChunk")
 VERIFIER_KEYS = ("sensor", "survivor", "rounds")
@@ -481,6 +482,17 @@ def config_problems(cfg, ds=None):
             out.append("verifier.survivor \"minor\" cannot be used with tlc-spec-lean (the downstream here, because it is installed: "
                        "when both skills are installed tlc-spec-lean is the one used): its completion gate refuses a PASS written above "
                        "a surviving mutant. Cap the mutants instead, or install only tlc-spec-driven")
+    sm = cfg.get("selfMutate")
+    if sm is not None and not isinstance(sm, dict):
+        out.append("selfMutate takes an object of mutant caps per tier, such as {\"A\": 5, \"B\": 3} (a tier it does not name, or names with 0, "
+                   "breaks nothing before it hands over); not: %r" % (sm,))
+    elif isinstance(sm, dict):
+        badtier = sorted(k for k in sm if k not in TIERS)
+        badnum = sorted(k for k, n in sm.items() if k in TIERS and not _whole(n, 0))
+        if badtier:
+            out.append("selfMutate has no tier %s; the tiers are A, B and C" % ", ".join(badtier))
+        if badnum:
+            out.append("selfMutate.%s must be a whole number of at least 0 (0 = that tier breaks nothing)" % ", ".join(badnum))
     m = cfg.get("models")
     if m is not None and not isinstance(m, dict):
         out.append("models takes an object: {\"build\": \"<model>\", ...}; not: %r" % (m,))
@@ -544,6 +556,16 @@ def verifier_policy(cfg):
     for k in ("survivor", "rounds"):
         if v.get(k):
             out[k] = v[k]
+    return out or None
+
+
+def self_mutate_policy(cfg):
+    """`selfMutate`, normalised after validate_config accepted it: the tiers whose builder breaks its own code before it
+    hands over, with the cap of mutants for each. A tier at 0 or not named breaks nothing; none named is no policy."""
+    sm = cfg.get("selfMutate")
+    if not isinstance(sm, dict):
+        return None
+    out = {k: n for k, n in sm.items() if k in TIERS and _whole(n, 1)}
     return out or None
 
 
@@ -818,6 +840,9 @@ x
                 ("a verifier that is 0", {"verifier": 0}, "verifier"), ("a verifier that is false", {"verifier": False}, "verifier"),
                 ("a sensor that is 0", {"verifier": {"sensor": 0}}, "verifier.sensor"), ("a survivor that is an empty string", {"verifier": {"survivor": ""}}, "verifier.survivor"),
                 ("a rounds that is false", {"verifier": {"rounds": False}}, "verifier.rounds"), ("a typo inside verifier", {"verifier": {"sensr": {"A": 3}}}, "sensr"),
+                ("a selfMutate that is a list", {"selfMutate": []}, "selfMutate"), ("a selfMutate that is true", {"selfMutate": True}, "selfMutate"),
+                ("a selfMutate cap that is true", {"selfMutate": {"A": True}}, "selfMutate.A"), ("a selfMutate cap of 2.0", {"selfMutate": {"B": 2.0}}, "selfMutate.B"),
+                ("a selfMutate cap below zero", {"selfMutate": {"C": -1}}, "selfMutate.C"), ("a selfMutate tier that does not exist", {"selfMutate": {"D": 3}}, "selfMutate has no tier D"),
                 ("a sensor cap that is true", {"verifier": {"sensor": {"A": True}}}, "verifier.sensor.A"), ("a sensor cap of 3.0", {"verifier": {"sensor": {"A": 3.0}}}, "verifier.sensor.A"),
                 ("models as a list", {"models": []}, "models"), ("a model name that is only spaces", {"models": {"build": "  "}}, "models.build"),
                 ("barrierEvery that is a word", {"barrierEvery": "x"}, "barrierEvery"), ("lanes that is 0", {"lanes": 0}, "lanes"),
@@ -850,6 +875,12 @@ x
                plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, verifier={}, models={}))[0].get("verifier") is None)
         roles_all = {r: "m-" + r for r in ("build", "prove", "verify", "review", "merge", "record", "triage", "barrier")}
         expect("every role the pipeline can name is accepted", plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, models=roles_all))[0]["models"] == roles_all)
+        expect("no builder breaks its own code unless the config says so", args["selfMutate"] is None)
+        expect("a selfMutate that is empty, or all zeros, is no policy",
+               plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, selfMutate={}))[0]["selfMutate"] is None and
+               plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, selfMutate={"A": 0, "B": 0}))[0]["selfMutate"] is None)
+        expect("a selfMutate cap per tier reaches the args, and a tier at 0 is left out",
+               plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, selfMutate={"A": 5, "B": 3, "C": 0}))[0]["selfMutate"] == {"A": 5, "B": 3})
         expect("a sensor naming only one tier is accepted", plan(root, os.path.join("docs", "ROADMAP.md"), dict(cfg, verifier={"sensor": {"A": 3}}))[0]["verifier"]["sensor"] == {"A": 3})
         said_ds = refused_with("a survivor that is only minor under tlc-spec-lean", {"verifier": {"survivor": "minor"}}, "tlc-spec-lean")
         expect("and the message says why this downstream was chosen", "because it is installed" in said_ds)
@@ -1183,6 +1214,7 @@ def check_config(root, cfg_path):
     print("gateOrder: %s | mergeGate: %s | verifier.rounds: %s | verifier.sensor: %s | verifier.survivor: %s" % (
           cfg.get("gateOrder") or "gate-first (default)", cfg.get("mergeGate") or "rerun (default)", v.get("rounds") or "scoped (default)",
           v.get("sensor") or "no cap", v.get("survivor") or "the downstream's own"))
+    print("selfMutate: %s" % (self_mutate_policy(cfg) or "off (no builder breaks its own code)"))
     print("models: %s | postMerge: %s | barrierGate: %s | lanes: %s" % (
           cfg.get("models") or "one model for every role", cfg.get("postMerge") or "none", "set" if cfg.get("barrierGate") else "none", cfg.get("lanes") or 1))
     print("%d problem(s), %d warning(s)" % (len(problems), WARNED[0]))

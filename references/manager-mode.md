@@ -132,12 +132,13 @@ section against the code as the previous ones left it.
 4. **How much per run.** `manager.sectionsPerRun` (default 4): a Workflow run caps its agents at 1000,
    and a section of ten tier-A features can use up to about two hundred (five attempts of four agents each). The manager stops at the cap and says so;
    launching again continues.
-5. **Speed.** The same five levers as option C, with the same prices — handover-prompt.md, Step 10,
+5. **Speed.** The same six levers as option C, with the same prices — handover-prompt.md, Step 10,
    "Option C — the pipeline": `lanes` (measure first with `bench-gate.py --lanes 2`), the builder's
    effort at tier A, `gateOrder` (whether the full gate runs before or after the verifier),
    `mergeGate` (whether the merge runs the gate again; `receipt` needs a `barrierGate` and a
    `barrierEvery` of at least 1) and `verifier` (a cap on the sensor's mutants, what a survivor is —
-   `minor` only under `tlc-spec-driven` — and `rounds`, scoped or full). A sixth happens by itself: Phase 2 groups small same-area units into one feature
+   `minor` only under `tlc-spec-driven` — and `rounds`, scoped or full) and `selfMutate` (a cap of mutants per tier that the builder breaks and kills in a scratch
+   copy before it hands over; off unless set). A seventh happens by itself: Phase 2 groups small same-area units into one feature
    (decompose-phase.md Step 3), so a section of small fixes pays the per-feature cycle fewer times.
    **Effort.** The roles that write code and judge tests — builder, verifier, reviewer — default to `xhigh` at every tier, whichever model runs
    them: changing a test and judging the change is work for someone who understands the product. `plan-pipeline.py --check-config` warns when a

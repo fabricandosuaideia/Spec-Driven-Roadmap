@@ -275,6 +275,35 @@ const scenarios = {
     const b = r.calls.find(c => c.role === 'build').prompt, v = r.calls.find(c => c.role === 'verify').prompt
     return /test-edit-guard\.py --root \/p\.wt\/lane1\/a --main main/.test(b) && /test-edit-guard\.py --root \/p\.wt\/lane1\/a --main main/.test(v)
   },
+  // 3.51.0 — a corrected test is run, not only read; a builder may break its own code first (opt in, capped).
+  'with no selfMutate nobody is asked to break their own code': async src => {
+    const r = await run(src, { features: [feat('a', 'A'), feat('b', 'C')] }, pass())
+    return r.calls.filter(c => c.role === 'build').every(c => !/SELF-MUTATION/.test(c.prompt))
+  },
+  'selfMutate caps the mutants by tier, and a tier it does not name breaks nothing': async src => {
+    const r = await run(src, { selfMutate: { A: 5, B: 1 }, features: [feat('a', 'A'), feat('b', 'B'), feat('c', 'C')] }, pass())
+    const p = n => r.calls.find(c => c.role === 'build' && c.name === n).prompt
+    return /SELF-MUTATION \(at most 5 mutants;/.test(p('a')) && /SELF-MUTATION \(at most 1 mutant;/.test(p('b')) && !/SELF-MUTATION/.test(p('c'))
+  },
+  'a survivor graded minor leaves the builder nothing to find, so selfMutate says nothing': async src => {
+    const r = await run(src, { selfMutate: { B: 3 }, verifier: { survivor: 'minor' }, downstream: 'tlc-spec-driven', downstreamDir: '.claude/skills/tlc-spec-driven', features: [feat('a', 'B')] }, pass())
+    return !/SELF-MUTATION/.test(r.calls.find(c => c.role === 'build').prompt)
+  },
+  'a later attempt breaks only the lines its fix changed': async src => {
+    const r = await run(src, { selfMutate: { C: 3 }, features: [feat('a', 'C')] }, pass({ verify: (n, att) => att < 2 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }))
+    const b1 = r.calls.find(c => c.role === 'build' && c.attempt === 1).prompt, b2 = r.calls.find(c => c.role === 'build' && c.attempt === 2).prompt
+    return !/break only the lines your fix changed/.test(b1) && /break only the lines your fix changed/.test(b2)
+  },
+  'under tlc-spec-lean the light profile skips selfMutate, under tlc-spec-driven it is a criterion not a check': async src => {
+    const lean = await run(src, { selfMutate: { B: 3 }, features: [feat('a', 'B')] }, pass())
+    const drv = await run(src, { selfMutate: { B: 3 }, downstream: 'tlc-spec-driven', downstreamDir: '.claude/skills/tlc-spec-driven', features: [feat('a', 'B')] }, pass())
+    const l = lean.calls.find(c => c.role === 'build').prompt, d = drv.calls.find(c => c.role === 'build').prompt
+    return /Profile: light/.test(l) && /every test that carries a check/.test(l) && !/Profile: light/.test(d) && /every test that carries a criterion/.test(d)
+  },
+  'the scratch of selfMutate is outside the project tree': async src => {
+    const r = await run(src, { selfMutate: { B: 3 }, features: [feat('a', 'B')] }, pass())
+    return /git worktree add \/p\.wt\/mutants\/a HEAD/.test(r.calls.find(c => c.role === 'build').prompt)
+  },
   // 3.35.0 — level unblock: a red barrier is triaged by script, repaired, checked, merged, re-run.
   'at level decide a red barrier is never triaged': async src => {
     const r = await run(src, { managerMode: true, barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
@@ -423,6 +452,11 @@ const mutants = {
   'verify-first gate result ignored': ['if (pass && VERIFY_FIRST) { pass = await proveStep(); gateRefused = !pass }', 'if (pass && VERIFY_FIRST) { await proveStep() }'],
   'verify-first runs the gate before the verdict anyway': ['if (!VERIFY_FIRST && !(await proveStep())) continue', 'if (!(await proveStep())) continue'],
   'builder not told to wait for a long command': ['${LONG_COMMANDS}\n${A.checklist ?', '${A.checklist ?'],
+  'selfMutate ignores its cap': ['const cap = (A.selfMutate || {})[tierOf(f)]', 'const cap = 99'],
+  'selfMutate is on without the config': ["if (!cap || VP.survivor === 'minor') return ''", "if (VP.survivor === 'minor') return ''"],
+  'selfMutate despite a survivor that does not refuse': ["if (!cap || VP.survivor === 'minor') return ''", 'if (!cap) return \'\''],
+  'selfMutate breaks the lines of the whole feature on a later attempt': ["${attempt > 1 ? ' This is a later attempt: break only the lines your fix changed.' : ''}", ''],
+  'the scratch is the project tree': ["const SCRATCH = (kind, f) => `${A.worktreeRoot || (P + '.lanes')}/${kind}/${f.name}`", 'const SCRATCH = (kind, f) => P'],
   'builder not told to run the guard in manager mode': ["${MANAGED ? TEST_EDIT_GUARD(f) + '\\n' : ''}Reply ready=true", 'Reply ready=true'],
   'the guard is run outside manager mode too': ["${MANAGED ? TEST_EDIT_GUARD(f) + '\\n' : ''}Reply ready=true", "${TEST_EDIT_GUARD(f) + '\\n'}Reply ready=true"],
   'the builder runs the guard on the project root, not its worktree': ['test-edit-guard.py --root ${wt(f)} --main ${MAIN} --branch feat/${f.name} — exit 0 is required', 'test-edit-guard.py --root ${P} --main ${MAIN} --branch feat/${f.name} — exit 0 is required'],
@@ -520,6 +554,10 @@ const CLAUSES = [
   ['build (manager): an edit already committed is restored, then made again in the declaring commit', 'build', 'then make the edit again in the REVOKED-TEST commit', { args: { managerMode: true } }],
   ['verify (manager): an undeclared line is a blocker with nothing more to read', 'verify', 'every UNDECLARED line it prints is a blocker issue at that file', { args: { managerMode: true } }],
   ['verify (manager): what the guard cannot see the verifier lists itself', 'verify', 'it does not see the gate script, test configuration outside its patterns, or a line added to an existing test', { args: { managerMode: true } }],
+  ['build (self-mutation): never in the real working tree', 'build', 'Never break code in the real working tree', { args: { selfMutate: { B: 3 } } }],
+  ['build (self-mutation): a collection error is not a kill', 'build', 'an import, collection or syntax error is not a kill', { args: { selfMutate: { B: 3 } } }],
+  ['build (self-mutation): an old test is never edited to kill a mutant', 'build', 'Never edit a test that existed on', { args: { selfMutate: { B: 3 } } }],
+  ['build (self-mutation): what cannot be broken safely is listed, not broken', 'build', 'break nothing and list those lines as unproven in your notes', { args: { selfMutate: { B: 3 } } }],
   ['build (manager): the criterion is decided before the build', 'build', 'decided before you started — never from a spec, plan or check that you wrote on this branch', { args: { managerMode: true } }],
   ['build (manager): the first line of the commit', 'build', 'whose FIRST LINE is REVOKED-TEST', { args: { managerMode: true } }],
   ['build (manager): red for another reason is the builder\'s defect', 'build', 'A test red for any other reason is a defect in your change', { args: { managerMode: true } }],
