@@ -707,12 +707,13 @@ them for an unattended run:
      - **Whether the builder breaks its own code before it hands over** (`"selfMutate"`: `{"A": n, "B": n, "C": n}`, a cap of mutants per tier; off unless set,
        and a tier at 0 or not named breaks nothing). The sensor refuses a feature whose tests do not notice a deliberate break; this moves the discovery to
        the builder, in a scratch copy of the branch and never the real tree, instead of a refused round of build, verify and prove (0.74 agent-hours per round on the
-       one project measured, the mean of the 12 rounds whose only findings were weak tests or undeclared test edits). What the builder pays was measured only on a toy
-       project: five mutants added 47 seconds (+45%) to a builder that took 104, and its tests already killed 16 of 16 hidden mutants without them, so that run could
-       not show a gain. A test batch on the real project took 74 to 89 seconds (p75 and p90 of 333 calls). The cap is the price and the reason it is a cap: that project's features had 9 to 37 acceptance criteria
+       one project measured, the mean over the 12 rounds whose findings were all weak tests or undeclared test edits; classified by keyword, so a rough figure). What the builder pays was
+       measured only on a toy project: a cap of five added 47 seconds (+45%) to a builder that took 104, and its tests already killed 16 of 16 hidden mutants without it, so that
+       run could not show a gain. On the real project a builder's test batch took 74 seconds at the 75th percentile and 89 at the 90th (333 calls in the transcripts of that run,
+       not reproducible from this repository). The cap is the price and the reason it is a cap: that project's features had 9 to 37 acceptance criteria
        (mean 26), so "a mutant per criterion" would have cost about 26 per feature. Set it near `verifier.sensor` for the same tier. It says nothing when
        `verifier.survivor` is `minor` (a survivor that refuses nothing), and under `tlc-spec-lean` a feature whose `checks.md` carries `Profile: light` skips it (no
-       fault injection runs). It cannot save more than the rounds that were refused only for weak tests: on that project 12 of 17 refusals, across 11 features.
+       fault injection runs). It cannot save more than the rounds that were refused only for weak tests: on that project 10 of 17 refusals, across 11 features (2 more also held undeclared test edits, which `test-edit-guard.py` catches, and 5 held something else, such as a real bug).
        Where mutants kept surviving in this project (a threshold's other side, every caller of a shared function, a failure path that must not persist) belongs in
        `"checklist"`, the file every builder checks its diff against, not in the skill. Say it is one project, and measure with `measure-agents.py` before and after.
 

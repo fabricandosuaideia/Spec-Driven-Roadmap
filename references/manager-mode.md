@@ -86,9 +86,10 @@ every attempt up to the tier's ceiling, and the owner settles it (checked on bli
 A script does the mechanical half of that check. `scripts/test-edit-guard.py` lists every existing test file whose net diff removes or
 rewrites a line and for which no `REVOKED-TEST` commit names that exact path **and changes it**: a header on a commit that touches
 something else declares nothing (a feature on a real project passed its verifier with exactly that). The builder runs it as the last
-thing before it hands over, the verifier runs it first, and each undeclared line is a blocker at that file. It proves that a declaration
-exists and carries the edit, never that it is justified; it does not see the gate script or a line added to an existing test, which the
-verifier still reads.
+thing before it hands over, the verifier runs it first, and each undeclared line is a blocker at that file. It proves only that a commit
+which declares a file also changes it (a declaration is per file, not per edit, and its test name is not checked); it says nothing about whether the
+correction is justified or still bites, and it does not see the gate script, an edit that is not committed or a line added to an existing test,
+which the verifier still reads. The default patterns can be extended on its command line (`--pattern`, `--exclude`); `pipeline.json` cannot pass them yet.
 
 The correction is **run, not only read**. A person who changes a test first understands what it protects and why the product
 changed, then shows that it still bites; a test that was changed and never shown to fail is a regression waiting, and a verifier that
@@ -97,8 +98,8 @@ the corrected tests in a scratch copy of the branch (never the real tree, never 
 under them they must fail by an assertion, and with the line that implements the new behaviour broken the ones that cover it must fail
 again. It writes one sentence on what the test protects and a `Proof:` line in the commit body. The verifier does not take that line
 as evidence: it runs the same two experiments itself, and a corrected test that passes against the old behaviour, or when the new
-behaviour is broken, is a blocker whatever the line says. The experiments cost one run per distinct behaviour the corrections share,
-not one per test.
+behaviour is broken, is a blocker whatever the line says. The experiments are specified per distinct behaviour the corrections share, not
+per test; what that costs on a feature with many corrections is not measured (one corrected test cost the builder 78 s without it and 123 s with it, on a toy project).
 
 The unblock repairer keeps the **narrow** form (an owner decision recorded in the roadmap revokes exactly
 that assertion), because a regression belongs to a feature whose own spec did not change; it may also
@@ -143,16 +144,19 @@ section against the code as the previous ones left it.
    and a section of ten tier-A features can use up to about two hundred (five attempts of four agents each). The manager stops at the cap and says so;
    launching again continues.
 5. **Speed.** The same six levers as option C, with the same prices — handover-prompt.md, Step 10,
-   "Option C — the pipeline": `lanes` (measure first with `bench-gate.py --lanes 2`), the builder's
-   effort at tier A, `gateOrder` (whether the full gate runs before or after the verifier),
+   "Option C — the pipeline": `lanes` (measure first with `bench-gate.py --lanes 2`), the effort of the
+   roles that write code and judge it, `gateOrder` (whether the full gate runs before or after the verifier),
    `mergeGate` (whether the merge runs the gate again; `receipt` needs a `barrierGate` and a
    `barrierEvery` of at least 1) and `verifier` (a cap on the sensor's mutants, what a survivor is —
    `minor` only under `tlc-spec-driven` — and `rounds`, scoped or full) and `selfMutate` (a cap of mutants per tier that the builder breaks and kills in a scratch
    copy before it hands over; off unless set). A seventh happens by itself: Phase 2 groups small same-area units into one feature
    (decompose-phase.md Step 3), so a section of small fixes pays the per-feature cycle fewer times.
    **Effort.** The roles that write code and judge tests — builder, verifier, reviewer — default to `xhigh` at every tier, whichever model runs
-   them: changing a test and judging the change is work for someone who understands the product. `plan-pipeline.py --check-config` warns when a
-   manager project sets them lower; the value stays the owner's.
+   them: changing a test and judging the change is work for someone who understands the product. It is a default: a `pipeline.json` with no
+   `effort` key, or an empty one, plans with it (a file from before 3.51.0 that never had one moves to `xhigh`), and one that names some roles is NOT
+   merged with it, so a role it leaves out runs at the session's effort. `plan-pipeline.py --check-config` is where a manager project is told (the
+   planner prints nothing, because the launching session reads one line from it): a WARNING for each role and tier below `xhigh` or not named
+   (the reviewer counts at tier A only, the only tier it runs at); the value stays the owner's.
 6. **The level.** `manager.autonomy`: `decide` (the default) or `unblock` — ask, with the price of each
    as "Two levels — how much permission the owner gives" above states it, and write the owner's answer; never raise it yourself.
 7. **Optionally, a stronger model for the decisions.** `manager.decomposeModel` sets the model of the
