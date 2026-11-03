@@ -9,6 +9,85 @@ disagree. Before that they drifted — see **Two contents under one label** and 
 
 ---
 
+## 3.51.0 — 2026-11-02
+
+**A test that is changed is run, not only read; the existing-test slip is found in a second; build, verify and review default to `xhigh`; and a builder can be asked, at a price, to break its own code first.**
+It started as a local patch of MakeContent's pipeline (a guard script and a "break your own code" paragraph) and the owner's point that a person who changes a test first understands
+what it protects and shows that it still bites. Every claim below was run; where it was not, it says so. Three independent reviewers (xhigh, each in its own clone, told to refute) read the
+result and what they reproduced is fixed in the last four commits of this release.
+
+**The premise, reproduced from the Workflow journals of the metricfix run (read-only; not reproducible from this repository).** All 11 features were refused at their first verification: 45
+blocker and major findings (7 blockers, 38 majors); 33 name a surviving mutant (a keyword count, so a rough one); 5 of the 7 blockers were an existing test edited without a `REVOKED-TEST`
+commit; 8.1 of the verifiers' 16.1 agent-hours were spent in attempts after the first. Of the 17 refused verifications, 10 held only weak-test findings, 2 more held those and undeclared test
+edits, and 5 held something else (one a real bug). So at best 7 of the 11 features could have passed first time, not 11, and the success measure "approved at the first verification" cannot be
+met by these two changes alone.
+
+- **`scripts/test-edit-guard.py`, shipped to users (manager mode).** Lists the existing test files whose net diff removes or rewrites a line and for which no commit named
+  `REVOKED-TEST <file>:<test name>` also changes that file. The builder runs it last, after its final commit; the verifier runs it first. It started as the project's local patch, which matched
+  the subject as a substring: on that project's history a `REVOKED-TEST` commit that names a file but changes only a spec passed it (`metricfix-hygiene`), a path was matched as a substring,
+  names with an accent were skipped, a README under `tests/` was reported. The shipped script matches the exact path, needs the declaring commit to change the file, reads paths NUL-separated, reads
+  "existing" at the merge base, treats docs as never tests, and covers rspec, Django, `.snap`, `Tests/`, `testdata/`, `fixtures/` and more, with `--exclude` for a production path that only looks like
+  a test. **What it does not prove is said in its docstring and in its green line:** the declaration is per file, not per edit; it reads commits (an uncommitted edit is not seen); it does not
+  say whether the correction is justified or still bites. **Measured**, on a bare clone of the project's main branch: 41 features since 2026-10-20 with a contiguous commit range, 3 reported, all three real
+  edits to existing tests (one, `metricfix-contracts`, had passed its verifier), 0 false positives, slowest run 0.29 s. Of the five metricfix blockers one (`metricfix-hygiene`) could be replayed and is
+  reported; three (`metricfix-evergreen` twice, `metricfix-intel`) could not, because their first-attempt history was rewritten after the verdict; the fifth (a gate script, additions only) is outside what it sees. Its selftest has 52 scenarios and survives 44
+  planted defects, among them every default pattern deleted one at a time; the first version's selftest missed 31 of an independent reviewer's 60 mutants.
+- **Manager mode: a corrected test is run.** *Builder* (CORRECTED-TEST PROOF), before it commits the correction and in a scratch copy of the branch (never the real tree, never `git stash`, every
+  command through `git -C <scratch>`): with the main branch's production files under the corrected test it must fail by an assertion; with the line that implements the new behaviour broken it
+  must fail again; side by side with the old version nothing is removed or loosened beyond the revoked assertion and every input the old one pinned is still pinned (the new edges go in tests of
+  its own). The commit body gets one sentence on what the test protects and a `Proof:` line. *Verifier* (step 4 of `REVOKED_CHECK`): the `Proof:` line is the builder's claim; it runs the
+  same experiments itself, writes each run under `## Corrected tests`, and a pass with corrections to judge and no such lines is not a pass. A corrected test that passes against the old behaviour,
+  or when the new one is broken, or an edge the criterion names that no test pins (the feature's own new tests count), is a blocker. A scratch that cannot run is "could not run: <why>" and a
+  refusal that names the environment, never a pass. **This touches a protected check (`REVOKED_CHECK`) and adds to the builder's obligations. It adds evidence and blockers and loosens nothing;
+  `REVOKED_RULE`, the test-conflict clause and the repairer's clause are untouched** (a word diff of the verifier's paragraph against 3.50.0's differs in one token, `deletion`, which gains a comma and the new blockers).
+  **Measured**, blind agents each in their own copy of a fixture (a shipping-cost function whose feature revokes `cost(11) is None`; three `REVOKED-TEST` branches that are green on the gate and
+  pass the guard: a correct one, one that cannot fail, and one that pins 15 and 21 so the 10/11 threshold and the 20 edge are unprotected), given only the exact rendered paragraph; "refused" is
+  `pass:false`. 42 verifier runs:
+  | text | effort | correct | cannot fail | edges unpinned |
+  |---|---|---|---|---|
+  | before | xhigh | 2/2 passed | 3/3 refused | **0/3 refused** |
+  | before | medium | - | 2/2 refused | **0/2 refused** |
+  | first new text ("run it") | xhigh | 2/2 passed | 3/3 refused | 3/3 refused |
+  | first new text | medium | 2/2 passed | 1/1 refused | **0/1 refused** (it read the diff and ran nothing) |
+  | + the report must show its runs, "same strength" defined | xhigh / medium | 1/1 + 1/1 passed | - | 2/2 + 3/3 refused |
+  | + an edge is pinned by any test; a stale-cache sentence | xhigh / medium | 1/1 + 2/2 passed (edges pinned by new tests) | - | 2/2 refused (medium) |
+  | final (scratch rules, "could not run", per-file) | xhigh / medium | 1/1 + 2/2 passed | 1/1 refused | 2/2 refused (medium) |
+  The correct correction was never refused (14 runs). The 0/3 and 0/2 are the point: a verifier that only reads the correction passes one that leaves the threshold unprotected, and at medium
+  effort, which is what a tier C verifier gets on MakeContent, even the first new wording did not make it run anything until the report had to show its runs. *Builders*, 3 without the proof and
+  3 + 3 with it (two texts), scored by script on the real branch: all 9 corrected the test so that it fails against the old behaviour and kills all 5 hidden mutants, so the proof shows **no gain
+  in recall** on this fixture; only the builders with it wrote the protects-sentence and the `Proof:` line (6/6). Cost for one corrected test: 78 s and 13.0 tool calls without it, 123 s and
+  18.7 with the first text, 107 s and 13.0 with the final. **Limits:** one toy project, one planted defect per weak branch, the paragraph tested alone and not inside a whole `VERIFY` prompt,
+  `lanes` above 1 and a project whose tests cannot run in a scratch copy not exercised by an agent, and `## Corrected tests` is read by nobody's script (the lines are claims too, visible to the
+  owner and to `measure-agents.py`).
+- **`selfMutate`, an opt-in lever.** `{"A": n, "B": n, "C": n}` is a cap of mutants per tier the builder breaks and kills before it hands over, in a scratch copy, one per distinct assertion
+  surface; a kill is an assertion failing (not an import error); a survivor gets a new test beside the existing ones, never an edit of an old one. Off unless set; a tier at 0 or not named
+  breaks nothing; it says nothing when `verifier.survivor` is `minor`, and under `tlc-spec-lean` skips a feature whose `checks.md` says `Profile: light`. It is a cap because the project's local
+  patch said "for every criterion" and its features had 9 to 37 criteria (mean 26.1). **Measured:** 3 builders without it and 3 with a cap of 5 implemented a module with two callers and were scored on 16
+  hidden mutant implementations of its API: 16/16 killed in both arms (a fixture at ceiling, so it shows no gain), 104 s to 151 s (+45%), 11.7 to 16.7 tool calls, tests added by the pass 0 in all
+  three. So it ships off, priced, and the evidence that it pays is the owner's own measurement on a real project. The project's list of places mutants kept surviving belongs in `checklist`, which
+  exists for it, not in the skill.
+- **Build, verify and review default to `xhigh` at every tier** (they were `xhigh`/`high`/`medium`, `high`/`high`/`medium`, `high`), whichever model runs them: changing a test and judging the change
+  is the work the owner asked to be done with care. It is a default: `--init` writes it, and a `pipeline.json` with **no `effort` key, or an empty one, plans with it** (a file that never had one moves
+  from high/medium to xhigh at tiers B and C without an edit); one whose `effort` is an object keeps its values, and an object that names only some roles is **not** merged with the defaults. The planner
+  prints nothing; `plan-pipeline.py --check-config` prints a WARNING per role and tier below xhigh or not set in a project with a manager delegation (the reviewer counts at tier A only). On
+  MakeContent's file, read-only, it printed 5. The cost of `xhigh` is **not measured**. Option B's agent files (`write-agents.py`) and the four benchmark fixtures keep their own efforts.
+- **The manager asks the planner again when its reply drops `selfMutate`, `verifier`, `gateOrder` or `mergeGate`** (an LLM copies the args, and a dropped key switched the lever off in silence;
+  `verifier` and `gateOrder` had the same hole).
+- **A stale-cache sentence.** A run of a broken copy must not be served from a cache of the code it replaced: Python reuses a `.pyc` for a file rewritten in the same second with the same size, and a
+  mutant that should fail looks like it survived. Of the 31 verifiers whose prompt did not warn about it, 9 wrote that a stale cached run misled them (7 of the 7 that had to write their runs down);
+  of the 5 with the sentence none did and all 5 turned bytecode caching off first (small numbers; the sentence is stack-agnostic).
+
+**What the independent review found and this release fixed** (each reproduced by the reviewer first): `--amend` reaching only `HEAD` (the proof is now made before the commit); a bare
+`git checkout <main> -- <file>` in the agent's own directory overwriting its uncommitted edit; that checkout failing for a file the feature added; a stale scratch from a crashed agent;
+"start only when `git status` prints nothing" being unsatisfiable (the pipeline's own files are uncommitted by design); the guard reading the tip of the main branch instead of the merge base,
+failing silently with `--root` in a subdirectory, dropping a path with a tab, accepting a bare path as a declaration; and `check-pipeline.mjs` letting 18 of 20 mutants of the prompts through (a
+main branch not called `main`, a second attempt and the scratch commands now have scenarios). **Corrected in my own drafts:** a count of "six of sixteen" for the stale-cache trap that I had not
+measured (9 of 31, above), "12 of 17" that mixed two kinds of round (10 + 2), and "four planted defects" that were five.
+
+**Not executed:** a real Workflow run with this text, and the `manager-revoke` benchmark (both need the owner's opt-in; `benchmark/expected.md` says it was updated by reading); the effect of
+`selfMutate` and of `xhigh` on cost and refusals on a real project; per-edit attribution inside a declared file (the verifier reads the whole diff of every declared file; a first idea, forbidding removals
+in non-declaring commits, would break the "restore, then redo" recipe); passing the guard's `--pattern` and `--exclude` from `pipeline.json`.
+
 ## 3.50.0 — 2026-10-22
 
 **The suspicions 3.49.0 left unlisted, checked one by one; what was real is fixed, what was not is recorded as not.** Eleven independent agents,
