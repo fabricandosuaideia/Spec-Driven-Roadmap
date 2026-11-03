@@ -145,7 +145,8 @@ def check(root, main, branch, patterns):
             "first line and a body quoting the criterion or decision that revokes the old assertion. If the edit already sits in an "
             "earlier commit: restore the file from %s in a commit, then redo the edit in the REVOKED-TEST commit." % (missing, main))
         return lines, 1
-    lines.append("test-edit-guard: every changed existing test file has its REVOKED-TEST commit")
+    lines.append("test-edit-guard: every changed existing test file has its REVOKED-TEST commit "
+                 "(that proves a declaration exists and carries the edit; whether the corrected test still bites is not checked here)")
     return lines, 0
 
 
