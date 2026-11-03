@@ -62,11 +62,11 @@ irm https://raw.githubusercontent.com/fabricandosuaideia/Spec-Driven-Roadmap/mai
 .\install.ps1 -Global -Force
 ```
 
-A skill em si é markdown mais dez scripts auxiliares em Python 3 (só biblioteca padrão), então é
+A skill em si é markdown mais onze scripts auxiliares em Python 3 (só biblioteca padrão), então é
 totalmente multiplataforma; só o instalador muda por SO. Eles convertem um projeto de roadmap único
 em roadmaps por seção, conferem um roadmap, medem quanto as execuções de agentes custam, imprimem só
 o trecho do roadmap que o construtor de uma feature precisa, mantêm pequeno o bloco de status do
-roadmap, escrevem as definições de sub-agente que um loop dispara, planejam uma execução da esteira, cronometram o gate completo do projeto, rodam um teste que falha antes e depois de um lote de merges e registram o commit que uma barreira verde provou;
+roadmap, escrevem as definições de sub-agente que um loop dispara, planejam uma execução da esteira, cronometram o gate completo do projeto, rodam um teste que falha antes e depois de um lote de merges, registram o commit que uma barreira verde provou e listam as edições de testes existentes que o modo gestor exige declarar;
 cada um precisa de um `python3` funcionando no PATH. No Claude Code a skill também traz dois scripts de
 Workflow: um constrói um roadmap com um agente novo por papel — construtor, provador, verificador,
 revisor, mesclador — e o outro roda o modo gestor sobre todas as seções; cada um só roda quando você pede. No Windows, o `python3` puro costuma ser o stub da Microsoft Store, que abre a
