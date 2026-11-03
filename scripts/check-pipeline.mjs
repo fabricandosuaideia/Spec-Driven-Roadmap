@@ -300,9 +300,21 @@ const scenarios = {
     const l = lean.calls.find(c => c.role === 'build').prompt, d = drv.calls.find(c => c.role === 'build').prompt
     return /Profile: light/.test(l) && /every test that carries a check/.test(l) && !/Profile: light/.test(d) && /every test that carries a criterion/.test(d)
   },
-  'the scratch of selfMutate is outside the project tree': async src => {
-    const r = await run(src, { selfMutate: { B: 3 }, features: [feat('a', 'B')] }, pass())
-    return /git worktree add \/p\.wt\/mutants\/a HEAD/.test(r.calls.find(c => c.role === 'build').prompt)
+  'the scratch of selfMutate and of the corrected-test proof is outside the project tree': async src => {
+    const r = await run(src, { managerMode: true, selfMutate: { B: 3 }, features: [feat('a', 'B')] }, pass())
+    const b = r.calls.find(c => c.role === 'build').prompt, v = r.calls.find(c => c.role === 'verify').prompt
+    return /git worktree add \/p\.wt\/mutants\/a HEAD/.test(b) && /git worktree add \/p\.wt\/proof\/a HEAD/.test(b) && /git worktree add \/p\.wt\/proof\/a HEAD/.test(v)
+  },
+  'in manager mode the builder proves each corrected test against the old behaviour, before the guard, and the verifier runs it again': async src => {
+    const r = await run(src, { managerMode: true, selfMutate: { B: 3 }, features: [feat('a', 'B')] }, pass())
+    const b = r.calls.find(c => c.role === 'build').prompt, v = r.calls.find(c => c.role === 'verify').prompt
+    const at = t => b.indexOf(t)
+    return at('SELF-MUTATION') > 0 && at('SELF-MUTATION') < at('CORRECTED-TEST PROOF') && at('CORRECTED-TEST PROOF') < at('DEFERRED SCOPE') && at('DEFERRED SCOPE') < at('EXISTING-TEST GUARD') &&
+      /Then \(4\) run the corrected tests yourself/.test(v) && v.indexOf('(3) that it was decided') < v.indexOf('Then (4)')
+  },
+  'outside manager mode there is no corrected-test proof to make or to check': async src => {
+    const r = await run(src, { features: [feat('a', 'C')] }, pass())
+    return r.calls.filter(c => c.role === 'build' || c.role === 'verify').every(c => !/CORRECTED-TEST PROOF|run the corrected tests yourself/.test(c.prompt))
   },
   // 3.35.0 — level unblock: a red barrier is triaged by script, repaired, checked, merged, re-run.
   'at level decide a red barrier is never triaged': async src => {
@@ -456,6 +468,9 @@ const mutants = {
   'selfMutate is on without the config': ["if (!cap || VP.survivor === 'minor') return ''", "if (VP.survivor === 'minor') return ''"],
   'selfMutate despite a survivor that does not refuse': ["if (!cap || VP.survivor === 'minor') return ''", 'if (!cap) return \'\''],
   'selfMutate breaks the lines of the whole feature on a later attempt': ["${attempt > 1 ? ' This is a later attempt: break only the lines your fix changed.' : ''}", ''],
+  'the corrected-test proof is asked outside manager mode': ["${MANAGED ? REVOKED_PROOF(f) + '\\n' : ''}DEFERRED SCOPE:", "${REVOKED_PROOF(f) + '\\n'}DEFERRED SCOPE:"],
+  'the corrected-test proof is not asked in manager mode': ["${MANAGED ? REVOKED_PROOF(f) + '\\n' : ''}DEFERRED SCOPE:", 'DEFERRED SCOPE:'],
+  'the verifier only reads the corrected tests': ['Then (4) run the corrected tests yourself, adversarially', 'Then (4) read the corrected tests'],
   'the scratch is the project tree': ["const SCRATCH = (kind, f) => `${A.worktreeRoot || (P + '.lanes')}/${kind}/${f.name}`", 'const SCRATCH = (kind, f) => P'],
   'builder not told to run the guard in manager mode': ["${MANAGED ? TEST_EDIT_GUARD(f) + '\\n' : ''}Reply ready=true", 'Reply ready=true'],
   'the guard is run outside manager mode too': ["${MANAGED ? TEST_EDIT_GUARD(f) + '\\n' : ''}Reply ready=true", "${TEST_EDIT_GUARD(f) + '\\n'}Reply ready=true"],
@@ -558,6 +573,21 @@ const CLAUSES = [
   ['build (self-mutation): a collection error is not a kill', 'build', 'an import, collection or syntax error is not a kill', { args: { selfMutate: { B: 3 } } }],
   ['build (self-mutation): an old test is never edited to kill a mutant', 'build', 'Never edit a test that existed on', { args: { selfMutate: { B: 3 } } }],
   ['build (self-mutation): what cannot be broken safely is listed, not broken', 'build', 'break nothing and list those lines as unproven in your notes', { args: { selfMutate: { B: 3 } } }],
+  ['build (manager): a test changed and never shown to fail', 'build', 'a test that was changed and never shown to fail is a regression waiting', { args: { managerMode: true } }],
+  ['build (manager): the corrected test must fail against the old behaviour', 'build', 'every corrected test must FAIL by an assertion, an import or collection error is no proof', { args: { managerMode: true } }],
+  ['build (manager): and when the new behaviour is broken', 'build', 'the corrected tests that cover it must FAIL', { args: { managerMode: true } }],
+  ['build (manager): no assertion made looser beyond the one revoked', 'build', 'no assertion removed, narrowed or made looser except the one the criterion revokes', { args: { managerMode: true } }],
+  ['verify (manager): the builder\'s proof is a claim', 'verify', 'a Proof: line in the commit body is the builder\'s claim, not evidence', { args: { managerMode: true } }],
+  ['verify (manager): the corrected tests fail against the old behaviour', 'verify', 'each must FAIL by an assertion, and one that passes still tests nothing the criterion changed', { args: { managerMode: true } }],
+  ['verify (manager): and when the new behaviour is broken', 'verify', 'at least one corrected test that covers it must FAIL', { args: { managerMode: true } }],
+  ['verify (manager): never in the real tree', 'verify', 'never break code in the real tree, never git stash', { args: { managerMode: true } }],
+  ['verify (manager): a corrected test that still passes is a blocker', 'verify', 'a corrected test that passes against the old behaviour or when the new behaviour is broken', { args: { managerMode: true } }],
+  ['verify (manager): a pass needs the runs written down', 'verify', 'with REVOKED-TEST commits to judge and no such lines, you do not pass', { args: { managerMode: true } }],
+  ['verify (manager): an edge the criterion names must fail when the threshold moves by one', 'verify', 'an edge the criterion names that no test pins — the feature\'s own new tests count — (move the threshold by one: some test must fail)', { args: { managerMode: true } }],
+  ['build (manager): the corrected test keeps every input the old assertion pinned', 'build', 'still pins every input the old assertion pinned', { args: { managerMode: true } }],
+  ['build (manager): new edges are pinned by tests of its own, never by widening the corrected one', 'build', 'never by widening the corrected one: the correction changes only the assertion the criterion revokes', { args: { managerMode: true } }],
+  ['build (manager): the Proof line is written by amending that commit\'s message only', 'build', 'by amending that commit\'s message only (git commit --amend)', { args: { managerMode: true } }],
+  ['verify (manager): a run of a broken copy must not be served from a cache', 'verify', 'when a mutant you expected to fail passes, check that the run saw the changed file before you call the test weak', { args: { managerMode: true } }],
   ['build (manager): the criterion is decided before the build', 'build', 'decided before you started — never from a spec, plan or check that you wrote on this branch', { args: { managerMode: true } }],
   ['build (manager): the first line of the commit', 'build', 'whose FIRST LINE is REVOKED-TEST', { args: { managerMode: true } }],
   ['build (manager): red for another reason is the builder\'s defect', 'build', 'A test red for any other reason is a defect in your change', { args: { managerMode: true } }],

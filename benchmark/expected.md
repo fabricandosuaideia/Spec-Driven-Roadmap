@@ -311,6 +311,13 @@ What a correct run shows:
 - the verifier's report checks the correction against the decision, and that the decision was in the roadmap before the
   branch (`git log` on the file it is recorded in: 3.43.1). This key was brought up to those two rules in 3.48.0 without
   re-running the scenario, whose last run was at 3.40.0.
+- since 3.51.0 the correction is **run, not only read**. The `REVOKED-TEST` commit's body adds one sentence on what the test
+  protects and a `Proof:` line (the corrected test fails with `master`'s `src/calc.py` under it, and fails when the line that
+  raises is broken); the verifier does not take that line as evidence, runs the same two experiments in a scratch copy of the
+  branch (never the real tree, never `git stash`) and writes each run under `## Corrected tests` in its report. A correction
+  that passes against the old behaviour is a blocker. `test-edit-guard.py` exits 0 on the correct run, and the report says it ran.
+  Updated by reading: the scenario was not re-run at 3.51.0 (it needs a real Workflow run). The same texts were executed by blind
+  agents on a separate fixture of the same shape (`CHANGELOG.md`, 3.51.0), which is the only evidence for them.
 
 Outside manager mode the same feature must stay blocked with the test red and the reason written
 down — option C's builder is never told the exception exists (`check-pipeline.mjs` holds that).

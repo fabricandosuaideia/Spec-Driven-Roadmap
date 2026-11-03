@@ -90,6 +90,16 @@ thing before it hands over, the verifier runs it first, and each undeclared line
 exists and carries the edit, never that it is justified; it does not see the gate script or a line added to an existing test, which the
 verifier still reads.
 
+The correction is **run, not only read**. A person who changes a test first understands what it protects and why the product
+changed, then shows that it still bites; a test that was changed and never shown to fail is a regression waiting, and a verifier that
+only reads "the new assertion is as strong" cannot tell a correction from a vacuous one. So the builder, before it hands over, runs
+the corrected tests in a scratch copy of the branch (never the real tree, never `git stash`): with the main branch's production code
+under them they must fail by an assertion, and with the line that implements the new behaviour broken the ones that cover it must fail
+again. It writes one sentence on what the test protects and a `Proof:` line in the commit body. The verifier does not take that line
+as evidence: it runs the same two experiments itself, and a corrected test that passes against the old behaviour, or when the new
+behaviour is broken, is a blocker whatever the line says. The experiments cost one run per distinct behaviour the corrections share,
+not one per test.
+
 The unblock repairer keeps the **narrow** form (an owner decision recorded in the roadmap revokes exactly
 that assertion), because a regression belongs to a feature whose own spec did not change; it may also
 fix a test that is wrong about timing, ordering or shared state at that cause, never by loosening.
