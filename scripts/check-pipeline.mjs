@@ -258,6 +258,23 @@ const scenarios = {
       /REVOKED TESTS \(manager mode\)/.test(v.prompt) && /is a blocker issue/.test(v.prompt) &&
       /states a behaviour the OLD assertion contradicts/.test(v.prompt)
   },
+  // 3.51.0 — test-edit-guard.py: the mechanical half of the REVOKED-TEST check.
+  'in manager mode the builder runs the existing-test guard last and the verifier first': async src => {
+    const r = await run(src, { managerMode: true, features: [feat('a', 'C')] }, pass())
+    const b = r.calls.find(c => c.role === 'build').prompt, v = r.calls.find(c => c.role === 'verify').prompt
+    const cmd = /test-edit-guard\.py --root \/p --main main --branch feat\/a/
+    return cmd.test(b) && cmd.test(v) && b.indexOf('test-edit-guard.py') > b.indexOf('DEFERRED SCOPE') && b.indexOf('test-edit-guard.py') < b.indexOf('Reply ready=true') &&
+      v.indexOf('test-edit-guard.py') < v.indexOf('List every change')
+  },
+  'outside manager mode nobody is told about the existing-test guard': async src => {
+    const r = await run(src, { features: [feat('a', 'C')] }, pass())
+    return r.calls.filter(c => c.role === 'build' || c.role === 'verify').every(c => !/test-edit-guard/.test(c.prompt))
+  },
+  'with several lanes the guard looks at the feature\'s own worktree, not the project root': async src => {
+    const r = await run(src, { managerMode: true, lanes: 2, features: [feat('a', 'C')] }, pass())
+    const b = r.calls.find(c => c.role === 'build').prompt, v = r.calls.find(c => c.role === 'verify').prompt
+    return /test-edit-guard\.py --root \/p\.wt\/lane1\/a --main main/.test(b) && /test-edit-guard\.py --root \/p\.wt\/lane1\/a --main main/.test(v)
+  },
   // 3.35.0 — level unblock: a red barrier is triaged by script, repaired, checked, merged, re-run.
   'at level decide a red barrier is never triaged': async src => {
     const r = await run(src, { managerMode: true, barrierGate: 'make all', barrierEvery: 1, features: [feat('a'), feat('b')] },
@@ -406,6 +423,10 @@ const mutants = {
   'verify-first gate result ignored': ['if (pass && VERIFY_FIRST) { pass = await proveStep(); gateRefused = !pass }', 'if (pass && VERIFY_FIRST) { await proveStep() }'],
   'verify-first runs the gate before the verdict anyway': ['if (!VERIFY_FIRST && !(await proveStep())) continue', 'if (!(await proveStep())) continue'],
   'builder not told to wait for a long command': ['${LONG_COMMANDS}\n${A.checklist ?', '${A.checklist ?'],
+  'builder not told to run the guard in manager mode': ["${MANAGED ? TEST_EDIT_GUARD(f) + '\\n' : ''}Reply ready=true", 'Reply ready=true'],
+  'the guard is run outside manager mode too': ["${MANAGED ? TEST_EDIT_GUARD(f) + '\\n' : ''}Reply ready=true", "${TEST_EDIT_GUARD(f) + '\\n'}Reply ready=true"],
+  'the builder runs the guard on the project root, not its worktree': ['test-edit-guard.py --root ${wt(f)} --main ${MAIN} --branch feat/${f.name} — exit 0 is required', 'test-edit-guard.py --root ${P} --main ${MAIN} --branch feat/${f.name} — exit 0 is required'],
+  'the verifier is not sent to the guard': ['first run python3 ${SKILL}/scripts/test-edit-guard.py --root ${wt(f)}', 'first run python3 ${SKILL}/scripts/nope.py --root ${wt(f)}'],
   'verifier not told to check test changes in manager mode': ["${MANAGED ? REVOKED_CHECK(f) + '\\n' : ''}", ''],
   'verifier not told the criterion must contradict the old assertion': ['states a behaviour the OLD assertion contradicts', 'exists'],
   'barrier only at the end': ['if (BARRIER_EVERY && sinceBarrier.length >= BARRIER_EVERY) await runBarrier()', ''],
@@ -494,6 +515,11 @@ const CLAUSES = [
   ['verify (manager): not a decision when the branch wrote it', 'verify', 'it is not a decision', { args: { managerMode: true } }],
   ['verify (manager): the branch wrote it itself', 'verify', 'one the branch wrote itself', { args: { managerMode: true } }],
   ['verify (manager): a criterion written to explain the edit', 'verify', 'states nothing the product needed, is the same blocker', { args: { managerMode: true } }],
+  ['build (manager): the guard is the last thing before the reply', 'build', 'the last thing you do before you reply ready=true, after your last commit', { args: { managerMode: true } }],
+  ['build (manager): a header declares nothing', 'build', 'a header on a commit that does not touch the file declares nothing', { args: { managerMode: true } }],
+  ['build (manager): an edit already committed is restored, then made again in the declaring commit', 'build', 'then make the edit again in the REVOKED-TEST commit', { args: { managerMode: true } }],
+  ['verify (manager): an undeclared line is a blocker with nothing more to read', 'verify', 'every UNDECLARED line it prints is a blocker issue at that file', { args: { managerMode: true } }],
+  ['verify (manager): what the guard cannot see the verifier lists itself', 'verify', 'it does not see the gate script, test configuration outside its patterns, or a line added to an existing test', { args: { managerMode: true } }],
   ['build (manager): the criterion is decided before the build', 'build', 'decided before you started — never from a spec, plan or check that you wrote on this branch', { args: { managerMode: true } }],
   ['build (manager): the first line of the commit', 'build', 'whose FIRST LINE is REVOKED-TEST', { args: { managerMode: true } }],
   ['build (manager): red for another reason is the builder\'s defect', 'build', 'A test red for any other reason is a defect in your change', { args: { managerMode: true } }],

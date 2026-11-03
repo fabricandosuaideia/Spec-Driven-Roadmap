@@ -83,6 +83,13 @@ behaviour stops the feature for the owner to settle: that is the safe direction,
 that conflicts with a change the main branch made to the same test: the builder's stop on a test conflict (3.47.0) applies to it too,
 every attempt up to the tier's ceiling, and the owner settles it (checked on blind agents in 3.50.0: 4 of 4 stopped, none settled it).
 
+A script does the mechanical half of that check. `scripts/test-edit-guard.py` lists every existing test file whose net diff removes or
+rewrites a line and for which no `REVOKED-TEST` commit names that exact path **and changes it**: a header on a commit that touches
+something else declares nothing (a feature on a real project passed its verifier with exactly that). The builder runs it as the last
+thing before it hands over, the verifier runs it first, and each undeclared line is a blocker at that file. It proves that a declaration
+exists and carries the edit, never that it is justified; it does not see the gate script or a line added to an existing test, which the
+verifier still reads.
+
 The unblock repairer keeps the **narrow** form (an owner decision recorded in the roadmap revokes exactly
 that assertion), because a regression belongs to a feature whose own spec did not change; it may also
 fix a test that is wrong about timing, ordering or shared state at that cause, never by loosening.
