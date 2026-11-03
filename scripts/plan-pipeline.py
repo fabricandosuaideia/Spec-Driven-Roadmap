@@ -1143,6 +1143,13 @@ x
         expect("a manager project with build below xhigh is warned, per tier, and not refused",
                code == 0 and "effort.implement is high for B" in out and "effort.implement is medium for C" in out and "effort.verify is high for every tier" in out
                and "effort.review" not in out and "xhigh whichever model" in out)
+        code, out = check_with({"manager": dict(mw["manager"]), "effort": {"implement": "xhigh", "verify": {"A": "xhigh"}, "review": {"A": "xhigh", "B": "low", "C": "low"}}})
+        expect("a role or tier the effort leaves out is told (it runs at the session's effort), and a low review at tier B or C is not (the reviewer runs at A only)",
+               "effort.verify is not set for B" in out and "effort.verify is not set for C" in out and "effort.review" not in out and "effort.implement" not in out)
+        code, out = check_with({"manager": dict(mw["manager"]), "effort": {"implement": "xhigh", "verify": "xhigh", "review": "high"}})
+        expect("a review below xhigh is told for tier A", "effort.review is high for tier A" in out)
+        code, out = check_with({"manager": dict(mw["manager"]), "effort": {}})
+        expect("an empty effort plans with the defaults and is not warned about", code == 0 and "WARNING  effort" not in out)
         code, out = check_with({"manager": dict(mw["manager"], delegation=""), "effort": low})
         expect("a project that does not use manager mode is not warned", code == 0 and "WARNING  effort" not in out)
         code, out = check_with({"manager": dict(mw["manager"]), "effort": {"implement": "xhigh", "verify": {"A": "max", "B": "xhigh", "C": "xhigh"}, "review": "max"}})
@@ -1201,10 +1208,18 @@ def check_config(root, cfg_path):
     ef = cfg.get("effort") if isinstance(cfg.get("effort"), dict) else {}
     if str(mgr.get("delegation") or "").strip():
         rank = {lv: i for i, lv in enumerate(EFFORT_LEVELS)}
-        for role in ("implement", "verify", "review"):
+        # An absent, null or empty `effort` plans with the defaults (xhigh). One that names some roles is NOT merged with them: a role or tier it
+        # leaves out runs at the session's effort. The reviewer runs at tier A only, so a lower value for B or C of `review` is not told.
+        for role in (("implement", "verify", "review") if ef else ()):
             val = ef.get(role)
-            for tier, lv in ((t, val.get(t)) for t in TIERS) if isinstance(val, dict) else [("every tier", val)]:
-                if isinstance(lv, str) and lv in rank and rank[lv] < rank["xhigh"]:
+            tiers = ("A",) if role == "review" else TIERS
+            pairs = [(t, val.get(t)) for t in tiers] if isinstance(val, dict) else [("tier A" if role == "review" else "every tier", val)]
+            for tier, lv in pairs:
+                if lv is None:
+                    WARNED[0] += 1
+                    print("WARNING  effort.%s is not set for %s: it runs at the session's effort, not at xhigh (an effort that names some roles is not merged with "
+                          "the defaults)" % (role, tier))
+                elif isinstance(lv, str) and lv in rank and rank[lv] < rank["xhigh"]:
                     WARNED[0] += 1
                     print("WARNING  effort.%s is %s for %s: manager mode edits and judges tests, work that is asked to run at xhigh "
                           "whichever model runs it (the file's value stands; it is yours to change)" % (role, lv, tier))

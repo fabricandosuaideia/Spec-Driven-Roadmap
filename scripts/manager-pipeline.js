@@ -84,6 +84,8 @@ const argsProblem = (o, s) => {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return 'it is not a JSON object'
   const lacks = ARGS_NEEDED.filter(k => o[k] === undefined || o[k] === null || o[k] === '')
   if (!('barrierGate' in o)) lacks.push('barrierGate')
+  // plan-pipeline.py always prints these; an LLM planner that drops one turns the lever off in silence (selfMutate and verifier print null when unset)
+  for (const k of ['gateOrder', 'mergeGate', 'verifier', 'selfMutate']) if (!(k in o)) lacks.push(k)
   if (lacks.length) return `it lacks ${lacks.join(', ')}`
   if (o.project !== P) return `its project is ${o.project}, not ${P}`
   const other = (Array.isArray(o.features) ? o.features : []).filter(f => !f || f.roadmap !== s.roadmap).map(f => f && f.name)

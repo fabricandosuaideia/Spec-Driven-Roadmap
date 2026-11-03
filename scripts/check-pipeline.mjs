@@ -933,7 +933,7 @@ const MBASE = {
   delegatedOn: '2026-09-29', stopAt: [], sectionsPerRun: 4, effort: { decompose: 'xhigh', plan: 'low', final: 'medium' },
 }
 const sec = (slug, over = {}) => ({ slug, roadmap: `docs/ROADMAP-${slug}.md`, txt: `docs/roadmap-${slug}.txt`, dependsOn: [], decomposed: false, pending: [], ...over })
-const planArgs = slug => ({ project: '/p', skillDir: '/s', downstream: 'tlc-spec-lean', downstreamDir: '/d', statusPath: 'docs/ROADMAP-INDEX.md', mainBranch: 'main', gate: 'make check', barrierGate: null, lanes: 1, worktreeRoot: '/p.lanes', effort: {}, maxAttempts: { A: 5, B: 4, C: 3 }, features: [{ name: slug + '-a', roadmap: `docs/ROADMAP-${slug}.md` }], roadmap: `docs/ROADMAP-${slug}.md` })
+const planArgs = slug => ({ project: '/p', skillDir: '/s', downstream: 'tlc-spec-lean', downstreamDir: '/d', statusPath: 'docs/ROADMAP-INDEX.md', mainBranch: 'main', gate: 'make check', barrierGate: null, gateOrder: 'gate-first', mergeGate: 'rerun', verifier: null, selfMutate: null, lanes: 1, worktreeRoot: '/p.lanes', effort: {}, maxAttempts: { A: 5, B: 4, C: 3 }, features: [{ name: slug + '-a', roadmap: `docs/ROADMAP-${slug}.md` }], roadmap: `docs/ROADMAP-${slug}.md` })
 async function runManager(src, argsOver, child = () => ['x: merged (attempt 1)', 'barrier: green after x'], behave = {}) {
   const calls = [], children = []
   const agent = async (prompt, opts) => {
@@ -1121,6 +1121,14 @@ const managerScenarios = {
       { plan: slug => n++ === 0 ? { exitCode: 0, line: 'ok', argsJson: JSON.stringify(dropped) } : undefined })
     const plans = r.calls.filter(c => c.role === 'plan')
     return plans.length === 2 && /it lacks statusPath, barrierGate/.test(plans[1].prompt)
+  },
+  'manager: a plan that dropped selfMutate, verifier, gateOrder or mergeGate is asked again, so a lever is never switched off in silence': async src => {
+    let n = 0
+    const { selfMutate, verifier, gateOrder, mergeGate, ...dropped } = planArgs('a')
+    const r = await runManager(src, { sections: [sec('a', { decomposed: true, pending: ['a-a'] })] }, undefined,
+      { plan: slug => n++ === 0 ? { exitCode: 0, line: 'ok', argsJson: JSON.stringify(dropped) } : undefined })
+    const plans = r.calls.filter(c => c.role === 'plan')
+    return plans.length === 2 && /it lacks gateOrder, mergeGate, verifier, selfMutate/.test(plans[1].prompt)
   },
   'manager: every agent carries the launch scoping, and the decomposer the delegation and the marking': async src => {
     const r = await runManager(src, { sections: [sec('a')] })
