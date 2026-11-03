@@ -292,7 +292,7 @@ const scenarios = {
   'a later attempt breaks only the lines its fix changed': async src => {
     const r = await run(src, { selfMutate: { C: 3 }, features: [feat('a', 'C')] }, pass({ verify: (n, att) => att < 2 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }))
     const b1 = r.calls.find(c => c.role === 'build' && c.attempt === 1).prompt, b2 = r.calls.find(c => c.role === 'build' && c.attempt === 2).prompt
-    return !/break only the lines your fix changed/.test(b1) && /break only the lines your fix changed/.test(b2)
+    return !/break the lines your fix changed/.test(b1) && /break the lines your fix changed and the code covered by any test your fix added/.test(b2)
   },
   'under tlc-spec-lean the light profile skips selfMutate, under tlc-spec-driven it is a criterion not a check': async src => {
     const lean = await run(src, { selfMutate: { B: 3 }, features: [feat('a', 'B')] }, pass())
@@ -315,6 +315,25 @@ const scenarios = {
   'outside manager mode there is no corrected-test proof to make or to check': async src => {
     const r = await run(src, { features: [feat('a', 'C')] }, pass())
     return r.calls.filter(c => c.role === 'build' || c.role === 'verify').every(c => !/CORRECTED-TEST PROOF|run the corrected tests yourself/.test(c.prompt))
+  },
+  // R2's review of 3.51.0: a main branch that is not called main, a branch name that is a prefix of another, a second attempt, and the scratch commands' shape.
+  'a main branch that is not called main is the one every guard, proof and check names': async src => {
+    const r = await run(src, { managerMode: true, mainBranch: 'master', selfMutate: { B: 3 }, features: [feat('a', 'B')] }, pass())
+    const b = r.calls.find(c => c.role === 'build').prompt, v = r.calls.find(c => c.role === 'verify').prompt
+    return /test-edit-guard\.py --root \/p --main master --branch feat\/a /.test(b) && /test-edit-guard\.py --root \/p --main master --branch feat\/a /.test(v) &&
+      /master's version of each production file/.test(b) && /master's version of each production file/.test(v) && !/--main main\b/.test(b + v)
+  },
+  'the guard and the proof are asked again on a later attempt, and the verifier checks them in every round': async src => {
+    const r = await run(src, { managerMode: true, features: [feat('a', 'C')] }, pass({ verify: (n, att) => att < 2 ? { gateExit: 1, pass: false, notMet: ['AC-1'], issues: [] } : undefined }))
+    const b2 = r.calls.find(c => c.role === 'build' && c.attempt === 2).prompt, v2 = r.calls.find(c => c.role === 'verify' && c.attempt === 2).prompt
+    return /EXISTING-TEST GUARD/.test(b2) && /CORRECTED-TEST PROOF/.test(b2) && /Then \(4\) run the corrected tests yourself/.test(v2) && /test-edit-guard\.py/.test(v2)
+  },
+  'every command of a scratch experiment names the scratch, and the scratch is removed before it is made and after': async src => {
+    const r = await run(src, { managerMode: true, selfMutate: { B: 3 }, features: [feat('a', 'B')] }, pass())
+    const b = r.calls.find(c => c.role === 'build').prompt, v = r.calls.find(c => c.role === 'verify').prompt
+    const rule = /git worktree remove --force \/p\.wt\/(proof|mutants)\/a 2>\/dev\/null; git worktree prune; git worktree add \/p\.wt\/\1\/a HEAD/
+    return rule.test(b) && rule.test(v) && (b.match(/git -C \/p\.wt\/proof\/a checkout main -- <the file>/g) || []).length === 1 && /git -C \/p\.wt\/proof\/a rm -f <the file>/.test(v) &&
+      /Remove the scratch when you are done: git worktree remove --force \/p\.wt\/proof\/a\./.test(b)
   },
   // 3.35.0 — level unblock: a red barrier is triaged by script, repaired, checked, merged, re-run.
   'at level decide a red barrier is never triaged': async src => {
@@ -467,11 +486,16 @@ const mutants = {
   'selfMutate ignores its cap': ['const cap = (A.selfMutate || {})[tierOf(f)]', 'const cap = 99'],
   'selfMutate is on without the config': ["if (!cap || VP.survivor === 'minor') return ''", "if (VP.survivor === 'minor') return ''"],
   'selfMutate despite a survivor that does not refuse': ["if (!cap || VP.survivor === 'minor') return ''", 'if (!cap) return \'\''],
-  'selfMutate breaks the lines of the whole feature on a later attempt': ["${attempt > 1 ? ' This is a later attempt: break only the lines your fix changed.' : ''}", ''],
+  'selfMutate breaks the lines of the whole feature on a later attempt': ["${attempt > 1 ? ' This is a later attempt: break the lines your fix changed and the code covered by any test your fix added (a fix that only adds a test changes no code, and that test has never been made to fail once).' : ''}", ''],
   'the corrected-test proof is asked outside manager mode': ["${MANAGED ? REVOKED_PROOF(f) + '\\n' : ''}DEFERRED SCOPE:", "${REVOKED_PROOF(f) + '\\n'}DEFERRED SCOPE:"],
   'the corrected-test proof is not asked in manager mode': ["${MANAGED ? REVOKED_PROOF(f) + '\\n' : ''}DEFERRED SCOPE:", 'DEFERRED SCOPE:'],
   'the verifier only reads the corrected tests': ['Then (4) run the corrected tests yourself, adversarially', 'Then (4) read the corrected tests'],
   'the scratch is the project tree': ["const SCRATCH = (kind, f) => `${A.worktreeRoot || (P + '.lanes')}/${kind}/${f.name}`", 'const SCRATCH = (kind, f) => P'],
+  'the guard is given the project root as the main branch name': ['--root ${wt(f)} --main ${MAIN} --branch feat/${f.name} — exit 0 is required', '--root ${wt(f)} --main main --branch feat/${f.name} — exit 0 is required'],
+  'the scratch is made without removing a stale one': ['git worktree remove --force ${d} 2>/dev/null; git worktree prune; git worktree add ${d} HEAD', 'git worktree add ${d} HEAD'],
+  'the scratch rule loses its \"could not run\" way out': ['${whoCannot} Remove the scratch', 'Remove the scratch'],
+  'a file the feature added is checked out from the main branch': ['git -C ${d} rm -f <the file> when the feature added it', 'git -C ${d} checkout ${MAIN} -- <the file> when the feature added it'],
+  'the verifier is not told the sensor cap does not bound its runs': ['These runs are not the sensor\'s mutants: SENSOR POLICY\'s cap and a survivor\'s severity do not apply to them. ', ''],
   'builder not told to run the guard in manager mode': ["${MANAGED ? TEST_EDIT_GUARD(f) + '\\n' : ''}Reply ready=true", 'Reply ready=true'],
   'the guard is run outside manager mode too': ["${MANAGED ? TEST_EDIT_GUARD(f) + '\\n' : ''}Reply ready=true", "${TEST_EDIT_GUARD(f) + '\\n'}Reply ready=true"],
   'the builder runs the guard on the project root, not its worktree': ['test-edit-guard.py --root ${wt(f)} --main ${MAIN} --branch feat/${f.name} — exit 0 is required', 'test-edit-guard.py --root ${P} --main ${MAIN} --branch feat/${f.name} — exit 0 is required'],
@@ -567,8 +591,9 @@ const CLAUSES = [
   ['build (manager): the guard is the last thing before the reply', 'build', 'the last thing you do before you reply ready=true, after your last commit', { args: { managerMode: true } }],
   ['build (manager): a header declares nothing', 'build', 'a header on a commit that does not touch the file declares nothing', { args: { managerMode: true } }],
   ['build (manager): an edit already committed is restored, then made again in the declaring commit', 'build', 'then make the edit again in the REVOKED-TEST commit', { args: { managerMode: true } }],
+  ['verify (manager): the declaration is per file, so the whole diff of a declared file is read', 'verify', 'the declaration is per file, not per edit, so you read the whole diff of every declared file', { args: { managerMode: true } }],
   ['verify (manager): an undeclared line is a blocker with nothing more to read', 'verify', 'every UNDECLARED line it prints is a blocker issue at that file', { args: { managerMode: true } }],
-  ['verify (manager): what the guard cannot see the verifier lists itself', 'verify', 'it does not see the gate script, test configuration outside its patterns, or a line added to an existing test', { args: { managerMode: true } }],
+  ['verify (manager): what the guard cannot see the verifier lists itself', 'verify', 'It does not see the gate script, test configuration outside its patterns, an edit that is not committed, or a line added to an existing test', { args: { managerMode: true } }],
   ['build (self-mutation): never in the real working tree', 'build', 'Never break code in the real working tree', { args: { selfMutate: { B: 3 } } }],
   ['build (self-mutation): a collection error is not a kill', 'build', 'an import, collection or syntax error is not a kill', { args: { selfMutate: { B: 3 } } }],
   ['build (self-mutation): an old test is never edited to kill a mutant', 'build', 'Never edit a test that existed on', { args: { selfMutate: { B: 3 } } }],
@@ -580,13 +605,22 @@ const CLAUSES = [
   ['verify (manager): the builder\'s proof is a claim', 'verify', 'a Proof: line in the commit body is the builder\'s claim, not evidence', { args: { managerMode: true } }],
   ['verify (manager): the corrected tests fail against the old behaviour', 'verify', 'each must FAIL by an assertion, and one that passes still tests nothing the criterion changed', { args: { managerMode: true } }],
   ['verify (manager): and when the new behaviour is broken', 'verify', 'at least one corrected test that covers it must FAIL', { args: { managerMode: true } }],
-  ['verify (manager): never in the real tree', 'verify', 'never break code in the real tree, never git stash', { args: { managerMode: true } }],
+  ['verify (manager): every command goes through the scratch, a bare git checkout would overwrite the agent\'s own work', 'verify', 'a bare git checkout runs in your own tree and overwrites your work', { args: { managerMode: true } }],
+  ['verify (manager): a stale scratch is removed first', 'verify', 'a copy that a crashed agent left there is removed first', { args: { managerMode: true } }],
+  ['verify (manager): a run that cannot be made is a refusal that says so, never a pass', 'verify', 'that is a refusal for the owner to read, never a pass', { args: { managerMode: true } }],
+  ['verify (manager): a file the feature added is removed, not restored', 'verify', 'the checkout is all or nothing, so one new file would stop it for all', { args: { managerMode: true } }],
+  ['verify (manager): the sensor\'s cap does not bound these runs', 'verify', 'SENSOR POLICY\'s cap and a survivor\'s severity do not apply to them', { args: { managerMode: true } }],
   ['verify (manager): a corrected test that still passes is a blocker', 'verify', 'a corrected test that passes against the old behaviour or when the new behaviour is broken', { args: { managerMode: true } }],
   ['verify (manager): a pass needs the runs written down', 'verify', 'with REVOKED-TEST commits to judge and no such lines, you do not pass', { args: { managerMode: true } }],
   ['verify (manager): an edge the criterion names must fail when the threshold moves by one', 'verify', 'an edge the criterion names that no test pins — the feature\'s own new tests count — (move the threshold by one: some test must fail)', { args: { managerMode: true } }],
   ['build (manager): the corrected test keeps every input the old assertion pinned', 'build', 'still pins every input the old assertion pinned', { args: { managerMode: true } }],
   ['build (manager): new edges are pinned by tests of its own, never by widening the corrected one', 'build', 'never by widening the corrected one: the correction changes only the assertion the criterion revokes', { args: { managerMode: true } }],
-  ['build (manager): the Proof line is written by amending that commit\'s message only', 'build', 'by amending that commit\'s message only (git commit --amend)', { args: { managerMode: true } }],
+  ['build (manager): the proof is made before the correction is committed', 'build', 'Make the correction in your working tree and do not commit it yet', { args: { managerMode: true } }],
+  ['build (manager): nothing is amended or rebased', 'build', 'never by amending or rebasing a commit that is not the last', { args: { managerMode: true } }],
+  ['build (manager): a weak correction is made exact, not widened', 'build', 'make that same assertion exact (the same input, the exact value or the exact exception) until it fails', { args: { managerMode: true } }],
+  ['build (manager): the builder may say it could not run the proof', 'build', 'write Proof: not run, <why> instead of a result: the verifier then runs it', { args: { managerMode: true } }],
+  ['build (self-mutation): the pipeline\'s own uncommitted files do not block it', 'build', 'the pipeline\'s own files may sit uncommitted', { args: { selfMutate: { B: 3 } } }],
+  ['build (self-mutation): no stash', 'build', 'Never git stash.', { args: { selfMutate: { B: 3 } } }],
   ['verify (manager): a run of a broken copy must not be served from a cache', 'verify', 'when a mutant you expected to fail passes, check that the run saw the changed file before you call the test weak', { args: { managerMode: true } }],
   ['build (manager): the criterion is decided before the build', 'build', 'decided before you started — never from a spec, plan or check that you wrote on this branch', { args: { managerMode: true } }],
   ['build (manager): the first line of the commit', 'build', 'whose FIRST LINE is REVOKED-TEST', { args: { managerMode: true } }],
